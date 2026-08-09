@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "oneunit": {
+      "command": "oneunit",
+      "args": ["mcp"]
+    }
+  }
+}

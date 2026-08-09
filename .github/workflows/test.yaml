@@ -1,0 +1,14 @@
+name: Тестирование
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    uses: autumn-library/workflows/.github/workflows/test.yml@main
+    with:
+      test_engine: oneunit
+      oscript_version: stable
+      os_versions: '["ubuntu-latest", "windows-latest", "macos-latest"]'

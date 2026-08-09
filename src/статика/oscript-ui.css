@@ -1,0 +1,1541 @@
+/* oscript-ui — базовый лист UI-кита: правила его собственных примитивов.
+ *
+ * САМОДОСТАТОЧЕН. Библиотека, поставленная в чужой проект, выглядит прилично без
+ * единой строки CSS от потребителя: этот лист печатает КаркасСтраницы первым тегом
+ * <link>, спрашивая адрес у АктивыСтатики.АдресБазовогоЛиста().
+ *
+ * ПЕРЕОПРЕДЕЛЕНИЕ — КАСКАДОМ. Лист инсталляции идёт вторым, поэтому её правило той же
+ * специфичности побеждает без !important. Как проект перебивает правило, подменяет файл
+ * и меняет палитру — раздел «Переопределение» в README.
+ *
+ * ХЕШ СОДЕРЖИМОГО В АДРЕСЕ. Файл лежит на диске БЕЗ версии в имени, а отдаётся по адресу
+ * /static/oscript-ui-<хеш>.css, где хеш — префикс SHA-256 этого файла (считает
+ * ОтпечаткиСтатики). Любая правка сама меняет адрес: «правка без сброса кэша» невозможна.
+ *
+ * НИ ОДНОГО ЦВЕТА. Все значения берутся из CSS-переменных, которые сервер печатает
+ * инлайном в <head> (ТокеныТемы): тема, акцент, плотность, радиусы. Поэтому смена темы
+ * не требует ни пересборки этого файла, ни сброса его кэша.
+ *
+ * Порядок разделов: сброс → каркас → типографика → компоненты → страницы (формы, отборы,
+ * свёртки) → каркас настроек → движение.
+ */
+
+/* --- сброс --- */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+	margin: 0;
+	font-family: var(--font-body);
+	font-size: var(--font-size-body);
+	line-height: 1.55;
+	color: var(--color-text);
+	background: var(--color-bg);
+	-webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--color-accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible,
+textarea:focus-visible, summary:focus-visible {
+	outline: 2px solid var(--color-accent);
+	outline-offset: 2px;
+	border-radius: var(--radius-sm);
+}
+
+code, pre, kbd, samp { font-family: var(--font-mono); }
+
+/* --- каркас --- */
+
+.wrap {
+	max-width: var(--layout-width);
+	margin: 0 auto;
+	padding: 0 var(--space-5);
+}
+
+.top {
+	background: var(--color-surface);
+	border-bottom: 1px solid var(--color-divider);
+	padding: var(--space-3) 0;
+	position: sticky;
+	top: 0;
+	z-index: 20;
+	backdrop-filter: saturate(140%) blur(6px);
+}
+
+.top .wrap { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+
+.brand {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-2);
+	font-family: var(--font-heading);
+	font-weight: 600;
+	font-size: 17px;
+	color: var(--color-text);
+}
+.brand:hover { text-decoration: none; color: var(--color-accent); }
+/* Высота фиксирована, ширина считается по СОБСТВЕННЫМ пропорциям картинки: знак бывает
+   и квадратным (поставка), и горизонтальным с нарисованным названием (загруженный).
+   Квадратный от этого не меняется — 28 на 28 он и есть. Потолок ширины держит очень
+   длинный логотип, чтобы тот не выдавил навигацию; object-fit не даёт потолку растянуть
+   картинку — вместо искажения остаются поля. */
+.brand__mark { height: 28px; width: auto; max-width: 200px; object-fit: contain; flex: none; }
+
+.top__nav { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
+.top__link { color: var(--color-text-muted); }
+.top__link:hover { color: var(--color-text); text-decoration: none; }
+
+.who {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+	color: var(--color-text-muted);
+	font-size: var(--font-size-small);
+}
+
+main.wrap { padding-top: var(--space-6); padding-bottom: var(--space-8); min-height: 60vh; }
+
+.bottom {
+	border-top: 1px solid var(--color-divider);
+	color: var(--color-text-muted);
+	padding: var(--space-5) 0;
+	font-size: var(--font-size-small);
+	margin-top: var(--space-8);
+}
+
+/* --- типографика --- */
+
+h1, h2, h3, h4 { font-family: var(--font-heading); font-weight: var(--font-weight-heading); }
+h1 { font-size: var(--font-size-h1); margin: 0 0 var(--space-3); letter-spacing: -0.01em; }
+h2 {
+	font-size: var(--font-size-h2);
+	margin: var(--space-6) 0 var(--space-3);
+	padding-bottom: var(--space-2);
+	border-bottom: 1px solid var(--color-divider);
+}
+h3 { font-size: 16px; margin: var(--space-5) 0 var(--space-2); }
+.muted { color: var(--color-text-muted); }
+
+/* --- компонент: иконка --- */
+
+.icon {
+	width: 1em;
+	height: 1em;
+	flex: none;
+	vertical-align: -0.125em;
+}
+
+/* --- компонент: карточка --- */
+
+.card {
+	background: var(--color-surface);
+	border-radius: var(--radius-lg);
+	box-shadow: var(--shadow-sm);
+	padding: var(--space-5);
+	margin-bottom: var(--space-4);
+}
+.card__title {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	margin: 0 0 var(--space-2);
+	font-size: var(--font-size-h2);
+	border: 0;
+	padding: 0;
+}
+.card__title .icon { color: var(--color-accent); }
+.card__lead { color: var(--color-text-muted); margin: 0 0 var(--space-4); }
+/* Ритм внутри карточки — та же обязанность, что у .section__body. Тело карточки держит
+   произвольное доверенное содержимое, в том числе поля кита, и раньше ритм давали
+   маргины самих полей: в витрине кита восемь полей подряд в .card__body слиплись
+   в ноль пикселей. Маргин, а не flex+gap — по той же причине, что и у .section__body:
+   в потоке маргины детей схлопываются, а не складываются с зазором.
+
+   ОХВАТ ПРАВИЛА ПРОВЕРЕН ЧИСЛАМИ.
+   Правило кладёт margin-top ВСЕМ не-первым детям тела карточки, поэтому вопрос «не
+   поехала ли вёрстка» законный. Шаг сетки здесь не 4px, а 2.8/5.6/8.4/11.2/16.8
+   (ТокеныТемы.ШагСетки, плотность 1), то есть --space-4 = 11.2px при font-size-body 15px.
+   Считаем по факту, помня две вещи: правило трогает только ВЕРХНИЙ маргин, а маргины
+   соседей СХЛОПЫВАЮТСЯ (зазор = max, а не сумма):
+     * поля и тумблеры (собственных маргинов у них нет): 0 -> 11.2px — собственно
+       починенный дефект;
+     * <p> + <p> без класса: остаётся 15px. Правило переопределяет margin-top второго
+       абзаца, но margin-bottom первого — браузерный 1em = 15px — остаётся, и схлопывание
+       даёт max(15, 11.2) = 15px. Не «стало плотнее», а «не изменилось»;
+     * pre.code (margin-bottom space-3 = 8.4px) перед <p>: max(8.4, 11.2) = 11.2px;
+     * первый и последний ребёнок: внешние маргины сняты, чтобы не удваивать padding
+       карточки (space-5 = 16.8px).
+   ЗАЗОР ПОД ЗАГОЛОВКОМ СТАНОВИТСЯ ШИРЕ — и это единственное место, где правило не
+   только нормализует. У заголовков собственный нижний маргин МЕНЬШЕ 11.2px, а верхний
+   больше, так что правило подтягивает их сверху и раздвигает снизу:
+     * h3 (margin: space-5 0 space-2 = 16.8/5.6) — реальный непосредственный ребёнок
+       .card__body (ВитринаКита.os: заголовки блоков витрины): сверху 16.8 -> 11.2,
+       снизу max(5.6, 11.2) = 11.2 (+5.6). Заголовок становится равноудалён от соседей
+       сверху и снизу — практически это ровнее, а не поломка;
+     * h1 (margin-bottom space-3 = 8.4) и h2 (space-6 0 space-3 = 22.4/8.4) — так же:
+       снизу 8.4 -> 11.2.
+   АТОМАРНОМУ ИНЛАЙНУ (inline-block, inline-flex — такова .tag) ЭТОТ МАРГИН УХОДИТ
+   В ВЫСОТУ СТРОЧНОГО БОКСА и опускает всю строку вместе с собой; настоящий inline
+   вертикальный маргин игнорирует. Поэтому ряд инлайновых элементов печатается ОДНИМ
+   ребёнком тела (.tag-row), а не несколькими. Одиночный атомарный инлайн после
+   заголовка — законный случай (витрина кита): там маргин отбивает образец от подписи
+   своего блока.
+   Сужать правило нельзя: «> * + *» владеет интервалом между ЛЮБЫМИ соседями тела,
+   а «> .field + .field» не покрывает даже пару .field + .toggle — стоит поставить
+   тумблер между двумя полями, и зазор в этом месте пропадёт. */
+.card__body > * + * { margin-top: var(--space-4); }
+.card__body > :first-child { margin-top: 0; }
+.card__body > :last-child { margin-bottom: 0; }
+.card__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-2);
+	margin-top: var(--space-4);
+	padding-top: var(--space-4);
+	border-top: 1px solid var(--color-divider);
+}
+/* Карточка В ЯЧЕЙКЕ СЕТКИ — колонка на всю высоту ряда; лекарство то же, что у .objcard.
+   Ячейка сетки высоту ряда получает (align-items: stretch), а карточка внутри неё росла
+   только под своё содержимое: в ряду карточек описание в три строки опускало разделитель
+   и кнопку на 23 px ниже, чем у соседей, и ряд разъезжался. height: 100% выравнивает
+   коробки, margin-top: auto ставит полосу действий на одну линию у всех.
+   Собственный нижний маргин карточки в сетке лишний вдвойне: интервал между рядами
+   держит gap сетки, а внутри ячейки он не давал карточке дойти до низа.
+   Зазор над разделителем не теряется: маргины флекс-элементов не схлопываются, и
+   нижний маргин .card__lead (space-4) даёт ровно тот же отступ, что схлопывание давало
+   в потоке. Вне сетки правило молчит — одиночной карточке не во что тянуться. */
+.grid__cell > .card {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	margin-bottom: 0;
+}
+.grid__cell > .card > .card__actions { margin-top: auto; }
+
+/* --- компонент: поле ---
+
+   ИНТЕРВАЛ МЕЖДУ ПОЛЯМИ ДАЁТ КОНТЕЙНЕР, А НЕ ПОЛЕ.
+   Было: у .field и .toggle стоял margin-bottom: space-4, и он СКЛАДЫВАЛСЯ с gap
+   контейнера — формы дышали двойным ритмом 16+12 px, причём величина зависела
+   от того, в какой контейнер поле попало. Заодно это ломало выравнивание в .filters:
+   align-items: flex-end равняет МАРГИН-БОКСЫ, поэтому нижний отступ поля опускал его
+   контрол на 16 px выше базовой линии кнопки рядом. Один владелец интервала
+   (контейнер) лечит и то, и то.
+
+   ПОЛНОТА ДЕРЖИТСЯ НЕ СПИСКОМ.
+   Первая редакция этого правила называла три контейнера (.form-stack, .filters,
+   .from-config) и этим создала впечатление полноты: тело секции настроек
+   (.section__body), где лежит большинство полей приложения, в список не попало
+   и осталось без ритма — три поля подряд слиплись в ноль пикселей. Обязанность
+   формулируется поэтому не перечнем, а правилом: КАЖДЫЙ элемент, внутри которого
+   печатается больше одного .field/.toggle, обязан задать интервал сам. Новый
+   контейнер подпадает под правило сразу, без правки этого комментария.
+
+   Контейнер, в котором поле ОДНО по конструкции (.filters, .from-config), интервалом
+   между полями не владеет, но gap ему всё равно нужен: он разводит поле с кнопкой
+   отбора и с подписью источника. Задавая gap, не забудь про display: flex — без
+   flex-контекста gap инертен, и правило выглядит рабочим, ничего не делая. */
+
+.field { display: flex; flex-direction: column; gap: var(--space-1); }
+.field__label { font-size: var(--font-size-small); color: var(--color-text-muted); }
+.field__control {
+	width: 100%;
+	padding: var(--space-2) var(--space-3);
+	font: inherit;
+	color: var(--color-text);
+	background: var(--color-surface-alt);
+	border: 1px solid var(--color-divider);
+	border-radius: var(--radius-md);
+	transition: border-color var(--motion-fast) var(--motion-ease),
+	            box-shadow var(--motion-fast) var(--motion-ease);
+}
+.field__control:hover:not([disabled]) { border-color: var(--color-accent); }
+.field__control[disabled], .field__control[readonly] {
+	color: var(--color-text-muted);
+	cursor: not-allowed;
+}
+.field__hint { font-size: var(--font-size-small); color: var(--color-text-muted); }
+.field__error { font-size: var(--font-size-small); color: var(--color-danger); }
+.field--error .field__control { border-color: var(--color-danger); }
+.field--check { flex-direction: row; align-items: center; gap: var(--space-2); }
+.field--check .field__label { color: var(--color-text); }
+.field__check { width: 16px; height: 16px; accent-color: var(--color-accent); }
+textarea.field__control { min-height: calc(var(--space-8) * 2); resize: vertical; }
+
+/* Группа полей <fieldset><legend> — тоже КОНТЕЙНЕР полей, а значит владелец интервала:
+   без этого правила три флажка подряд внутри группы слипаются в ноль пикселей.
+   Правило висит на ТЕГЕ, а не на классе: fieldset группирует поля семантикой,
+   и требовать от разметки лишний класс не за что.
+   Маргин, а не flex+gap: display:flex у fieldset выбивает <legend> из его собственного
+   способа отрисовки (легенда становится обычным flex-элементом и уезжает из рамки). */
+fieldset > * + * { margin-top: var(--space-2); }
+
+/* --- компонент: тумблер (поле из двух состояний) ---
+   Без JS: всё держится на :checked у настоящего <input type="checkbox">. Флажок НЕ
+   скрыт через display:none — иначе он выпал бы из порядка фокуса и тумблер перестал
+   бы переключаться пробелом; он прозрачен и растянут поверх дорожки. */
+
+/* интервал снизу не ставим — его даёт контейнер (см. комментарий у .field) */
+.toggle { display: flex; flex-direction: column; gap: var(--space-1); }
+.toggle__box { display: flex; align-items: center; gap: var(--space-3); cursor: pointer; }
+.toggle__input {
+	position: absolute;
+	width: 44px; height: 24px;
+	margin: 0;
+	opacity: 0;
+	cursor: pointer;
+}
+.toggle__track {
+	position: relative;
+	flex: 0 0 auto;
+	width: 44px; height: 24px;
+	border-radius: 999px;
+	background: var(--color-surface-alt);
+	border: 1px solid var(--color-divider);
+	transition: background var(--motion-fast) var(--motion-ease),
+	            border-color var(--motion-fast) var(--motion-ease);
+}
+.toggle__thumb {
+	position: absolute;
+	top: 2px; left: 2px;
+	width: 18px; height: 18px;
+	border-radius: 50%;
+	background: var(--color-text-muted);
+	transition: transform var(--motion-fast) var(--motion-ease),
+	            background var(--motion-fast) var(--motion-ease);
+}
+.toggle__input:checked + .toggle__track { background: var(--color-accent); border-color: var(--color-accent); }
+.toggle__input:checked + .toggle__track .toggle__thumb { transform: translateX(20px); background: var(--color-accent-contrast); }
+.toggle__input:focus-visible + .toggle__track { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.toggle__input[disabled] { cursor: not-allowed; }
+.toggle__input[disabled] + .toggle__track { opacity: .55; }
+.toggle__input[disabled] ~ .toggle__text { color: var(--color-text-muted); }
+.toggle__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.toggle__label { color: var(--color-text); }
+.toggle__state { font-size: var(--font-size-small); color: var(--color-text-muted); }
+.toggle__hint { font-size: var(--font-size-small); color: var(--color-text-muted); }
+
+/* --- компонент: проводник (шаги с отметкой пройденного и текущего) --- */
+
+.guide__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.guide__step {
+	display: flex;
+	gap: var(--space-3);
+	padding: var(--space-3);
+	border: 1px solid var(--color-divider);
+	border-radius: var(--radius-md);
+	background: var(--color-surface-alt);
+}
+.guide__step--done { border-color: var(--color-success); }
+.guide__step--current { border-color: var(--color-accent); box-shadow: var(--shadow-sm); }
+.guide__mark { flex: 0 0 auto; color: var(--color-text-muted); }
+.guide__step--done .guide__mark { color: var(--color-success); }
+.guide__body { min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.guide__title { font-weight: 600; }
+.guide__hint { color: var(--color-text-muted); font-size: var(--font-size-small); }
+.guide__progress { color: var(--color-text-muted); font-size: var(--font-size-small); margin: 0 0 var(--space-3); }
+pre.code {
+	margin: 0 0 var(--space-3);
+	padding: var(--space-3);
+	overflow-x: auto;
+	background: var(--color-surface-alt);
+	border: 1px solid var(--color-divider);
+	border-radius: var(--radius-md);
+	font-size: var(--font-size-small);
+}
+
+/* --- компонент: поле из конфига --- */
+
+.from-config {
+	/* контейнер сам держит интервал между полем, источником и ENV-сниппетом:
+	   раньше это делал margin-bottom у вложенного .field, и величина отступа зависела
+	   от порядка правил, а не от того, что внутри */
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+	border: 1px dashed var(--color-divider);
+	border-radius: var(--radius-md);
+	padding: var(--space-4);
+	margin-bottom: var(--space-4);
+	background: var(--color-surface-alt);
+}
+.from-config__source {
+	display: inline-flex;
+	/* в flex-колонке .from-config элемент растянулся бы на всю ширину: подпись
+	   источника должна занимать ровно свой текст */
+	align-self: flex-start;
+	align-items: center;
+	gap: var(--space-1);
+	font-size: var(--font-size-small);
+	color: var(--color-text-muted);
+}
+.from-config__env {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	padding: var(--space-2) var(--space-3);
+	background: var(--color-bg);
+	border-radius: var(--radius-md);
+	overflow-x: auto;
+}
+.from-config__env code { font-size: var(--font-size-small); white-space: nowrap; }
+
+/* --- источник значения настройки: дефолт / база / конфигурация --- */
+
+.note-origin {
+	/* строка идёт СРАЗУ ПОД своим полем и подписана ключом настройки: у каждого
+	   значения виден его собственный источник, а не «источник где-то рядом» */
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	margin: calc(-1 * var(--space-2)) 0 var(--space-4);
+	font-size: var(--font-size-small);
+	color: var(--color-text-muted);
+}
+.text-key code { font-size: var(--font-size-small); white-space: nowrap; }
+
+/* Показ загруженной картинки оформления: те же правила, что и у знака в шапке, только
+   крупнее — высота фиксирована, ширина по пропорциям, потолок держит очень длинный
+   логотип, чтобы он не растянул таблицу и не увёл колонку с кнопкой за край экрана. */
+.image-preview {
+	height: 32px;
+	width: auto;
+	max-width: 240px;
+	object-fit: contain;
+	vertical-align: middle;
+	margin-right: var(--space-2);
+}
+
+/* --- компонент: таблица --- */
+
+.table-scroll { overflow-x: auto; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
+table, .table {
+	border-collapse: collapse;
+	width: 100%;
+	background: var(--color-surface);
+}
+th, td {
+	text-align: left;
+	padding: var(--space-3) var(--space-4);
+	border-bottom: 1px solid var(--color-divider);
+	font-size: 14px;
+}
+th {
+	font-family: var(--font-heading);
+	font-weight: var(--font-weight-heading);
+	color: var(--color-text-muted);
+	background: var(--color-surface-alt);
+}
+tr:last-child td { border-bottom: none; }
+tbody tr { transition: background var(--motion-fast) var(--motion-ease); }
+tbody tr:hover { background: var(--color-surface-alt); }
+caption { text-align: left; padding: var(--space-3) var(--space-4); color: var(--color-text-muted); }
+.note-empty { color: var(--color-text-muted); font-style: italic; }
+
+/* Строка-разворот: печатается следующим за записью <tr> во всю ширину таблицы.
+   Пара «запись + разворот» — ОДНА запись: разделитель между ними снят, отступ сверху
+   у разворота тоже, и подсветка записи забирает обе строки. */
+.table__record > td { border-bottom: none; }
+.table__expand > td { padding-top: 0; }
+tbody tr.table__record:hover + .table__expand { background: var(--color-surface-alt); }
+
+/* --- компонент: тост --- */
+
+.toast {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	padding: var(--space-3) var(--space-4);
+	border-radius: var(--radius-md);
+	margin: var(--space-3) 0;
+	font-size: 14px;
+	border: 1px solid var(--color-divider);
+	animation: ui-toast var(--motion-slow) var(--motion-ease);
+}
+.toast .icon { width: 18px; height: 18px; }
+.toast__title { font-family: var(--font-heading); font-weight: var(--font-weight-heading); }
+.toast__text { flex: 1; }
+.toast__close { background: none; border: 0; color: inherit; cursor: pointer; padding: 0; }
+.toast--ok { background: var(--color-success-bg); border-color: var(--color-success); color: var(--color-success); }
+.toast--warn { background: var(--color-warning-bg); border-color: var(--color-warning); color: var(--color-warning); }
+.toast--err { background: var(--color-danger-bg); border-color: var(--color-danger); color: var(--color-danger); }
+.toast--info { background: var(--color-surface); color: var(--color-text-muted); }
+
+/* --- компонент: плашка --- */
+
+.tag {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+	padding: 2px var(--space-3);
+	border-radius: 999px;
+	font-size: 12px;
+	background: var(--color-surface-alt);
+	border: 1px solid var(--color-divider);
+	color: var(--color-text-muted);
+	margin-right: var(--space-1);
+}
+a.tag:hover { text-decoration: none; border-color: var(--color-accent); color: var(--color-text); }
+.tag--accent { border-color: var(--color-accent); color: var(--color-accent); }
+.tag--ok { border-color: var(--color-success); color: var(--color-success); }
+.tag--warn { border-color: var(--color-warning); color: var(--color-warning); }
+.tag--err { border-color: var(--color-danger); color: var(--color-danger); }
+/* Ряд плашек — ОДИН элемент, а не соседние дети контейнера. Плашка — атомарный инлайн
+   (inline-flex), и вертикальный маргин, который контейнер ритма даёт своим детям как
+   блокам (.card__body > * + *), уходит ей в высоту строчного бокса: строка опускается,
+   а контейнер растёт. Зазор внутри ряда — тот же, что у .objcard__chips и .objhead__chips. */
+.tag-row { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+
+/* --- компонент: дерево разделов --- */
+
+.tree { min-width: 0; }
+.tree__list { list-style: none; margin: 0; padding: 0; }
+.tree--row > .tree__list { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.tree--column > .tree__list { display: flex; flex-direction: column; gap: 2px; }
+.tree__item { min-width: 0; }
+.tree__link {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+	padding: var(--space-1) var(--space-3);
+	border-radius: var(--radius-md);
+	color: var(--color-text-muted);
+	font-size: 14px;
+	transition: background var(--motion-fast) var(--motion-ease),
+	            color var(--motion-fast) var(--motion-ease);
+}
+.tree__link:hover { color: var(--color-text); background: var(--color-surface-alt); text-decoration: none; }
+.tree__link--active { color: var(--color-accent); background: var(--color-surface-alt); }
+.tree--column .tree__link { display: flex; }
+.tree--column .tree__list--1 { margin-left: var(--space-4); }
+.office-nav {
+	margin: 0 0 var(--space-5);
+	padding-bottom: var(--space-3);
+	border-bottom: 1px solid var(--color-divider);
+}
+
+/* --- компонент: панель сохранения --- */
+
+.savebar {
+	position: sticky;
+	bottom: 0;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-4);
+	flex-wrap: wrap;
+	margin-top: var(--space-5);
+	padding: var(--space-3) var(--space-4);
+	background: var(--color-surface);
+	border-top: 1px solid var(--color-divider);
+	border-radius: var(--radius-md);
+	box-shadow: var(--shadow-md);
+	transition: box-shadow var(--motion-medium) var(--motion-ease);
+}
+.savebar__note { color: var(--color-text-muted); font-size: var(--font-size-small); }
+.savebar__actions { display: flex; gap: var(--space-2); align-items: center; }
+
+/* --- компонент: кнопка ---
+   Вид задаётся модификатором, а не наличием элемента. Ловушка, которую это лечит:
+   `.button--primary` печатался разметкой, но правила для него НЕ БЫЛО — класс молча
+   падал на базовый `.button`, и кнопка выглядела правильно ровно потому, что базовый
+   вид совпадал с первичным. Поэтому у каждого варианта есть собственное правило:
+   класса без правила и правила без класса в этом листе не бывает. */
+
+.button {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+	padding: var(--space-2) var(--space-4);
+	font: inherit;
+	font-size: 14px;
+	border-radius: var(--radius-md);
+	border: 1px solid var(--color-accent);
+	background: var(--color-accent);
+	color: var(--color-accent-contrast);
+	cursor: pointer;
+	white-space: nowrap;
+	transition: filter var(--motion-fast) var(--motion-ease),
+	            border-color var(--motion-fast) var(--motion-ease);
+}
+.button:hover {
+	filter: brightness(1.08);
+	text-decoration: none;
+}
+.button[disabled], .button[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
+.button--primary { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-accent-contrast); }
+.button--ghost {
+	background: transparent;
+	border-color: var(--color-divider);
+	color: var(--color-text-muted);
+}
+.button--ghost:hover { color: var(--color-text); }
+.button--danger { background: var(--color-danger); border-color: var(--color-danger); color: var(--color-bg); }
+.button--link {
+	background: none;
+	border-color: transparent;
+	color: var(--color-accent);
+	padding-left: 0;
+	padding-right: 0;
+}
+.button--link:hover { text-decoration: underline; filter: none; }
+.button--sm { padding: 2px var(--space-3); font-size: 12px; }
+.button--lg { padding: var(--space-3) var(--space-5); font-size: 16px; }
+/* Кнопка во всю ширину живёт в вертикальном перечне, а не в ряду действий: подпись
+   здесь переносится, иначе на узком экране длинная надпись выезжает за контейнер. */
+.button--block { display: flex; width: 100%; justify-content: center; white-space: normal; }
+.button--busy { cursor: progress; }
+/* Кнопка-иконка: подпись у неё есть, но живёт в aria-label — значит нужен квадрат под
+   иконку, а не прямоугольник под текст. Поворот на наведении — движение 120 мс;
+   глобальное правило в конце файла гасит его при prefers-reduced-motion,
+   а собственное правило ниже снимает и конечное состояние, иначе иконка осталась бы
+   повёрнутой рывком. */
+/* Картинка кнопки (произвольный значок вместо глифа набора) занимает РОВНО ту же
+   коробку, что иконка набора (.icon): сторона в 1em и flex: none — иначе она тянется
+   вместе с подписью, перерастает текст и меняет высоту кнопки. */
+.button__pic { width: 1em; height: 1em; flex: none; vertical-align: -0.125em; }
+
+.button--icon { padding: var(--space-1); }
+.button--icon .icon { width: 18px; height: 18px; transition: transform var(--motion-fast) var(--motion-ease); }
+.button--icon:hover .icon { transform: rotate(20deg); }
+
+/* --- меню строки -------------------------------------------------------------------
+   Панель меню лежит в ВЕРХНЕМ СЛОЕ браузера: у панели атрибут popover, у кнопки —
+   popovertarget с её идентификатором. Из потока панель вынута, поэтому строка таблицы
+   от неё не растёт и соседние строки не сдвигаются; предок с overflow (обёртка прокрутки
+   таблицы) её не обрезает. Открытие, закрытие щелчком мимо и по Esc, возврат фокуса
+   на кнопку — работа движка: JS здесь нет вовсе. Браузер, который верхнего слоя не знает,
+   атрибут popover игнорирует — панель остаётся видимой на своём месте в потоке, то есть
+   деградирует в прежнее поведение, а не в пустой экран. */
+
+.menu { display: inline-block; }
+
+/* Вид панели — безусловный, место — только там, где браузер знает верхний слой. Без него
+   панель остаётся ОБЫЧНЫМ блоком в потоке ячейки: видна на месте со всеми пунктами, как
+   раскрытая раскрывашка до перехода. Вырви её из потока безусловно — старый движок
+   показал бы её обрезанной обёрткой прокрутки или вовсе за краем экрана. */
+.menu__panel {
+	margin: var(--space-1) 0 0 0;
+	width: max-content;
+	max-width: 16rem;
+	padding: var(--space-3);
+	flex-direction: column;
+	gap: var(--space-2);
+	background: var(--color-surface);
+	border: 1px solid var(--color-divider);
+	border-radius: var(--radius-md);
+	box-shadow: var(--shadow-md);
+}
+
+@supports selector(:popover-open) {
+
+	/* Место панели — под кнопкой, которая её открыла. Имени привязки не нужно: кнопка
+	   названа в popovertarget, и она же становится якорем панели. `inset: auto` снимает
+	   раскладку UA-стиля (`inset: 0` вместе с `margin: auto` ставит popover по центру
+	   экрана), поэтому стоит ПЕРЕД top/right: сокращённая запись обнулила бы их.
+
+	   Панель растёт ВЛЕВО от правого края кнопки: меню стоит в последней колонке таблицы,
+	   и растущая вправо вылезала бы за край экрана. Если места не хватит и так, браузер
+	   отзеркалит её сам — на это стоит position-try-fallbacks. */
+	.menu__panel {
+		position: absolute;
+		inset: auto;
+		top: anchor(bottom);
+		right: anchor(right);
+		position-try-fallbacks: flip-inline, flip-block;
+	}
+
+	/* display достаётся ТОЛЬКО открытой панели: авторское правило сильнее UA-стиля
+	   `[popover]:not(:popover-open) { display: none }`, и безусловный display оставил бы
+	   панель раскрытой навсегда. */
+	.menu__panel:popover-open { display: flex; }
+
+	/* Движок знает верхний слой, но не знает привязки к якорю: панель встаёт по центру
+	   экрана — всё так же поверх таблицы и всё так же по одной за раз. */
+	@supports not (top: anchor(bottom)) {
+		.menu__panel { position: fixed; inset: auto; top: 30vh; left: 50%; translate: -50% 0; }
+	}
+
+}
+
+.menu__form { display: flex; flex-direction: column; gap: var(--space-2); }
+
+/* Набор полей одного варианта: невыбранный уезжает под `disabled hidden`, поэтому
+   собственной рамки и отступов у набора нет — в колонке полей он прозрачен
+   для раскладки. */
+.field-set { border: 0; padding: 0; margin: 0; min-width: 0; }
+.field-set[hidden] { display: none; }
+
+/* Крестик снятия печатается ВНУТРИ плашки (компонент «Плашка», поле Действие): их
+   связку держит рамка самой плашки, поэтому перенос строки не может оторвать крестик
+   от своей метки. Интервал до крестика даёт gap самой плашки. */
+.tag__action { display: inline-flex; align-items: center; }
+
+/* Крестик — служебная деталь ПРИ плашке, а не самостоятельная кнопка рядом с ней.
+   Кит даёт ему полный набор кнопки (рамка, свой акцентный цвет, глиф 18px, поворот
+   на наведении) — здесь всё это снимается: без такого сброса связка читалась как
+   «плашка и случайно оказавшаяся рядом кнопка».
+
+   Цвет НЕ наследуется от плашки сознательно: у вариантов плашки свои цвета, а крестик
+   служебный и обязан оставаться контрастным в обеих темах — поэтому он берёт
+   --color-text-muted, а не currentColor. */
+.tag__action .button {
+	padding: 0 2px;
+	border: 0;
+	background: none;
+	border-radius: var(--radius-sm);
+	color: var(--color-text-muted);
+	/* .7, а не «поглуше»: на поверхности карточки более низкое значение уводит глиф
+	   ниже 3:1, а это нетекстовый элемент управления. */
+	opacity: .7;
+	transition: opacity var(--motion-fast) var(--motion-ease),
+	            color var(--motion-fast) var(--motion-ease);
+}
+
+/* 12px вместо кнопочных 18px: прежний глиф был шире всей подписи короткой плашки
+   и спорил с её текстом за внимание. */
+.tag__action .button .icon { width: 12px; height: 12px; }
+
+.tag__action .button:hover {
+	opacity: 1;
+	filter: none;
+	color: var(--color-text);
+	background: var(--color-surface-alt);
+}
+
+/* Фокус обязателен: это кнопка, по ней ходят с клавиатуры. Обводка от глобального
+   правила, здесь только прижатый offset — вокруг 12-пиксельного глифа зазор в 2px
+   выглядит нимбом. */
+.tag__action .button:focus-visible { opacity: 1; color: var(--color-text); outline-offset: 1px; }
+
+/* Поворот крестика на наведении читается как «закрыть окно», а не «снять плашку». */
+.tag__action .button:hover .icon { transform: none; }
+
+/* --- студия: поля слева, образец справа -----------------------------------------
+   Образец — серверный рендер того же компонента при любой перерисовке страницы: это
+   и есть путь без скрипта. Прогрессивное улучшение лишь перерисовывает тот же образец
+   по вводу; разметку и цвета печатает сервер.
+
+   flex-wrap, а не grid с двумя колонками: колонка образца обязана уезжать ПОД поля
+   на узком экране, а без медиазапроса grid этого не умеет. Интервал между полями
+   даёт .studio__work — он и есть тот контейнер-владелец интервала, о котором говорит
+   комментарий у .field. */
+.studio { display: flex; flex-wrap: wrap; gap: var(--space-5); align-items: flex-start; }
+
+.studio__work {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-3);
+	flex: 1 1 20rem;
+	min-width: 0;
+}
+
+.studio__sample {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+	flex: 0 1 14rem;
+	padding: var(--space-4);
+	background: var(--color-surface-alt);
+	border: 1px solid var(--color-divider);
+	border-radius: var(--radius-md);
+}
+
+/* Ряд, прижатый к правому краю: вторичное действие формы стоит там же, где кнопки
+   панели сохранения. Отбивку сверху даёт ритм контейнера (.section__body > * + *). */
+.row-end { display: flex; justify-content: flex-end; }
+
+/* Нативная пипетка рисует сплошную заливку во всю площадь ввода: у поля кита
+   с его паддингом она выглядела бы серой рамкой вокруг цветного пятна. */
+input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: pointer; }
+
+/* Подпись только для скринридера: видимая часть меню — символ «⋯», и без текстовой
+   пары кнопка безымянна (та же беда, что у кнопки-иконки в ките). */
+.visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+	border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.button--icon:hover .icon { transform: none; }
+}
+
+/* --- переключатель темы ---
+   Не слово в шапке, а кнопка-иконка кита (вариант «только иконка»): солнце или луна
+   по ТЕКУЩЕЙ теме, которую печатает сервер. Форма POST-ит смену, поэтому переключатель
+   работает без единой строки JS. Оформление кнопки берётся у кита (.button--icon),
+   собственного здесь ровно одно правило — раскладка формы. */
+
+.theme-toggle { display: inline-flex; margin: 0; }
+
+/* --- компонент: блок команды --- */
+
+.cmd__note { color: var(--color-text-muted); font-size: var(--font-size-small); margin: 0 0 var(--space-2); }
+.cmd {
+	display: flex;
+	/* flex-start, а не center: у многострочного сниппета центрирование уводило
+	   кнопку копирования на середину блока */
+	align-items: flex-start;
+	gap: var(--space-2);
+	background: var(--color-surface-alt);
+	border: 1px solid var(--color-divider);
+	border-radius: var(--radius-md);
+	padding: var(--space-2) var(--space-3);
+	overflow-x: auto;
+}
+/* ОДНО правило на .cmd code, и в нём pre-wrap.
+   Регрессия, которую это лечит: правил было ДВА — первое ставило pre-wrap ради
+   многострочного сниппета, второе (ниже по файлу, та же специфичность) перебивало его
+   на nowrap. Побеждало второе, и многострочный сниппет печатался одной строкой.
+   Не «поправить второе», а слить в одно: два правила на один селектор — это и есть
+   механизм, которым дефект вернётся. */
+.cmd code { font-size: 14px; white-space: pre-wrap; tab-size: 4; }
+.cmd .copy, .from-config__env .copy {
+	margin-left: auto;
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+	border: 1px solid var(--color-divider);
+	background: var(--color-surface);
+	color: var(--color-text-muted);
+	border-radius: var(--radius-sm);
+	padding: 2px var(--space-3);
+	cursor: pointer;
+	font: inherit;
+	font-size: 12px;
+	white-space: nowrap;
+	transition: color var(--motion-fast) var(--motion-ease),
+	            border-color var(--motion-fast) var(--motion-ease);
+}
+.cmd .copy:hover, .from-config__env .copy:hover { color: var(--color-text); border-color: var(--color-accent); }
+
+/* --- компонент: табы ---
+   Вкладка — обычная ссылка на свой URL, активная помечена aria-current="page":
+   подсветка берётся из атрибута, а не из отдельного состояния на JS. */
+
+.tabs { margin: var(--space-4) 0; border-bottom: 1px solid var(--color-divider); }
+.tabs__list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.tabs__item { min-width: 0; }
+.tabs__link {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+	padding: var(--space-2) var(--space-3);
+	color: var(--color-text-muted);
+	border-bottom: 2px solid transparent;
+	margin-bottom: -1px;
+	transition: color var(--motion-fast) var(--motion-ease),
+	            border-color var(--motion-fast) var(--motion-ease);
+}
+.tabs__link:hover { color: var(--color-text); text-decoration: none; }
+.tabs__link--active { color: var(--color-accent); border-bottom-color: var(--color-accent); }
+.tabs__link--plain { cursor: default; }
+.tabs--settings { margin-top: 0; }
+.tabs__count {
+	font-size: 12px;
+	padding: 0 var(--space-2);
+	border-radius: 999px;
+	background: var(--color-surface-alt);
+	color: var(--color-text-muted);
+}
+
+/* --- компонент: пустое состояние --- */
+
+.empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--space-2);
+	text-align: center;
+	padding: var(--space-6) var(--space-5);
+	border: 1px dashed var(--color-divider);
+	border-radius: var(--radius-lg);
+	color: var(--color-text-muted);
+}
+.empty__icon { font-size: 28px; line-height: 1; color: var(--color-text-muted); }
+.empty__title { margin: 0; font-family: var(--font-heading); font-size: 16px; color: var(--color-text); }
+.empty__text { margin: 0; max-width: 60ch; }
+.empty__action { margin-top: var(--space-2); }
+.empty--compact { padding: var(--space-4) var(--space-3); gap: var(--space-1); }
+.empty--compact .empty__icon { font-size: 18px; }
+
+/* --- компонент: опасная зона ---
+   Формы компонент не печатает (вложенная форма — невалидный HTML): он живёт внутри
+   формы секции настроек и добавляет к ней подтверждение и опасную кнопку. */
+
+.danger-zone {
+	border: 1px solid var(--color-danger);
+	border-radius: var(--radius-lg);
+	background: var(--color-danger-bg);
+	padding: var(--space-5);
+	margin: var(--space-4) 0;
+}
+.danger-zone__head { margin-bottom: var(--space-3); }
+.danger-zone__title {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	margin: 0;
+	font-size: var(--font-size-h2);
+	color: var(--color-danger);
+}
+.danger-zone__text { margin: var(--space-2) 0 0; color: var(--color-text); max-width: 70ch; }
+.danger-zone__body > :first-child { margin-top: 0; }
+.danger-zone__confirm { margin-top: var(--space-3); max-width: 420px; }
+.danger-zone__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+/* --- компонент: шапка объекта --- */
+
+.objhead { margin-bottom: var(--space-5); }
+.objhead__top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
+.objhead__title { display: flex; align-items: baseline; gap: var(--space-2); margin: 0; flex-wrap: wrap; }
+.objhead__title .icon { color: var(--color-accent); align-self: center; }
+.objhead__kind {
+	font-size: var(--font-size-small);
+	font-family: var(--font-body);
+	font-weight: 400;
+	color: var(--color-text-muted);
+}
+.objhead__actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.objhead__chips { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-top: var(--space-2); }
+.objhead__lead { color: var(--color-text-muted); margin: var(--space-2) 0 0; max-width: 70ch; }
+.objhead__meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-1) var(--space-3);
+	margin-top: var(--space-2);
+	color: var(--color-text-muted);
+	font-size: var(--font-size-small);
+}
+/* Разделитель — флекс-элемент строки, поэтому к его margin добавляется gap строки:
+   вместе они дают тот же отступ, что был у ряда без значков. */
+.objhead__meta-item { display: inline-flex; align-items: center; gap: var(--space-1); }
+.objhead__meta-item + .objhead__meta-item::before { content: "·"; margin-right: var(--space-2); }
+.objhead__cmd { margin-top: var(--space-4); }
+
+/* --- компонент: карточка объекта --- */
+
+.objcard-list { display: flex; flex-direction: column; gap: var(--space-3); }
+/* Три части в колонку: заголовок, описание, метаданные. Метаданные прижаты к низу
+   (margin-top: auto), поэтому в ряду карточек они стоят на одной линии независимо от
+   длины описания. height: 100% работает только в ячейке сетки (там высота ряда задана);
+   в .objcard-list высоты нет, и правило молчит. */
+.objcard {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	background: var(--color-surface);
+	border-radius: var(--radius-lg);
+	box-shadow: var(--shadow-sm);
+	padding: var(--space-4) var(--space-5);
+	transition: box-shadow var(--motion-fast) var(--motion-ease);
+}
+.objcard:hover { box-shadow: var(--shadow-md); }
+/* Строка заголовка не переносится: плашка состояния и кнопки держат свою ширину, а имя
+   объекта усекается многоточием — длинное имя больше не ломает ряд. */
+.objcard__head { display: flex; align-items: center; gap: var(--space-3); flex-wrap: nowrap; }
+.objcard__name {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	margin: 0;
+	font-size: 16px;
+	min-width: 0;
+	flex: 1 1 auto;
+	overflow: hidden;
+}
+.objcard__name .icon { color: var(--color-accent); flex: 0 0 auto; }
+.objcard__name a { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.objcard__chips { display: flex; gap: var(--space-1); flex: 0 0 auto; }
+.objcard__actions { margin-left: auto; display: flex; gap: var(--space-2); flex: 0 0 auto; }
+/* Описание — ровно две строки с многоточием: карточка перестаёт расти под текст, а ряд
+   остаётся ровным. Обрезает БРАУЗЕР по строкам, сервер отдаёт описание целиком. */
+.objcard__desc {
+	color: var(--color-text-muted);
+	margin: var(--space-1) 0 0;
+	font-size: 13px;
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+	overflow: hidden;
+}
+.objcard__meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-1) var(--space-3);
+	margin-top: auto;
+	padding-top: var(--space-2);
+	color: var(--color-text-muted);
+	font-size: 12px;
+}
+/* Значок вместо слова-подписи: пара «значок + значение» не разрывается переносом, а сам
+   ряд переносится по элементам. Цвет значка — унаследованный muted ряда, своего у него
+   нет; размер чуть крупнее текста ряда, иначе контур не читается. Слово-подпись остаётся
+   в разметке визуально скрытой парой (.visually-hidden) — её читает скринридер. */
+.objcard__meta-item {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+	white-space: nowrap;
+}
+.objcard__meta-item .icon,
+.objhead__meta-item .icon { width: 14px; height: 14px; }
+
+/* --- компонент: пагинация --- */
+
+.pagination {
+	display: flex;
+	align-items: center;
+	gap: var(--space-3);
+	margin-top: var(--space-5);
+	flex-wrap: wrap;
+}
+.pagination__link {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+	padding: var(--space-1) var(--space-3);
+	border: 1px solid var(--color-divider);
+	border-radius: var(--radius-md);
+	color: var(--color-text-muted);
+	transition: color var(--motion-fast) var(--motion-ease),
+	            border-color var(--motion-fast) var(--motion-ease);
+}
+.pagination__link:hover { color: var(--color-text); border-color: var(--color-accent); text-decoration: none; }
+.pagination__link--prev { margin-right: auto; }
+.pagination__link--next { margin-left: auto; }
+.pagination__status { color: var(--color-text-muted); font-size: var(--font-size-small); }
+
+/* --- компонент: плитка показателя ---
+   Плитка кликабельна целиком (вариант .tile--link), а не только её значение: показатель,
+   от которого нельзя перейти к стоящим за ним данным, — украшение, а не навигация. */
+
+.tile {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	background: var(--color-surface);
+	border: 1px solid var(--color-divider);
+	border-radius: var(--radius-lg);
+	box-shadow: var(--shadow-sm);
+	padding: var(--space-4) var(--space-5);
+	min-width: 140px;
+	color: var(--color-text);
+	transition: box-shadow var(--motion-fast) var(--motion-ease),
+	            border-color var(--motion-fast) var(--motion-ease);
+}
+.tile__value {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	font-family: var(--font-heading);
+	font-size: var(--font-size-h1);
+	line-height: 1.1;
+}
+.tile__value .icon { color: var(--color-accent); font-size: var(--font-size-body); }
+.tile__label { color: var(--color-text-muted); font-size: var(--font-size-small); }
+.tile__hint { color: var(--color-text-muted); font-size: 12px; }
+.tile--link:hover { text-decoration: none; border-color: var(--color-accent); box-shadow: var(--shadow-md); }
+.tile--ok .tile__value { color: var(--color-success); }
+.tile--warn .tile__value { color: var(--color-warning); }
+.tile--err .tile__value { color: var(--color-danger); }
+.tile--accent .tile__value { color: var(--color-accent); }
+
+/* --- ряд плашек в строку и его свёрнутый хвост ---
+   Раскладку даёт .tag-row, здесь — только «в строку» и сама свёртка: хвост прячется
+   в <details>, раскрытие без единой строки JS, маркер <summary> убран, чтобы счётчик
+   выглядел плашкой. Так показывают длинный ряд: важные плашки видны всегда, остальные
+   лежат за счётчиком и не разгоняют строку на пол-экрана. */
+
+.tag-row--inline { display: inline-flex; align-items: center; }
+.tag-row__more { display: inline-flex; align-items: center; }
+.tag-row__count {
+	cursor: pointer;
+	list-style: none;
+	font-size: 12px;
+	color: var(--color-text-muted);
+	border: 1px dashed var(--color-divider);
+	border-radius: 999px;
+	padding: 2px var(--space-3);
+}
+.tag-row__count::-webkit-details-marker { display: none; }
+.tag-row__count:hover { color: var(--color-text); border-color: var(--color-accent); }
+.tag-row__rest { display: inline-flex; flex-wrap: wrap; gap: var(--space-1); margin-left: var(--space-1); }
+
+/* --- компонент: сетка ---
+   Одна раскладка на все случаи: россыпь частных сеток по-разному ведёт себя на узком
+   экране, и предсказать её поведение по имени класса нельзя. Число колонок — по
+   allowlist, поэтому набор классов конечен и полностью покрыт правилами. */
+
+.grid { display: flex; flex-wrap: wrap; gap: var(--space-4); }
+.grid__cell { flex: 1 1 auto; min-width: 0; }
+.grid--auto > .grid__cell { flex: 0 1 auto; }
+/* Колонки — НАСТОЯЩАЯ сетка, а не flex-grow. На flex ширину ячейки решал остаток строки,
+   поэтому неполный последний ряд раздувался: две карточки занимали место шести. Ширину
+   задаёт трек, и она одинакова в любом ряду; высота выравнивается сама (align-items:
+   stretch), а карточка тянется на всю ячейку своим height: 100%.
+   Раскладки в 1–2 колонки — это ДВЕ КОЛОНКИ СОДЕРЖИМОГО (текст рядом с текстом, список
+   рядом со списком): им нужен auto-fit, чтобы пара блоков занимала ширину целиком,
+   как на flex.
+   Раскладки в 3–4 колонки — СЕТКА КАРТОЧЕК: у них auto-fill, то есть колонка одной ширины
+   всегда, даже когда карточек меньше, чем колонок.
+   min(100%, …) в минимуме трека: на узком экране колонка не выпирает за контейнер. */
+.grid--1 { display: grid; grid-template-columns: 1fr; }
+.grid--2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); }
+.grid--3 { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }
+.grid--4 { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); }
+.grid--tight { gap: var(--space-2); }
+
+/* --- страницы: формы, отборы, свёртки --- */
+
+/* Вертикальная форма: стопка полей кита с одинаковым зазором. Поверхности не рисует —
+   её даёт карточка или секция настроек, внутри которых форма и живёт. */
+.form-stack { display: flex; flex-direction: column; gap: var(--space-3); max-width: 560px; }
+.form-stack > .button { align-self: flex-start; }
+
+/* Форма-строка внутри ячейки таблицы: кнопка (и иногда пара полей) в одну линию. */
+.form-inline { display: inline-flex; align-items: center; gap: var(--space-2); margin: 0; }
+
+/* Полоса отборов над списком: поле поиска + кнопка в одну строку.
+
+   flex-end равняет МАРГИН-БОКСЫ элементов, поэтому кнопка вставала по нижней границе
+   отступа поля, а не по нижней границе его контрола — визуально на 16 px ниже.
+   Починка не здесь, а у .field: интервалы больше не живут на самих полях, и низ
+   маргин-бокса поля совпал с низом ввода. Правило оставлено flex-end сознательно:
+   baseline равняло бы по ТЕКСТУ, а метка поля сверху сдвинула бы кнопку вниз. */
+.filters { display: flex; align-items: flex-end; gap: var(--space-2); margin: var(--space-4) 0; }
+.filters > .field { flex: 1; min-width: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+.chip {
+	display: inline-flex;
+	align-items: center;
+	padding: var(--space-1) var(--space-3);
+	border: 1px solid var(--color-divider);
+	border-radius: 999px;
+	background: var(--color-surface);
+	color: var(--color-text-muted);
+	font-size: var(--font-size-small);
+	line-height: 1.6;
+	text-decoration: none;
+}
+
+.chip:hover { color: var(--color-text); border-color: var(--color-accent); text-decoration: none; }
+
+.chip--active {
+	color: var(--color-text);
+	border-color: var(--color-accent);
+	background: var(--color-bg);
+	font-weight: 600;
+}
+
+/* Раскладку чипов держит .tag-row внутри, здесь — только отбивка от списка ниже. */
+.chips-bar { margin-bottom: var(--space-3); }
+
+/* Свёрнутая группа списка: раскрытие без JS. */
+.fold {
+	background: var(--color-surface);
+	border-radius: var(--radius-lg);
+	box-shadow: var(--shadow-sm);
+	padding: var(--space-3) var(--space-4);
+	margin-top: var(--space-4);
+}
+.fold__head { cursor: pointer; color: var(--color-text-muted); font-size: var(--font-size-small); }
+.fold__head:hover { color: var(--color-text); }
+
+/* Отрендеренный README: чужой (санитизированный) HTML, которому нужны свои отступы. */
+.prose { overflow-x: auto; }
+.prose pre {
+	background: var(--color-surface-alt);
+	padding: var(--space-3);
+	border-radius: var(--radius-md);
+	overflow-x: auto;
+}
+.prose img { max-width: 100%; }
+.prose table { box-shadow: none; }
+
+/* --- каркас настроек: дом → дерево разделов → секции → sticky-панель --- */
+
+.settings { display: block; }
+.settings__head { margin-bottom: var(--space-5); }
+.settings__title {
+	font-size: var(--font-size-h1);
+	margin: 0;
+	display: flex;
+	align-items: baseline;
+	gap: var(--space-3);
+	flex-wrap: wrap;
+}
+.settings__object {
+	font-family: var(--font-mono);
+	font-size: var(--font-size-body);
+	color: var(--color-accent);
+}
+.settings__lead { color: var(--color-text-muted); margin: var(--space-2) 0 0; max-width: 70ch; }
+
+.settings__layout { display: flex; align-items: flex-start; gap: var(--space-6); }
+.settings__nav { flex: 0 0 220px; position: sticky; top: var(--space-4); }
+.settings__panes { flex: 1; min-width: 0; }
+
+.tree--settings > .tree__list { gap: 2px; }
+
+.crumbs { margin-bottom: var(--space-3); }
+.crumbs__list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-2);
+	font-size: var(--font-size-small);
+	color: var(--color-text-muted);
+}
+.crumbs__item + .crumbs__item::before { content: "/"; margin-right: var(--space-2); opacity: .6; }
+
+.section {
+	background: var(--color-surface);
+	border-radius: var(--radius-lg);
+	box-shadow: var(--shadow-sm);
+	padding: var(--space-5);
+	margin-bottom: var(--space-4);
+}
+.section__head { margin-bottom: var(--space-4); }
+.section__title {
+	font-size: var(--font-size-h2);
+	margin: 0;
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	border: 0;
+	padding: 0;
+}
+.section__title .icon { color: var(--color-accent); }
+.section__lead { color: var(--color-text-muted); margin: var(--space-2) 0 0; max-width: 70ch; }
+/* Ритм внутри секции настроек. Тело секции — тот самый контейнер, в котором лежит
+   большинство полей приложения: РендерерНастроек.СекцияHTML всегда заворачивает Тело
+   секции в .section__body, а поля туда кладут дома настроек. Собственных маргинов
+   у .field/.toggle нет, поэтому держать ритм здесь больше нечему.
+
+   Почему НЕ flex+gap, как у .form-stack: тело секции держит произвольное содержимое —
+   таблицы, списки, вложенные блоки, у каждого свои маргины. Во flex-боксе маргины
+   детей СКЛАДЫВАЮТСЯ с gap (ровно та двойная величина, от которой уходили, снимая
+   интервал с самих полей), а в обычном потоке margin-top соседа СХЛОПЫВАЕТСЯ с его
+   собственным — владелец интервала остаётся один, и таблицы не растягиваются
+   по align-items: stretch. */
+.section__body > * + * { margin-top: var(--space-4); }
+.section__body > :first-child { margin-top: 0; }
+.section__body > :last-child { margin-bottom: 0; }
+/* .section__form сам полей НЕ содержит: между формой и полями всегда стоит
+   .section__body (см. РендерерНастроек.ФормаСекции), поэтому ритм ему не нужен. */
+.section__form { margin: 0; }
+/* Кат секции: секция действия уходит под нативную <details> целиком, вместе со своей
+   формой. Раскрывает браузер — скрипта здесь нет. Поверхность даёт .section, а подпись
+   ката обязана читаться КНОПКОЙ: серая строчка того же цвета, что лид секции выше,
+   не говорит, что на неё можно нажать. Нативный маркер снят (кнопочной формы у него нет),
+   взамен — шеврон, глядящий вниз у закрытого ката и вверх у раскрытого. */
+.section__fold > .fold__head {
+	list-style: none;
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-2);
+	padding: var(--space-2) var(--space-3);
+	border: 1px solid var(--color-divider);
+	border-radius: var(--radius-md);
+	color: var(--color-text);
+	font-size: var(--font-size-body);
+	font-weight: 600;
+}
+.section__fold > .fold__head::-webkit-details-marker { display: none; }
+.section__fold > .fold__head:hover { background: var(--color-bg); border-color: var(--color-accent); }
+.section__fold > .fold__head::after {
+	content: "";
+	width: .45em;
+	height: .45em;
+	margin-top: -.2em;
+	border-right: 2px solid currentColor;
+	border-bottom: 2px solid currentColor;
+	transform: rotate(45deg);
+}
+.section__fold[open] > .fold__head::after { margin-top: .2em; transform: rotate(-135deg); }
+.section__fold[open] > .fold__head { margin-bottom: var(--space-4); }
+
+.section--danger { box-shadow: 0 0 0 1px var(--color-danger); }
+.section--danger .section__title { color: var(--color-danger); }
+.section--danger .section__title .icon { color: var(--color-danger); }
+
+.list-note { color: var(--color-text-muted); font-size: var(--font-size-small); margin: var(--space-2) 0 0; padding-left: var(--space-5); }
+
+.section table, .section .table-scroll { margin-bottom: var(--space-4); }
+
+/* --- раскрывашка-панель и надписи внутри её шапки --------------------------------
+   Печатает эти классы кит (род «раскрывашка», виды надписи и картинки), поэтому имена
+   в них ничего не знают о предмете: панель — нативная раскрывашка <details>, свёрнутая
+   строка отвечает «что это», развёрнутая отдаёт содержимое, и раскрытие работает без
+   единой строки JS. */
+
+.panel {
+	border: 1px solid var(--color-divider);
+	border-radius: var(--radius-md);
+	background: var(--color-surface);
+}
+
+.panel + .panel { margin-top: var(--space-2); }
+
+.panel__head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space-2);
+	padding: var(--space-3);
+	cursor: pointer;
+	line-height: 1.6;
+}
+
+.panel__head::-webkit-details-marker { display: none; }
+.panel__head:hover { background: var(--color-bg); }
+
+.image-icon { width: 20px; height: 20px; flex: none; }
+.text-name code { white-space: nowrap; }
+.text-hint { color: var(--color-text-muted); font-size: var(--font-size-small); }
+.text-note code { font-size: var(--font-size-small); color: var(--color-text-muted); }
+
+.panel__body {
+	padding: var(--space-4);
+	border-top: 1px solid var(--color-divider);
+}
+
+.panel__body > * + * { margin-top: var(--space-4); }
+
+/* --- модальное окно формы -------------------------------------------------------
+   Открытый <dialog> уходит в верхний слой браузера: он не в потоке, поэтому ничего
+   на странице не двигает, и его не обрезает предок с overflow. Открытие, закрытие
+   по Esc и щелчку мимо, удержание фокуса и гашение фона — работа движка, скрипта
+   здесь нет. Движок постарше покажет содержимое на месте: это ровно сегодняшний вид,
+   а не пустой экран. */
+
+.modal {
+	padding: 0;
+	max-width: min(40rem, calc(100vw - var(--space-6)));
+	width: 100%;
+	border: 1px solid var(--color-divider);
+	border-radius: var(--radius-md);
+	background: var(--color-surface);
+	color: var(--color-text);
+	box-shadow: var(--shadow-lg);
+}
+
+/* фон гасится тем же ambient, что лежит под тенями: своего токена окно не заводит */
+.modal::backdrop { background: var(--color-ambient); }
+
+.modal__box { padding: var(--space-5); }
+.modal__box > * + * { margin-top: var(--space-4); }
+
+.modal__actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: var(--space-2);
+	margin-top: var(--space-5);
+}
+
+/* --- врезка: шаг ВНУТРИ формы, а не своя секция ---------------------------------
+   Пунктир и означает «часть формы»: карточка рисует сплошную рамку и читалась бы
+   как самостоятельный блок. Так собирают подготовительный шаг — собственная кнопка
+   врезки отправляет ту же <form> с другими name/value и заполняет поля ниже. */
+
+.inset {
+	padding: var(--space-4);
+	border: 1px dashed var(--color-divider);
+	border-radius: var(--radius-md);
+	background: var(--color-bg);
+}
+
+.inset > * + * { margin-top: var(--space-3); }
+
+.inset__title {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	font-weight: 600;
+}
+
+.inset__lead {
+	display: block;
+	color: var(--color-text-muted);
+	font-size: var(--font-size-small);
+}
+
+.choice-row { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+/* Выбранная кнопка ряда обозначена ОДНИМ признаком — aria-current. Он же переносится
+   скриптом при мгновенном переключении, поэтому вид кнопки и её доступное имя разъехаться
+   не могут: вариант кнопки у всех ссылок ряда одинаковый. */
+.choice-row .button[aria-current] {
+	background: var(--color-accent);
+	border-color: var(--color-accent);
+	color: var(--color-accent-contrast);
+}
+
+/* Взаимоисключающий набор полей. Сервер печатает ВСЕ наборы, а невыбранные — с `disabled`
+   и `hidden`: отключённая группа не отправляется, не ловит фокус и не держит `required`.
+   Рамки у обёртки нет — она группирует поля для браузера, а не рисует рамку;
+   интервал между полями внутри даёт общее правило `fieldset > * + *` выше. */
+.choice-set { border: 0; padding: 0; margin: 0; min-width: 0; }
+.choice-set[hidden] { display: none; }
+
+/* --- движение --- */
+
+@keyframes ui-toast {
+	from { opacity: 0; transform: translateY(4px); }
+	to { opacity: 1; transform: none; }
+}
+
+/* --- компонент: полоса заполнения ---
+   Показание, а не орган управления: ширина берётся классом-ступенью, инлайновых стилей
+   в ките нет. Цвет — вторичный носитель смысла, процент всегда напечатан текстом. */
+
+.meter {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+	min-width: 0;
+}
+.meter__track {
+	position: relative;
+	height: 8px;
+	border-radius: var(--radius-sm);
+	background: var(--color-neutral-800);
+	border: 1px solid var(--color-divider);
+	overflow: hidden;
+}
+.meter__fill {
+	height: 100%;
+	min-width: 2px;
+	border-radius: inherit;
+	background: var(--color-accent);
+	transition: width var(--motion-medium) var(--motion-ease);
+}
+.meter--warn .meter__fill { background: var(--color-warning); }
+.meter--err .meter__fill { background: var(--color-danger); }
+.meter--ok .meter__fill { background: var(--color-success); }
+.meter__value {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-1) var(--space-2);
+	margin: 0;
+	font-size: var(--font-size-small);
+	color: var(--color-text-muted);
+}
+.meter__label { color: var(--color-text); }
+.meter--compact { gap: 0; }
+.meter--compact .meter__track { height: 6px; min-width: 56px; }
+
+.meter__fill--0 { width: 0%; }
+.meter__fill--5 { width: 5%; }
+.meter__fill--10 { width: 10%; }
+.meter__fill--15 { width: 15%; }
+.meter__fill--20 { width: 20%; }
+.meter__fill--25 { width: 25%; }
+.meter__fill--30 { width: 30%; }
+.meter__fill--35 { width: 35%; }
+.meter__fill--40 { width: 40%; }
+.meter__fill--45 { width: 45%; }
+.meter__fill--50 { width: 50%; }
+.meter__fill--55 { width: 55%; }
+.meter__fill--60 { width: 60%; }
+.meter__fill--65 { width: 65%; }
+.meter__fill--70 { width: 70%; }
+.meter__fill--75 { width: 75%; }
+.meter__fill--80 { width: 80%; }
+.meter__fill--85 { width: 85%; }
+.meter__fill--90 { width: 90%; }
+.meter__fill--95 { width: 95%; }
+.meter__fill--100 { width: 100%; }
+
+/* Уважение к настройке системы: анимации отключаются ПОЛНОСТЬЮ. */
+@media (prefers-reduced-motion: reduce) {
+	*, *::before, *::after {
+		animation-duration: 0.001ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.001ms !important;
+		scroll-behavior: auto !important;
+	}
+}
+
+/* align-items у колонки — поперечный размер, то есть ШИРИНА: с flex-start базового правила
+   панели хватало ширины по содержимому, и широкая таблица уносила вбок всю страницу вместо
+   того, чтобы прокручиваться внутри своей .table-scroll. */
+@media (max-width: 900px) {
+	.settings__layout { flex-direction: column; align-items: stretch; }
+	.settings__nav { position: static; flex: 1 1 auto; width: 100%; }
+	.tree--settings > .tree__list { flex-direction: row; flex-wrap: wrap; }
+}
+
+@media (max-width: 640px) {
+	.top .wrap { flex-direction: column; align-items: flex-start; gap: var(--space-2); }
+	main.wrap { padding-top: var(--space-5); }
+	.savebar { position: static; }
+}
+
+/* --- двухэтажная ячейка: сверху строка «значок + значение», снизу приписка --- */
+
+.cell-stack { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.row-line { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.image-icon--small { width: 16px; height: 16px; }
+
+/* --- таблица карточками: длинный список читается без горизонтальной прокрутки --- */
+
+.cell-value { white-space: nowrap; color: var(--color-text-muted); }
+
+/* Машинное значение в такой таблице не переносится: разорванный путь читается как два.
+   На узком экране запрет снимается — там строка уже стала карточкой во всю ширину. */
+.table-cards code { white-space: nowrap; }
+
+/* На узком экране строка перестаёт быть рядом ячеек и становится записью-карточкой:
+   имя, плашки, показатели и меню называют себя сами, поэтому шапка не нужна. */
+@media (max-width: 720px) {
+	.table-cards, .table-cards tbody, .table-cards tr, .table-cards td { display: block; }
+	.table-cards thead { display: none; }
+	.table-cards tr { padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-divider); }
+	.table-cards tr:last-child { border-bottom: none; }
+	.table-cards td { border-bottom: none; padding: var(--space-1) 0; }
+	.table-cards code { white-space: normal; overflow-wrap: anywhere; }
+}
+
+.text-below { display: block; margin-top: var(--space-1); color: var(--color-text-muted); font-size: var(--font-size-small); }
+
+/* --- подробность в ячейке: содержимое раскрывается на месте ----------------------
+   Свёрнутая строка не мешает читать список, развёрнутая отвечает «что именно».
+   Без единой строки JS. */
+
+.fold-detail > summary {
+	cursor: pointer;
+	color: var(--color-text-muted);
+	font-size: var(--font-size-small);
+}
+
+/* Свойства объекта — сетка «имя | значение». Потолок ширины — мера ЧИТАЕМОСТИ, как
+   у вводных абзацев: строка в половину экрана читается не лучше, чем строка в два
+   символа. Ширина у списка есть: он стоит строкой во всю таблицу, а не ячейкой в ряду. */
+.props {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: var(--space-1) var(--space-3);
+	margin-top: var(--space-2);
+	font-size: var(--font-size-small);
+	max-width: 70ch;
+}
+
+.props dt { color: var(--color-text-muted); white-space: nowrap; }
+/* anywhere — ради хешей и адресов: слово длиннее колонки переносится, а не вылезает из
+   таблицы. Обычные слова им не режутся: ширину даёт строка во всю таблицу. */
+.props dd { margin: 0; overflow-wrap: anywhere; }
