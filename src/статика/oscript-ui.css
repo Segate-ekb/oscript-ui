@@ -440,6 +440,19 @@ caption { text-align: left; padding: var(--space-3) var(--space-4); color: var(-
 .table__expand > td { padding-top: 0; }
 tbody tr.table__record:hover + .table__expand { background: var(--color-surface-alt); }
 
+/* Выделенная запись: одна строка списка отвечает на вопрос, ради которого список открыли,
+   и заливка находит её раньше, чем человек начнёт читать колонки. Оттенок берётся у дальней
+   ступени акцентной рампы — она переворачивается вместе с темой, поэтому строка светлее
+   поверхности в светлой теме и темнее в тёмной, а текст на ней читается тем же цветом. */
+tbody tr.row-accent { background: var(--color-accent-900); }
+tbody tr.row-accent:hover { background: var(--color-accent-800); }
+tbody tr.row-accent + .table__expand { background: var(--color-accent-900); }
+tbody tr.row-accent.table__record:hover + .table__expand { background: var(--color-accent-800); }
+
+/* Узкий столбец: сжат по содержимому и не переносится — значок, галочка, счётчик.
+   Соседние столбцы забирают освободившуюся ширину себе. */
+.col-narrow, .cell-narrow { width: 1%; white-space: nowrap; }
+
 /* --- компонент: тост --- */
 
 .toast {
