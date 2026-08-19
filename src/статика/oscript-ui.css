@@ -1217,9 +1217,42 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 }
 .settings__lead { color: var(--color-text-muted); margin: var(--space-2) 0 0; max-width: 70ch; }
 
+/* align-items у колонки — поперечный размер, то есть ШИРИНА: с flex-start панелям хватало
+   ширины по содержимому, и широкая таблица уносила вбок всю страницу вместо того, чтобы
+   прокручиваться внутри своей .table-scroll. На узком экране раскладка становится колонкой
+   и выравнивание меняется на stretch — см. медиа-блок дома настроек. */
 .settings__layout { display: flex; align-items: flex-start; gap: var(--space-6); }
-.settings__nav { flex: 0 0 220px; position: sticky; top: var(--space-4); }
 .settings__panes { flex: 1; min-width: 0; }
+
+/* Панель разделов несёт атрибут popover ради узкого экрана (шторка ниже), а на широком
+   остаётся обычной колонкой в потоке. Поэтому здесь СНИМАЕТСЯ раскладка, которую движок
+   даёт любому popover: он ставит его по центру экрана рамкой на своей заливке и прячет
+   до открытия. `inset: auto` стоит ПЕРЕД top — сокращённая запись обнулила бы его. */
+.settings__nav {
+	display: block;
+	flex: 0 0 220px;
+	position: sticky;
+	inset: auto;
+	top: var(--space-4);
+	width: auto;
+	height: auto;
+	max-width: none;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	border-radius: 0;
+	overflow: visible;
+	background: transparent;
+	color: inherit;
+	box-shadow: none;
+}
+
+/* Полоса с кнопкой «три черты» спрятана ПО УМОЛЧАНИЮ и показывается ровно там, где
+   кнопке есть что открыть: на широком экране колонка разделов стоит сама по себе,
+   а движок без верхнего слоя не открыл бы шторку вовсе — и кнопка осталась бы мёртвой.
+   Пальцевый размер задан кнопке здесь же: другого места, кроме этой полосы, у неё нет. */
+.settings__navtoggle { display: none; margin-bottom: var(--space-4); }
+.settings__navtoggle .button { min-height: 44px; min-width: 44px; }
 
 .tree--settings > .tree__list { gap: 2px; }
 
@@ -1506,13 +1539,79 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 	}
 }
 
-/* align-items у колонки — поперечный размер, то есть ШИРИНА: с flex-start базового правила
-   панели хватало ширины по содержимому, и широкая таблица уносила вбок всю страницу вместо
-   того, чтобы прокручиваться внутри своей .table-scroll. */
+/* --- дом настроек на узком экране: разделы уходят в шторку ---------------------------
+   На телефоне колонка в 220 px съедала половину ширины, а лента разделов в две строки
+   не читалась вовсе. Вместо неё — кнопка «три черты» и выдвижная панель слева: ровно то,
+   что человек ждёт от приложения. Открывает и закрывает её движок браузера по атрибутам
+   popover/popovertarget — щелчком мимо, по Esc и повторным нажатием; JS здесь нет.
+
+   Движок, который верхнего слоя не знает, до @supports не доходит: панель остаётся
+   колонкой в потоке, полоса с кнопкой не показывается вовсе. Разделы видны, каждая
+   дорога достижима, мёртвой кнопки на экране нет. */
 @media (max-width: 900px) {
+
 	.settings__layout { flex-direction: column; align-items: stretch; }
-	.settings__nav { position: static; flex: 1 1 auto; width: 100%; }
-	.tree--settings > .tree__list { flex-direction: row; flex-wrap: wrap; }
+
+	/* Панель в потоке стоит колонкой во всю ширину: базовый flex-basis в 220 px здесь
+	   означал бы ВЫСОТУ и обрезал бы разделы. */
+	.settings__nav { position: static; flex: 1 1 auto; }
+
+	/* Пункт под палец: 44 px — нижняя граница, ниже которой в него не попадают. Правило
+	   стоит ВНЕ @supports: пальцем в разделы тычут и там, где шторки нет. */
+	.settings__nav .tree__link {
+		min-height: 44px;
+		padding: var(--space-2) var(--space-3);
+		font-size: var(--font-size-body);
+	}
+
+	@supports selector(:popover-open) {
+
+		/* Кнопке есть что открыть — вот здесь полоса и появляется. */
+		.settings__navtoggle { display: block; }
+
+		/* Закрытая шторка убрана с экрана и стоит за левым краем: с этого места она
+		   выезжает и на это же место уходит. Плавность — только на движении; display
+		   и верхний слой снимаются дискретно, поэтому названы отдельно (allow-discrete).
+		   Движок, который так не умеет, отбрасывает объявление целиком и открывает
+		   шторку мгновенно — поведение то же, просто без анимации. */
+		.settings__nav {
+			translate: -100% 0;
+			transition: translate var(--motion-medium) var(--motion-ease),
+			            overlay var(--motion-medium) allow-discrete,
+			            display var(--motion-medium) allow-discrete;
+		}
+
+		.settings__nav:not(:popover-open) { display: none; }
+
+		/* Во всю высоту слева, шириной в четыре пятых экрана, но не шире 320 px:
+		   страница от неё вбок не едет. Самый длинный дом не влезает по высоте —
+		   поэтому панель прокручивается сама, а не тянет за собой страницу. */
+		.settings__nav:popover-open {
+			display: block;
+			position: fixed;
+			inset: 0 auto 0 0;
+			width: min(80vw, 320px);
+			height: auto;
+			padding: var(--space-4);
+			overflow-y: auto;
+			overscroll-behavior: contain;
+			background: var(--color-surface);
+			box-shadow: var(--shadow-lg);
+			border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+			translate: 0 0;
+		}
+
+		/* Состояние, из которого шторка выезжает. Отдельным блоком, потому что стартовый
+		   стиль знают не все движки: не знает — панель просто появляется на месте. */
+		@starting-style {
+			.settings__nav:popover-open { translate: -100% 0; }
+		}
+
+		/* Затемнение под шторкой — признак того, что страница за ней сейчас не работает. */
+		.settings__nav::backdrop { background: var(--color-scrim); }
+
+	}
+
 }
 
 @media (max-width: 640px) {

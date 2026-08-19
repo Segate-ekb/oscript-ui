@@ -41,5 +41,7 @@
 	Тексты.Вставить("chrome.top.theme.to-dark", "Включить тёмную тему");
 	Тексты.Вставить("chrome.top.theme.to-light", "Включить светлую тему");
 	Тексты.Вставить("chrome.office.nav.title", "Разделы личного");
+	Тексты.Вставить("settings.frame.nav.title", "Разделы настроек");
+	Тексты.Вставить("settings.frame.nav.toggle", "Разделы");
 
 КонецПроцедуры
