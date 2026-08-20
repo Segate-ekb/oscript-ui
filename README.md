@@ -38,7 +38,7 @@ opm install oscript-ui
 В `packagedef` приложения:
 
 ```bsl
-.ЗависитОт("oscript-ui", "0.5.0")
+.ЗависитОт("oscript-ui", "0.5.1")
 ```
 
 И подключаем:
