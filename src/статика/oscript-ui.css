@@ -53,6 +53,9 @@ code, pre, kbd, samp { font-family: var(--font-mono); }
 	padding: 0 var(--space-5);
 }
 
+/* ⚠ Высоту этой полосы повторяет отступ выпадающей панели меню (.hubmenu:popover-open
+   в медиа-блоке широкого экрана): панель висит ПОД шапкой и собрана из тех же величин.
+   Меняешь отступы полосы или высоту знака — поправь расчёт и там. */
 .top {
 	background: var(--color-surface);
 	border-bottom: 1px solid var(--color-divider);
@@ -95,6 +98,231 @@ code, pre, kbd, samp { font-family: var(--font-mono); }
 }
 
 main.wrap { padding-top: var(--space-6); padding-bottom: var(--space-8); min-height: 60vh; }
+
+/* --- единое меню инсталляции: шапка, бургер, панель -----------------------------------
+   Навигация инсталляции живёт в ОДНОМ меню. На широком экране шапка остаётся прежней —
+   знак, дороги, оформление, учётка справа, — и учётка же открывает панель; на телефоне
+   полоса ходов прячется целиком, а слева появляется бургер. Открывают они одну и ту же
+   панель, второй копии пунктов в разметке нет. Открытие, крест, Esc и щелчок мимо —
+   работа движка по атрибутам popover/popovertarget: JS в ките нет ни строки.
+
+   Открывашки печатаются всегда, а видны ровно там, где панель открывается: движку без
+   верхнего слоя кнопка ничего не откроет, и мёртвых кнопок на экране быть не должно. */
+.hubmenu__opener { display: none; }
+.hubmenu__user { display: none; }
+.hubmenu__close { display: none; }
+
+/* Панель БЕЗ верхнего слоя — обычный блок в потоке, до содержимого страницы: разделы
+   видны, каждая дорога достижима. Здесь же снимается раскладка, которую движок даёт
+   любому popover (по центру экрана, своей рамкой на своей заливке): `inset: auto` стоит
+   ПЕРЕД остальными, сокращённая запись обнулила бы их. */
+.hubmenu {
+	display: block;
+	position: static;
+	inset: auto;
+	width: auto;
+	max-width: none;
+	height: auto;
+	margin: 0 0 var(--space-5);
+	padding: var(--space-4);
+	border: 0;
+	border-bottom: 1px solid var(--color-divider);
+	border-radius: 0;
+	overflow: visible;
+	background: var(--color-surface);
+	color: inherit;
+}
+
+.hubmenu__head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-3);
+	margin-bottom: var(--space-4);
+}
+.hubmenu__brand { display: inline-flex; align-items: center; min-width: 0; }
+
+/* Блок вошедшего — он же ход в кабинет, поэтому кликабелен целиком. */
+.hubmenu__account {
+	display: flex;
+	align-items: center;
+	gap: var(--space-3);
+	min-height: 44px;
+	padding: var(--space-2) var(--space-3);
+	border-radius: var(--radius-md);
+	color: var(--color-text);
+}
+.hubmenu__account:hover { background: var(--color-surface-alt); text-decoration: none; }
+.hubmenu__avatar {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 36px;
+	height: 36px;
+	flex: none;
+	border-radius: 50%;
+	background: var(--color-accent-900);
+	color: var(--color-accent-400);
+	font-family: var(--font-heading);
+	font-weight: 600;
+}
+.hubmenu__who { display: flex; flex-direction: column; min-width: 0; }
+.hubmenu__login { font-weight: 600; overflow-wrap: anywhere; }
+.hubmenu__role { color: var(--color-text-muted); font-size: var(--font-size-small); }
+
+.hubmenu__section { margin-top: var(--space-4); }
+/* Разделы текущего экрана: на широком их прячет медиа-блок — там они уже стоят колонкой
+   на самой странице. На телефоне колонки нет, и это единственная дорога к ним. */
+.hubmenu__section--screen { display: block; }
+.hubmenu__title {
+	margin: 0 0 var(--space-1);
+	color: var(--color-text-muted);
+	font-size: var(--font-size-small);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+/* Пункт меню — строка во всю ширину и под палец: кнопка кита сама по себе ужимается
+   по содержимому и выравнивается по центру. */
+.hubmenu .button {
+	min-height: 44px;
+	justify-content: flex-start;
+	text-align: left;
+}
+
+.hubmenu__foot {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+	margin-top: var(--space-5);
+	padding-top: var(--space-3);
+	border-top: 1px solid var(--color-divider);
+}
+
+/* Шапка страницы с единым меню — прежняя шапка: знак слева, ходы справа. Бургер стоит
+   первым и виден только на телефоне, поэтому на широком экране полоса выглядит ровно
+   так же, как у инсталляции без меню. */
+.top--menu .wrap { gap: var(--space-3); }
+
+/* Верхний слой знает не всякий движок, поэтому ВСЁ, что без него бессмысленно, живёт
+   здесь: и открывашки, и всплывающая панель. */
+@supports selector(:popover-open) {
+
+	.hubmenu__user { display: inline-flex; }
+	.hubmenu__close { display: inline-flex; }
+
+	.hubmenu:not(:popover-open) { display: none; }
+
+	/* Открытая панель прокручивается сама: самый длинный дом в неё не влезает ни на одной
+	   ширине, а тянуть за собой страницу она не должна. */
+	.hubmenu:popover-open {
+		display: flex;
+		flex-direction: column;
+		position: fixed;
+		margin: 0;
+		border: 0;
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		box-shadow: var(--shadow-lg);
+	}
+
+	/* Панель — колонка, и содержимого в ней бывает больше, чем высоты: без этого браузер
+	   ужимает строки, чтобы всё влезло, и учётка с рубриками наезжают друг на друга.
+	   Не ужимаем — прокручиваем. */
+	.hubmenu:popover-open > * { flex: none; }
+
+}
+
+/* Панель широкого экрана висит под шапкой у ПРАВОГО края — там же, где стоит кнопка,
+   которая её открыла. Позиция обычная, `position: fixed`: привязка к якорю (anchor())
+   живёт не во всех движках, а меню, которое в одном браузере выпадает у кнопки, а в другом
+   прилипает к левому верхнему углу, — хуже предсказуемого. `inset: auto` снимает раскладку
+   UA-стиля (`inset: 0` вместе с `margin: auto` ставит popover по центру экрана), поэтому
+   стоит ПЕРЕД top/right. Отступ сверху — высота липкой шапки плюс зазор. */
+@media (min-width: 901px) {
+
+	/* Шапка панели на широком не нужна вовсе: знак стоит в двух шагах, в самой шапке
+	   страницы, а закрывают выпадающее меню щелчком мимо и клавишей Esc — так жило
+	   прежнее меню учётки. Крест — привычка телефона, там он и остаётся. */
+	.hubmenu__head { display: none; }
+
+	/* Вид — прежнего меню учётки: компактный дропдаун, а не мобильная шторка. */
+	.hubmenu {
+		padding: var(--space-3);
+		border: 1px solid var(--color-divider);
+		border-radius: var(--radius-md);
+		box-shadow: var(--shadow-md);
+	}
+
+	/* Пункт — строка с тонким фоном на наведении: рамка-коробка у каждого пункта дробила
+	   бы список на кнопки, а это список. */
+	.hubmenu .button {
+		min-height: 0;
+		width: 100%;
+		padding: var(--space-1) var(--space-2);
+		border-color: transparent;
+		background: transparent;
+		border-radius: var(--radius-sm);
+	}
+	.hubmenu .button:hover { background: var(--color-surface-alt); filter: none; }
+
+	/* Рубрика — мелкая приглушённая подпись над тонким разделителем, а не заголовок:
+	   в дропдауне секции разделяют, а не объявляют. */
+	.hubmenu__section {
+		margin-top: var(--space-3);
+		padding-top: var(--space-2);
+		border-top: 1px solid var(--color-divider);
+	}
+	.hubmenu__title {
+		margin-bottom: 2px;
+		text-transform: none;
+		letter-spacing: normal;
+	}
+
+	/* Учётка — такая же строка, как пункты: мелкий кружок, имя и роль под ним. Высота
+	   собственная, а не нулевая: с min-height: 0 двухэтажная строка съезжала на аватар. */
+	.hubmenu__account {
+		min-height: 36px;
+		gap: var(--space-2);
+		padding: var(--space-1) var(--space-2);
+		margin-top: var(--space-1);
+	}
+	.hubmenu__avatar { width: 24px; height: 24px; font-size: var(--font-size-small); }
+	.hubmenu__who { line-height: 1.25; }
+	.hubmenu__login { font-size: 14px; }
+
+	/* Разделы текущего экрана на широком стоят колонкой на самой странице — второй раз
+	   в меню они не нужны. */
+	.hubmenu__section--screen { display: none; }
+
+	/* Скрим под дропдауном не нужен: прежнее меню учётки страницу не затемняло. */
+	.hubmenu::backdrop { background: transparent; }
+
+	.hubmenu__foot {
+		margin-top: var(--space-2);
+		padding-top: var(--space-2);
+		gap: var(--space-1);
+	}
+
+	@supports selector(:popover-open) {
+
+		.hubmenu:popover-open {
+			inset: auto;
+			/* Отступ сверху — не число на глаз: это высота липкой шапки, собранная из тех же
+			   величин, что и она сама (её вертикальные отступы, знак в 28px и линия снизу),
+			   плюс зазор. Меняется плотность — панель едет вместе с шапкой. */
+			top: calc(var(--space-3) * 2 + 28px + 1px + var(--space-5));
+			right: var(--space-5);
+			width: min(92vw, 280px);
+			max-height: min(80vh, 640px);
+			border: 1px solid var(--color-divider);
+			border-radius: var(--radius-md);
+			box-shadow: var(--shadow-md);
+		}
+
+	}
+
+}
 
 .bottom {
 	border-top: 1px solid var(--color-divider);
@@ -522,6 +750,9 @@ a.tag:hover { text-decoration: none; border-color: var(--color-accent); color: v
 .tree__link--active { color: var(--color-accent); background: var(--color-surface-alt); }
 .tree--column .tree__link { display: flex; }
 .tree--column .tree__list--1 { margin-left: var(--space-4); }
+/* Ряд ходов в шапке дышит шире колонки: соседние дороги там читаются как отдельные,
+   а не как список. */
+.tree--top > .tree__list { gap: var(--space-3); }
 .office-nav {
 	margin: 0 0 var(--space-5);
 	padding-bottom: var(--space-3);
@@ -1224,35 +1455,7 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 .settings__layout { display: flex; align-items: flex-start; gap: var(--space-6); }
 .settings__panes { flex: 1; min-width: 0; }
 
-/* Панель разделов несёт атрибут popover ради узкого экрана (шторка ниже), а на широком
-   остаётся обычной колонкой в потоке. Поэтому здесь СНИМАЕТСЯ раскладка, которую движок
-   даёт любому popover: он ставит его по центру экрана рамкой на своей заливке и прячет
-   до открытия. `inset: auto` стоит ПЕРЕД top — сокращённая запись обнулила бы его. */
-.settings__nav {
-	display: block;
-	flex: 0 0 220px;
-	position: sticky;
-	inset: auto;
-	top: var(--space-4);
-	width: auto;
-	height: auto;
-	max-width: none;
-	margin: 0;
-	padding: 0;
-	border: 0;
-	border-radius: 0;
-	overflow: visible;
-	background: transparent;
-	color: inherit;
-	box-shadow: none;
-}
-
-/* Полоса с кнопкой «три черты» спрятана ПО УМОЛЧАНИЮ и показывается ровно там, где
-   кнопке есть что открыть: на широком экране колонка разделов стоит сама по себе,
-   а движок без верхнего слоя не открыл бы шторку вовсе — и кнопка осталась бы мёртвой.
-   Пальцевый размер задан кнопке здесь же: другого места, кроме этой полосы, у неё нет. */
-.settings__navtoggle { display: none; margin-bottom: var(--space-4); }
-.settings__navtoggle .button { min-height: 44px; min-width: 44px; }
+.settings__nav { flex: 0 0 220px; position: sticky; top: var(--space-4); }
 
 .tree--settings > .tree__list { gap: 2px; }
 
@@ -1539,77 +1742,69 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 	}
 }
 
-/* --- дом настроек на узком экране: разделы уходят в шторку ---------------------------
-   На телефоне колонка в 220 px съедала половину ширины, а лента разделов в две строки
-   не читалась вовсе. Вместо неё — кнопка «три черты» и выдвижная панель слева: ровно то,
-   что человек ждёт от приложения. Открывает и закрывает её движок браузера по атрибутам
-   popover/popovertarget — щелчком мимо, по Esc и повторным нажатием; JS здесь нет.
-
-   Движок, который верхнего слоя не знает, до @supports не доходит: панель остаётся
-   колонкой в потоке, полоса с кнопкой не показывается вовсе. Разделы видны, каждая
-   дорога достижима, мёртвой кнопки на экране нет. */
+/* --- единое меню на узком экране ------------------------------------------------------
+   Полосе ходов на телефоне места нет: её роль забирает бургер слева, и открывает он ту же
+   панель — шторкой на всю высоту, из-за левого края. */
 @media (max-width: 900px) {
 
-	.settings__layout { flex-direction: column; align-items: stretch; }
-
-	/* Панель в потоке стоит колонкой во всю ширину: базовый flex-basis в 220 px здесь
-	   означал бы ВЫСОТУ и обрезал бы разделы. */
-	.settings__nav { position: static; flex: 1 1 auto; }
-
-	/* Пункт под палец: 44 px — нижняя граница, ниже которой в него не попадают. Правило
-	   стоит ВНЕ @supports: пальцем в разделы тычут и там, где шторки нет. */
-	.settings__nav .tree__link {
-		min-height: 44px;
-		padding: var(--space-2) var(--space-3);
-		font-size: var(--font-size-body);
-	}
+	.top--menu .top__nav { display: none; }
 
 	@supports selector(:popover-open) {
 
-		/* Кнопке есть что открыть — вот здесь полоса и появляется. */
-		.settings__navtoggle { display: block; }
+		.hubmenu__opener { display: block; }
 
-		/* Закрытая шторка убрана с экрана и стоит за левым краем: с этого места она
-		   выезжает и на это же место уходит. Плавность — только на движении; display
-		   и верхний слой снимаются дискретно, поэтому названы отдельно (allow-discrete).
-		   Движок, который так не умеет, отбрасывает объявление целиком и открывает
-		   шторку мгновенно — поведение то же, просто без анимации. */
-		.settings__nav {
+		/* Закрытая шторка стоит за левым краем: оттуда выезжает, туда и уходит. Плавность —
+		   на движении; display и верхний слой снимаются дискретно, поэтому названы отдельно.
+		   Движок, который так не умеет, отбрасывает объявление целиком и открывает шторку
+		   мгновенно — поведение то же, просто без анимации. */
+		.hubmenu {
 			translate: -100% 0;
 			transition: translate var(--motion-medium) var(--motion-ease),
 			            overlay var(--motion-medium) allow-discrete,
 			            display var(--motion-medium) allow-discrete;
 		}
 
-		.settings__nav:not(:popover-open) { display: none; }
-
-		/* Во всю высоту слева, шириной в четыре пятых экрана, но не шире 320 px:
-		   страница от неё вбок не едет. Самый длинный дом не влезает по высоте —
-		   поэтому панель прокручивается сама, а не тянет за собой страницу. */
-		.settings__nav:popover-open {
-			display: block;
-			position: fixed;
+		.hubmenu:popover-open {
 			inset: 0 auto 0 0;
 			width: min(80vw, 320px);
 			height: auto;
-			padding: var(--space-4);
-			overflow-y: auto;
-			overscroll-behavior: contain;
-			background: var(--color-surface);
-			box-shadow: var(--shadow-lg);
+			max-height: none;
 			border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
 			translate: 0 0;
 		}
 
-		/* Состояние, из которого шторка выезжает. Отдельным блоком, потому что стартовый
-		   стиль знают не все движки: не знает — панель просто появляется на месте. */
 		@starting-style {
-			.settings__nav:popover-open { translate: -100% 0; }
+			.hubmenu:popover-open { translate: -100% 0; }
 		}
 
-		/* Затемнение под шторкой — признак того, что страница за ней сейчас не работает. */
-		.settings__nav::backdrop { background: var(--color-scrim); }
+		/* Затемнение — признак того, что страница за шторкой сейчас не работает. */
+		.hubmenu::backdrop { background: var(--color-scrim); }
 
+	}
+
+}
+
+/* --- дом настроек на узком экране ----------------------------------------------------
+   Колонка разделов встаёт над секциями и читается пальцем. Выдвижного меню здесь нет:
+   те же разделы едут секцией в ЕДИНОЕ меню инсталляции (см. панель выше), и два выдвижных
+   меню на одном экране спорили бы друг с другом. */
+@media (max-width: 900px) {
+
+	.settings__layout { flex-direction: column; align-items: stretch; }
+	.settings__nav { position: static; flex: 1 1 auto; }
+
+	/* Страница с единым меню несёт те же разделы секцией меню, и на телефоне колонка
+	   была бы вторым их списком подряд. Прячется она ТОЛЬКО там, где меню есть: панель
+	   стоит перед содержимым, поэтому «страница с меню» выражается соседством, а не
+	   классом-маркером на теле. У инсталляции без слота колонка — единственный вход
+	   в соседний раздел, и она остаётся. */
+	.hubmenu ~ main .settings__nav { display: none; }
+
+	/* Пункт под палец: 44 px — нижняя граница, ниже которой в него не попадают. */
+	.settings__nav .tree__link {
+		min-height: 44px;
+		padding: var(--space-2) var(--space-3);
+		font-size: var(--font-size-body);
 	}
 
 }

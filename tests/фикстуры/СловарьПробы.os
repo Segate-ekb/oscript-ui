@@ -41,7 +41,12 @@
 	Тексты.Вставить("chrome.top.theme.to-dark", "Включить тёмную тему");
 	Тексты.Вставить("chrome.top.theme.to-light", "Включить светлую тему");
 	Тексты.Вставить("chrome.office.nav.title", "Разделы личного");
+	Тексты.Вставить("chrome.menu.open", "Меню");
+	Тексты.Вставить("chrome.menu.close", "Закрыть меню");
+	Тексты.Вставить("chrome.menu.rail.title", "Основные разделы");
+	Тексты.Вставить("chrome.menu.section.deeds", "Мои дела");
+	Тексты.Вставить("chrome.menu.section.nav", "Ромашка");
+	Тексты.Вставить("chrome.menu.section.screen", "Разделы экрана");
 	Тексты.Вставить("settings.frame.nav.title", "Разделы настроек");
-	Тексты.Вставить("settings.frame.nav.toggle", "Разделы");
 
 КонецПроцедуры
