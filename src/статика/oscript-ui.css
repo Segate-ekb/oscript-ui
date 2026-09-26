@@ -627,11 +627,19 @@ pre.code {
 	display: flex;
 	align-items: center;
 	gap: var(--space-2);
+	flex-wrap: wrap;
 	margin: calc(-1 * var(--space-2)) 0 var(--space-4);
 	font-size: var(--font-size-small);
 	color: var(--color-text-muted);
 }
 .text-key code { font-size: var(--font-size-small); white-space: nowrap; }
+
+/* Ключ настройки на телефоне: сначала он уходит на свою строку под плашку источника
+   (перенос ряда выше), а ключ длиннее строки переносится внутри себя — иначе он уводит
+   вбок всю страницу, а с ней и лист меню, прибитый к краям окна. */
+@media (max-width: 640px) {
+	.text-key code { white-space: normal; overflow-wrap: anywhere; }
+}
 
 /* Показ загруженной картинки оформления: те же правила, что и у знака в шапке, только
    крупнее — высота фиксирована, ширина по пропорциям, потолок держит очень длинный
@@ -885,7 +893,10 @@ a.tag:hover { text-decoration: none; border-color: var(--color-accent); color: v
    атрибут popover игнорирует — панель остаётся видимой на своём месте в потоке, то есть
    деградирует в прежнее поведение, а не в пустой экран. */
 
-.menu { display: inline-block; }
+/* Открывашка — кнопка-значок без текста, базовой линии у неё нет: по умолчанию она садилась
+   низом на строку текста соседа (кнопки «Отозвать» в той же ячейке) и торчала выше неё.
+   Середина к середине. */
+.menu { display: inline-block; vertical-align: middle; }
 
 /* Вид панели — безусловный, место — только там, где браузер знает верхний слой. Без него
    панель остаётся ОБЫЧНЫМ блоком в потоке ячейки: видна на месте со всеми пунктами, как
@@ -897,29 +908,78 @@ a.tag:hover { text-decoration: none; border-color: var(--color-accent); color: v
 	max-width: 16rem;
 	padding: var(--space-3);
 	flex-direction: column;
-	gap: var(--space-2);
+	gap: var(--space-1);
 	background: var(--color-surface);
 	border: 1px solid var(--color-divider);
 	border-radius: var(--radius-md);
 	box-shadow: var(--shadow-md);
 }
 
+/* Подпись меню — заголовок листа на телефоне: лист встаёт у нижнего края окна, вдали
+   от строки, и без подписи не видно, чьи это действия. На широком панель висит у самой
+   кнопки, подпись была бы дублем — там она спрятана. */
+.menu__title {
+	display: none;
+	margin: 0 0 var(--space-2);
+	font-weight: 600;
+	overflow-wrap: anywhere;
+}
+
+/* Пункт — строка во всю ширину панели, как в выпадающей панели единого меню: рамка-коробка
+   у каждого пункта дробила бы список на кнопки. Вид пункта задаёт МЕНЮ, а не вызывающий:
+   ссылка, кнопка окна и форма из одной кнопки выглядят одинаково, какой бы вариант кнопки
+   ни пришёл. Форма с полями — не пункт, а маленькая форма, и её кнопка остаётся кнопкой.
+   Кнопки окна, открытого из меню, лежат глубже и строкой не становятся. :has() обёрнут
+   в :is(): движок без :has() выбросил бы из-за него весь список вместе со ссылками,
+   а так теряет только форму. */
+.menu__panel > .button,
+.menu__panel > form:is(:not(:has(.field))) > .button {
+	width: 100%;
+	justify-content: flex-start;
+	padding: var(--space-1) var(--space-2);
+	font-size: 14px;
+	text-align: left;
+	white-space: normal;
+	border-color: transparent;
+	background: transparent;
+	color: var(--color-text);
+	border-radius: var(--radius-sm);
+}
+.menu__panel > .button:hover,
+.menu__panel > form:is(:not(:has(.field))) > .button:hover { background: var(--color-surface-alt); filter: none; }
+
+/* Опасный пункт узнаётся цветом подписи, а не заливкой: залитая кнопка перекрикивала бы
+   весь список. */
+.menu__panel > .button--danger,
+.menu__panel > form:is(:not(:has(.field))) > .button--danger { color: var(--color-danger); }
+.menu__panel > .button--danger:hover,
+.menu__panel > form:is(:not(:has(.field))) > .button--danger:hover { background: var(--color-danger-bg); }
+
 @supports selector(:popover-open) {
 
-	/* Место панели — под кнопкой, которая её открыла. Имени привязки не нужно: кнопка
-	   названа в popovertarget, и она же становится якорем панели. `inset: auto` снимает
-	   раскладку UA-стиля (`inset: 0` вместе с `margin: auto` ставит popover по центру
-	   экрана), поэтому стоит ПЕРЕД top/right: сокращённая запись обнулила бы их.
+	/* Место панели — под кнопкой, которая её открыла: кнопка, названная в popovertarget,
+	   и есть неявный якорь панели. Но движок берёт его, только когда попросили: при
+	   начальном `position-anchor: normal` значения anchor() якоря не находят, и панель
+	   ложилась в левый верхний угол ДОКУМЕНТА — на прокрученной странице за край экрана.
 
-	   Панель растёт ВЛЕВО от правого края кнопки: меню стоит в последней колонке таблицы,
-	   и растущая вправо вылезала бы за край экрана. Если места не хватит и так, браузер
-	   отзеркалит её сам — на это стоит position-try-fallbacks. */
+	   Позиция fixed, а не absolute: у кнопки привязка та же, а запасное значение
+	   anchor(…, запас) считается от окна — движок, не нашедший якоря, покажет панель
+	   в экране, а не в начале документа. `inset: auto` снимает раскладку UA-стиля (`inset: 0`
+	   вместе с `margin: auto` ставит popover по центру экрана), поэтому стоит ПЕРЕД top/right.
+
+	   Панель растёт ВЛЕВО от правого края кнопки: меню стоит в последней колонке таблицы.
+	   Не хватит места снизу или слева — браузер отзеркалит её сам; выше окна она не вырастет
+	   и прокручивается сама. */
 	.menu__panel {
-		position: absolute;
+		position: fixed;
 		inset: auto;
-		top: anchor(bottom);
-		right: anchor(right);
-		position-try-fallbacks: flip-inline, flip-block;
+		position-anchor: auto;
+		top: anchor(bottom, 30vh);
+		right: anchor(right, var(--space-5));
+		max-height: min(70vh, 32rem);
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline;
 	}
 
 	/* display достаётся ТОЛЬКО открытой панели: авторское правило сильнее UA-стиля
@@ -1174,6 +1234,12 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 .objhead__top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
 .objhead__title { display: flex; align-items: baseline; gap: var(--space-2); margin: 0; flex-wrap: wrap; }
 .objhead__title .icon { color: var(--color-accent); align-self: center; }
+/* Признак у имени — значок размером с букву имени, по средней линии строки. Последний
+   символ имени и значки — неразрывный кусок: значок не уходит на строку один, а перенос
+   внутри самого имени остаётся прежним. */
+.objhead__tail { white-space: nowrap; }
+.objhead__mark { margin-left: var(--space-1); }
+.objhead__mark .icon { width: 1em; height: 1em; vertical-align: middle; }
 .objhead__kind {
 	font-size: var(--font-size-small);
 	font-family: var(--font-body);
@@ -1759,6 +1825,10 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 
 	.top--menu .top__nav { display: none; }
 
+	/* На телефоне в шапке остаются двое — бургер и знак, — и стоять они обязаны рядом,
+	   слева. Базовое «по краям» растащило бы их по противоположным углам экрана. */
+	.top--menu .wrap { justify-content: flex-start; }
+
 	@supports selector(:popover-open) {
 
 		.hubmenu__opener { display: block; }
@@ -1794,6 +1864,69 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 
 }
 
+/* --- строчное меню на узком экране ----------------------------------------------------
+   На телефоне панель к кнопке не привязана: шестерёнка стоит в последней колонке, у края
+   экрана и внутри прокручиваемой обёртки таблицы, и панель у такой кнопки уезжала за край.
+   Здесь она встаёт ЛИСТОМ у нижнего края окна — там её видно целиком, в какой бы строке
+   и на какой прокрутке ни нажали, и туда дотягивается палец. Лист — пара шторке единого
+   меню: выезжает от своего края, под ним тот же скрим, пункты той же пальцевой высоты. */
+@media (max-width: 900px) {
+
+	.menu__title { display: block; }
+
+	.menu__panel > .button,
+	.menu__panel > form:is(:not(:has(.field))) > .button {
+		min-height: 44px;
+		padding: var(--space-2) var(--space-3);
+		font-size: var(--font-size-body);
+		border-color: var(--color-divider);
+		border-radius: var(--radius-md);
+	}
+
+	/* Кнопка формы с полями в листе — та же цель под палец. Форма тянет её во всю ширину,
+	   и подпись встаёт по центру, как у кнопки, а не у строки: строкой она не стала. */
+	.menu__panel > form:has(.field) > .button { min-height: 44px; justify-content: center; }
+
+	@supports selector(:popover-open) {
+
+		/* Место листа — края окна, а не кнопка: inset задаёт все четыре стороны разом
+		   и тем перекрывает и привязку к якорю, и запасной центр движка без якорей,
+		   а position-try-fallbacks: none не даёт браузеру отзеркалить лист. Ширина — во всё
+		   окно телефона, на планшете — полоса по центру: лист во всю ширину планшета
+		   с тремя строчками читался бы пустым полем. */
+		.menu__panel {
+			position: fixed;
+			inset: auto 0 0 0;
+			width: 100%;
+			max-width: 32rem;
+			margin: 0 auto;
+			max-height: 80vh;
+			max-height: 80dvh;
+			padding: var(--space-4);
+			border-width: 1px 1px 0;
+			border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+			box-shadow: var(--shadow-lg);
+			translate: 0 100%;
+			position-try-fallbacks: none;
+			transition: translate var(--motion-medium) var(--motion-ease),
+			            overlay var(--motion-medium) allow-discrete,
+			            display var(--motion-medium) allow-discrete;
+		}
+
+		.menu__panel:popover-open { translate: 0 0; }
+
+		@starting-style {
+			.menu__panel:popover-open { translate: 0 100%; }
+		}
+
+		/* Затемнение — признак того, что страница за листом сейчас не работает;
+		   щелчок по нему закрывает лист, как и щелчок мимо шторки. */
+		.menu__panel::backdrop { background: var(--color-scrim); }
+
+	}
+
+}
+
 /* --- дом настроек на узком экране ----------------------------------------------------
    Колонка разделов встаёт над секциями и читается пальцем. Выдвижного меню здесь нет:
    те же разделы едут секцией в ЕДИНОЕ меню инсталляции (см. панель выше), и два выдвижных
@@ -1820,7 +1953,10 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 }
 
 @media (max-width: 640px) {
-	.top .wrap { flex-direction: column; align-items: flex-start; gap: var(--space-2); }
+	/* Прежняя шапка на совсем узком встаёт колонкой: в ней ряд ходов, тема и учётка,
+	   в строку они не влезают. Шапке с единым меню это не нужно и вредно — там всего
+	   двое, бургер и знак, и колонка уводила бы знак на вторую строку. */
+	.top:not(.top--menu) .wrap { flex-direction: column; align-items: flex-start; gap: var(--space-2); }
 	main.wrap { padding-top: var(--space-5); }
 	.savebar { position: static; }
 }
@@ -1839,14 +1975,27 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
    На узком экране запрет снимается — там строка уже стала карточкой во всю ширину. */
 .table-cards code { white-space: nowrap; }
 
-/* На узком экране строка перестаёт быть рядом ячеек и становится записью-карточкой:
-   имя, плашки, показатели и меню называют себя сами, поэтому шапка не нужна. */
+/* На узком экране строка перестаёт быть рядом ячеек и становится записью-карточкой.
+   Шапки у записи нет, поэтому ячейка называет свою колонку сама: подпись колонки (кит
+   кладёт её в data-label) стоит приглушённой строкой над значением. Заглавная ячейка,
+   ячейка с меню строки и колонка, чьи значения называют себя сами, подписи не несут.
+
+   Ячейка записи — строка во всю ширину карточки: ширина и запрет переноса узкого столбца
+   (.cell-narrow) здесь снимаются, иначе ячейка ужимается до 1% и число встаёт столбиком
+   по букве. Пустую ячейку кит помечает классом, и места в записи она не занимает. */
 @media (max-width: 720px) {
 	.table-cards, .table-cards tbody, .table-cards tr, .table-cards td { display: block; }
 	.table-cards thead { display: none; }
 	.table-cards tr { padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-divider); }
 	.table-cards tr:last-child { border-bottom: none; }
-	.table-cards td { border-bottom: none; padding: var(--space-1) 0; }
+	.table-cards td { width: auto; white-space: normal; border-bottom: none; padding: var(--space-1) 0; }
+	.table-cards td.cell-empty { display: none; }
+	.table-cards td[data-label]::before {
+		content: attr(data-label);
+		display: block;
+		color: var(--color-text-muted);
+		font-size: var(--font-size-small);
+	}
 	.table-cards code { white-space: normal; overflow-wrap: anywhere; }
 }
 
