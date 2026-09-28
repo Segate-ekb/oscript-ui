@@ -1,16 +1,38 @@
 name: Публикация релиза
 
+# Доверенная публикация: пакет уходит в основной пул hub.oscript.io по тегу v*,
+# без секрета — хаб проверяет одноразовый id-token GitHub по записи доверия пакета.
 on:
-  release:
-    types:
-      - published
-  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  id-token: write
 
 jobs:
-  release:
-    uses: autumn-library/workflows/.github/workflows/release.yml@main
-    with:
-      oscript_version: stable
-      package_mask: "oscript-ui-*.ospx"
-    secrets:
-      PUSH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      audience: https://hub.oscript.io
+      hub: https://hub.oscript.io
+      pool: default
+      package: oscript-ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: otymko/setup-onescript@v1.5.1
+        with:
+          version: stable
+      - run: opm install opm@1.6.5
+      - run: opm build .
+      - name: push
+        run: |
+          id_token=$(curl -sSf -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$audience" | jq -r .value)
+          version="${GITHUB_REF_NAME#v}"
+          file="${package}-${version}.ospx"
+          test -f "$file" || { echo "tag $GITHUB_REF_NAME does not match the package version in packagedef"; exit 1; }
+          curl -sSf -X POST "$hub/api/v1/pools/$pool/push" \
+            -H "OAUTH-TOKEN: $id_token" \
+            -H "FILE-NAME: $(basename $file)" \
+            --data-binary "@$file"
