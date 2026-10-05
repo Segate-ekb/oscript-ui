@@ -496,8 +496,20 @@ h3 { font-size: 16px; margin: var(--space-5) 0 var(--space-2); }
 .field__hint { font-size: var(--font-size-small); color: var(--color-text-muted); }
 .field__error { font-size: var(--font-size-small); color: var(--color-danger); }
 .field--error .field__control { border-color: var(--color-danger); }
-.field--check { flex-direction: row; align-items: center; gap: var(--space-2); }
+/* Флажок — сетка в две колонки: галка слева, подпись справа, пояснение и отказ — под
+   подписью во второй колонке. Строкой (flex-row) пояснение вставало справа от подписи
+   и сжимало её в столбик из слов. */
+.field--check {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr);
+	align-items: start;
+	column-gap: var(--space-2);
+	row-gap: 2px;
+}
+.field--check .field__check { margin: 3px 0 0; }
 .field--check .field__label { color: var(--color-text); }
+.field--check .field__hint,
+.field--check .field__error { grid-column: 2; }
 .field__check { width: 16px; height: 16px; accent-color: var(--color-accent); }
 textarea.field__control { min-height: calc(var(--space-8) * 2); resize: vertical; }
 
@@ -745,6 +757,110 @@ a.tag:hover { text-decoration: none; border-color: var(--color-accent); color: v
    блокам (.card__body > * + *), уходит ей в высоту строчного бокса: строка опускается,
    а контейнер растёт. Зазор внутри ряда — тот же, что у .objcard__chips и .objhead__chips. */
 .tag-row { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+
+/* --- компонент: сводка (запись списка одним взглядом) ---
+   Название первым и крупнее всего, знаки состояния — плашками рядом с ним, подпись —
+   приглушённой строкой под ним, сведения — подписанными строками: на широком экране
+   подпись и значение колонками, на узком подпись встаёт над значением. Вся разметка
+   строчная (span): сводка живёт и в <summary>, куда блочные теги класть нельзя. */
+
+.brief { display: flex; flex-direction: column; gap: var(--space-1); flex: 1 1 auto; min-width: 0; }
+.brief__head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); }
+.brief__head .tag { margin-right: 0; }
+.brief__name { font-size: 16px; font-weight: 600; color: var(--color-text); overflow-wrap: anywhere; }
+.brief__sub { font-size: var(--font-size-small); color: var(--color-text-muted); overflow-wrap: anywhere; }
+.brief__facts {
+	display: grid;
+	grid-template-columns: max-content minmax(0, 1fr);
+	gap: 2px var(--space-3);
+	margin-top: var(--space-1);
+	font-size: var(--font-size-small);
+	line-height: 1.5;
+}
+.brief__fact { display: contents; }
+.brief__label { color: var(--color-text-muted); }
+.brief__value { color: var(--color-text); overflow-wrap: anywhere; }
+.brief__value--warn { color: var(--color-warning); }
+@media (max-width: 640px) {
+	.brief__facts { grid-template-columns: minmax(0, 1fr); gap: 0; }
+	.brief__fact + .brief__fact .brief__label { margin-top: var(--space-1); }
+}
+
+/* --- компонент: дерево галок (выбор с трёхпозиционной галкой у ветки) ---
+   Узел — строка «галка + подпись + приписка + плашки»; ветка — нативная раскрывашка,
+   чей <summary> — один шеврон слева от строки. Строка стоит в разметке после ветки,
+   а на экране первой (order): шеврон в порядке фокуса идёт раньше галки и в кнопку
+   раскрытия ничего не вложено. Вложенность показывают отступ и линия слева.
+   «Частично» рисуется знаком «—» в самой галке и без скрипта: по aria-checked="mixed",
+   который печатает сервер, и по :indeterminate, который ставит скрипт. */
+
+.checktree, .checktree__children { list-style: none; margin: 0; padding: 0; }
+.checktree__node { position: relative; display: flex; flex-direction: column; }
+.checktree__row {
+	order: -1;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space-1) var(--space-2);
+	min-height: 28px;
+	padding: 2px 0 2px 24px;
+}
+.checktree__item { display: inline-flex; align-items: center; gap: var(--space-2); cursor: pointer; min-width: 0; }
+.checktree__label { color: var(--color-text); overflow-wrap: break-word; }
+.checktree__note { font-size: var(--font-size-small); color: var(--color-text-muted); }
+.checktree__marks { display: inline-flex; flex-wrap: wrap; gap: var(--space-1); }
+.checktree__marks .tag { margin-right: 0; }
+.checktree__toggle {
+	position: absolute;
+	top: 2px; left: 0;
+	width: 22px; height: 24px;
+	display: flex; align-items: center; justify-content: center;
+	list-style: none;
+	cursor: pointer;
+	border-radius: var(--radius-sm);
+	color: var(--color-text-muted);
+}
+.checktree__toggle::-webkit-details-marker { display: none; }
+.checktree__toggle::before {
+	content: "";
+	width: 7px; height: 7px;
+	border-right: 1.5px solid currentColor;
+	border-bottom: 1.5px solid currentColor;
+	transform: rotate(-45deg);
+	transition: transform var(--motion-fast) var(--motion-ease);
+}
+.checktree__branch[open] > .checktree__toggle::before { transform: rotate(45deg); }
+.checktree__toggle:hover { color: var(--color-text); background: var(--color-surface-alt); }
+.checktree__toggle:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+.checktree__children {
+	margin: 0 0 var(--space-1) 10px;
+	padding-left: 14px;
+	border-left: 1px solid var(--color-divider);
+}
+.checktree__children > .checktree__node::before {
+	content: "";
+	position: absolute;
+	top: 16px; left: -14px;
+	width: 10px;
+	border-top: 1px solid var(--color-divider);
+}
+.checktree__more { margin: var(--space-1) 0 var(--space-1) 34px; font-size: var(--font-size-small); color: var(--color-text-muted); }
+.checktree__box { width: 16px; height: 16px; margin: 0; flex: none; accent-color: var(--color-accent); cursor: pointer; }
+.checktree__box[aria-checked="mixed"], .checktree__box:indeterminate {
+	-webkit-appearance: none;
+	appearance: none;
+	border: 1px solid var(--color-text-muted);
+	border-radius: 3px;
+	background: var(--color-surface-alt);
+}
+.checktree__box[aria-checked="mixed"]:checked, .checktree__box:indeterminate {
+	border-color: var(--color-accent);
+	background: linear-gradient(var(--color-accent-contrast), var(--color-accent-contrast)) center / 8px 2px no-repeat,
+		var(--color-accent);
+}
+.checktree__box:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.checktree__box[disabled] { cursor: not-allowed; opacity: .55; }
+.checktree__box[disabled] + .checktree__label { color: var(--color-text-muted); }
 
 /* --- компонент: дерево разделов --- */
 
@@ -1442,6 +1558,31 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 /* Вертикальная форма: стопка полей кита с одинаковым зазором. Поверхности не рисует —
    её даёт карточка или секция настроек, внутри которых форма и живёт. */
 .form-stack { display: flex; flex-direction: column; gap: var(--space-3); max-width: 560px; }
+/* Раздел длинной формы — группа полей с подписью-заголовком. Рамки нет: раздел от раздела
+   отделяет черта сверху. Легенда плавает на всю ширину — так она остаётся первым ребёнком
+   fieldset и при этом не рвёт черту. Вложенные группы внутри раздела — без рамок, их
+   подпись — как подпись поля. */
+.form-section { border: 0; margin: 0; padding: var(--space-4) 0 0; min-width: 0; border-top: 1px solid var(--color-divider); }
+.form-section:first-child { border-top: 0; padding-top: 0; }
+.form-section > legend {
+	float: left;
+	width: 100%;
+	padding: 0;
+	margin: 0 0 var(--space-3);
+	font-size: 15px;
+	font-weight: 600;
+	color: var(--color-text);
+}
+/* clear — у каждого, а не у соседа легенды: соседом бывает скрытое поле, а у него обтекание
+   не действует, и легенда вложенной группы уезжала вправо за край. */
+.form-section > :not(legend) { clear: both; }
+.form-section > legend + * { margin-top: 0; }
+.form-section > * + * { margin-top: var(--space-3); }
+.form-section fieldset { border: 0; margin-left: 0; margin-right: 0; padding: 0; min-width: 0; }
+.form-section fieldset > legend { padding: 0; margin-bottom: var(--space-1); font-size: var(--font-size-small); color: var(--color-text-muted); }
+/* Примечание внутри раздела формы — пояснение к полям, а не основной текст: размер подсказки
+   поля, чтобы не спорить с подписью раздела. */
+.form-section p.muted { font-size: var(--font-size-small); }
 .form-stack > .button { align-self: flex-start; }
 
 /* Форма-строка внутри ячейки таблицы: кнопка (и иногда пара полей) в одну линию. */
@@ -1965,6 +2106,9 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 
 .cell-stack { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
 .row-line { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+/* Действия записи одним рядом: кнопка формы и кнопки соседних форм (каждая — своя форма
+   из одной кнопки) стоят в строку и переносятся вместе. */
+.actions-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .image-icon--small { width: 16px; height: 16px; }
 
 /* --- таблица карточками: длинный список читается без горизонтальной прокрутки --- */
