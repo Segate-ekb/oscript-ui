@@ -2044,10 +2044,14 @@ input[type="color"].field__control { padding: 24px 12px 6px; height: 56px; curso
    flex-end равняет МАРГИН-БОКСЫ элементов, поэтому кнопка вставала по нижней границе
    отступа поля, а не по нижней границе его контрола — визуально на 16 px ниже.
    Починка не здесь, а у .field: интервалы больше не живут на самих полях, и низ
-   маргин-бокса поля совпал с низом ввода. Правило оставлено flex-end сознательно:
-   baseline равняло бы по ТЕКСТУ, а метка поля сверху сдвинула бы кнопку вниз. */
-.filters { display: flex; align-items: flex-end; gap: var(--space-2); margin: var(--space-4) 0; }
+   маргин-бокса поля совпал с низом ввода.
+   С полем Material правило стало flex-start: контейнер поля — 56px, кнопка — 40px, и низом
+   к низу она садилась ниже середины поля, а с пояснением под полем — и вовсе к пояснению.
+   По верху и со сдвигом на половину разницы высот кнопка стоит ровно по центру контрола,
+   что бы ни печаталось под ним. baseline по-прежнему не годится: равняло бы по ТЕКСТУ. */
+.filters { display: flex; align-items: flex-start; gap: var(--space-2); margin: var(--space-4) 0; }
 .filters > .field { flex: 1; min-width: 0; }
+.filters > .button { margin-top: var(--space-2); }
 .chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
 /* Чип фильтра Material: высота 32px, скругление small, обводка outline-variant;
