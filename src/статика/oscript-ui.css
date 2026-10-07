@@ -1,4 +1,13 @@
-/* oscript-ui — базовый лист UI-кита: правила его собственных примитивов.
+/* oscript-ui — базовый лист UI-кита: правила его собственных примитивов в облике
+ * Material Design 3 (m3.material.io): цвет ролями, шрифт шкалой, скругления формами,
+ * тени уровнями возвышения, наведение и нажатие слоями состояний — всё токенами
+ * --md-sys-*, которые печатает ТокеныТемы.
+ *
+ * ДВИЖЕНИЕ — ПО ОБРАЗЦУ MUI. Слой состояний, плавающая подпись поля, растущая полоса
+ * фокуса, раскрытие меню и окна, выезд шторки, скольжение индикатора вкладок — CSS.
+ * Рябь от точки нажатия, пустота поля и тень шапки при прокрутке — скрипт кита
+ * (oscript-ui.js). Без скрипта всё работает и выглядит законченным: подпись поля просто
+ * стоит наверху, а ряби нет.
  *
  * САМОДОСТАТОЧЕН. Библиотека, поставленная в чужой проект, выглядит прилично без
  * единой строки CSS от потребителя: этот лист печатает КаркасСтраницы первым тегом
@@ -16,8 +25,12 @@
  * инлайном в <head> (ТокеныТемы): тема, акцент, плотность, радиусы. Поэтому смена темы
  * не требует ни пересборки этого файла, ни сброса его кэша.
  *
- * Порядок разделов: сброс → каркас → типографика → компоненты → страницы (формы, отборы,
- * свёртки) → каркас настроек → движение.
+ * Порядок разделов: сброс → слой состояний и рябь → каркас → типографика → компоненты →
+ * страницы (формы, отборы, свёртки) → каркас настроек → движение.
+ *
+ * ЛОКАЛЬНЫЕ ПЕРЕМЕННЫЕ — С ПОДЧЁРКИВАНИЕМ. --_bg, --_fg, --_state и им подобные объявляет
+ * сам лист у своего компонента: это входы общих правил состояния, а не токены темы.
+ * Всё остальное, что лист читает через var(), объявляет ТокеныТемы.
  */
 
 /* --- сброс --- */
@@ -26,24 +39,55 @@
 
 body {
 	margin: 0;
-	font-family: var(--font-body);
-	font-size: var(--font-size-body);
-	line-height: 1.55;
-	color: var(--color-text);
-	background: var(--color-bg);
+	font: var(--type-body-large);
+	letter-spacing: var(--md-sys-typescale-body-large-tracking);
+	color: var(--md-sys-color-on-surface);
+	background: var(--md-sys-color-surface);
 	-webkit-font-smoothing: antialiased;
+	-webkit-tap-highlight-color: transparent;
 }
 
-a { color: var(--color-accent); text-decoration: none; }
+a { color: var(--md-sys-color-primary); text-decoration: none; }
 a:hover { text-decoration: underline; }
+/* Индикатор фокуса Material: обводка 3px цветом secondary с зазором. Скругление у обводки
+   своё не задаётся — она идёт по форме самого элемента, и пилюля остаётся пилюлей. */
 a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible,
 textarea:focus-visible, summary:focus-visible {
-	outline: 2px solid var(--color-accent);
+	outline: 3px solid var(--md-sys-color-secondary);
 	outline-offset: 2px;
-	border-radius: var(--radius-sm);
 }
 
-code, pre, kbd, samp { font-family: var(--font-mono); }
+code, pre, kbd, samp { font-family: var(--md-ref-typeface-mono); }
+
+/* --- слой состояний и рябь ---------------------------------------------------------
+   Наведение, фокус и нажатие в Material — не новый цвет, а СЛОЙ: поверх заливки элемента
+   ложится его же цвет содержимого с прозрачностью из токенов (8% наведение, 10% фокус
+   и нажатие). Здесь слой считается одной функцией: фон = color-mix(содержимое --_state,
+   заливка --_bg). Компонент объявляет только --_bg и --_fg, правила состояний у всех одни,
+   и прозрачная заливка (кнопка-текст, пункт меню) получает слой тем же путём.
+
+   Рябь — круг от точки нажатия, который расходится и гаснет, как в MUI. Её кладёт скрипт
+   кита (oscript-ui.js) внутрь элемента; правила ниже — её вид. Элемент, внутри которого
+   рябь, держит её в своих границах: контейнер ряби повторяет его скругление. */
+.ripple {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+	border-radius: inherit;
+	pointer-events: none;
+}
+.ripple__wave {
+	position: absolute;
+	border-radius: 50%;
+	background: currentColor;
+	opacity: .2;
+	transform: scale(0);
+	animation: ui-ripple var(--md-sys-motion-duration-long1) var(--md-sys-motion-easing-standard) forwards;
+}
+.ripple__wave--out {
+	opacity: 0;
+	transition: opacity var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-standard);
+}
 
 /* --- каркас --- */
 
@@ -55,15 +99,26 @@ code, pre, kbd, samp { font-family: var(--font-mono); }
 
 /* ⚠ Высоту этой полосы повторяет отступ выпадающей панели меню (.hubmenu:popover-open
    в медиа-блоке широкого экрана): панель висит ПОД шапкой и собрана из тех же величин.
-   Меняешь отступы полосы или высоту знака — поправь расчёт и там. */
+   Меняешь отступы полосы или высоту знака — поправь расчёт и там. Линия снизу прозрачна,
+   но остаётся в расчёте: у верхней панели Material разделителя нет.
+
+   Верхняя панель Material: цвета поверхности, пока страница наверху, и цвета контейнера
+   с тенью, когда содержимое уехало под неё. Признак прокрутки (data-scrolled) ставит
+   скрипт кита; без скрипта панель остаётся цвета поверхности — разница только в тени. */
 .top {
-	background: var(--color-surface);
-	border-bottom: 1px solid var(--color-divider);
+	background: var(--md-sys-color-surface);
+	color: var(--md-sys-color-on-surface);
+	border-bottom: 1px solid transparent;
 	padding: var(--space-3) 0;
 	position: sticky;
 	top: 0;
 	z-index: 20;
-	backdrop-filter: saturate(140%) blur(6px);
+	transition: background-color var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-standard),
+	            box-shadow var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-standard);
+}
+.top[data-scrolled] {
+	background: var(--md-sys-color-surface-container);
+	box-shadow: var(--md-sys-elevation-level2);
 }
 
 .top .wrap { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
@@ -72,12 +127,10 @@ code, pre, kbd, samp { font-family: var(--font-mono); }
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2);
-	font-family: var(--font-heading);
-	font-weight: 600;
-	font-size: 17px;
-	color: var(--color-text);
+	font: var(--type-title-large);
+	color: var(--md-sys-color-on-surface);
 }
-.brand:hover { text-decoration: none; color: var(--color-accent); }
+.brand:hover { text-decoration: none; color: var(--md-sys-color-primary); }
 /* Высота фиксирована, ширина считается по СОБСТВЕННЫМ пропорциям картинки: знак бывает
    и квадратным (поставка), и горизонтальным с нарисованным названием (загруженный).
    Квадратный от этого не меняется — 28 на 28 он и есть. Потолок ширины держит очень
@@ -85,16 +138,32 @@ code, pre, kbd, samp { font-family: var(--font-mono); }
    картинку — вместо искажения остаются поля. */
 .brand__mark { height: 28px; width: auto; max-width: 200px; object-fit: contain; flex: none; }
 
-.top__nav { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
-.top__link { color: var(--color-text-muted); }
-.top__link:hover { color: var(--color-text); text-decoration: none; }
+.top__nav { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+/* Ход в шапке — кнопка-текст Material: пилюля, слой состояния на наведении. */
+.top__link {
+	--_bg: transparent;
+	--_state: 0%;
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	min-height: 40px;
+	padding: 0 var(--space-3);
+	border-radius: var(--md-sys-shape-corner-full);
+	color: var(--md-sys-color-on-surface-variant);
+	background-color: color-mix(in srgb, currentColor var(--_state), var(--_bg));
+	font: var(--type-label-large);
+	letter-spacing: var(--md-sys-typescale-label-large-tracking);
+	transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
+}
+.top__link:hover { --_state: var(--state-hover); color: var(--md-sys-color-on-surface); text-decoration: none; }
+.top__link:active { --_state: var(--state-pressed); }
 
 .who {
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-1);
-	color: var(--color-text-muted);
-	font-size: var(--font-size-small);
+	color: var(--md-sys-color-on-surface-variant);
+	font: var(--type-label-large);
 }
 
 main.wrap { padding-top: var(--space-6); padding-bottom: var(--space-8); min-height: 60vh; }
@@ -124,13 +193,13 @@ main.wrap { padding-top: var(--space-6); padding-bottom: var(--space-8); min-hei
 	max-width: none;
 	height: auto;
 	margin: 0 0 var(--space-5);
-	padding: var(--space-4);
+	padding: var(--space-3);
 	border: 0;
-	border-bottom: 1px solid var(--color-divider);
+	border-bottom: 1px solid var(--md-sys-color-outline-variant);
 	border-radius: 0;
 	overflow: visible;
-	background: var(--color-surface);
-	color: inherit;
+	background: var(--md-sys-color-surface-container-low);
+	color: var(--md-sys-color-on-surface-variant);
 }
 
 .hubmenu__head {
@@ -142,33 +211,39 @@ main.wrap { padding-top: var(--space-6); padding-bottom: var(--space-8); min-hei
 }
 .hubmenu__brand { display: inline-flex; align-items: center; min-width: 0; }
 
-/* Блок вошедшего — он же ход в кабинет, поэтому кликабелен целиком. */
+/* Блок вошедшего — он же ход в кабинет, поэтому кликабелен целиком: пункт ящика
+   навигации Material с аватаром — пилюля во всю ширину, слой состояния на наведении. */
 .hubmenu__account {
+	--_bg: transparent;
+	--_state: 0%;
+	position: relative;
 	display: flex;
 	align-items: center;
 	gap: var(--space-3);
-	min-height: 44px;
-	padding: var(--space-2) var(--space-3);
-	border-radius: var(--radius-md);
-	color: var(--color-text);
+	min-height: 56px;
+	padding: var(--space-2) var(--space-4);
+	border-radius: var(--md-sys-shape-corner-full);
+	color: var(--md-sys-color-on-surface);
+	background-color: color-mix(in srgb, currentColor var(--_state), var(--_bg));
+	transition: background-color var(--motion-fast) var(--motion-ease);
 }
-.hubmenu__account:hover { background: var(--color-surface-alt); text-decoration: none; }
+.hubmenu__account:hover { --_state: var(--state-hover); text-decoration: none; }
+.hubmenu__account:active { --_state: var(--state-pressed); }
 .hubmenu__avatar {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: 36px;
-	height: 36px;
+	width: 40px;
+	height: 40px;
 	flex: none;
-	border-radius: 50%;
-	background: var(--color-accent-900);
-	color: var(--color-accent-400);
-	font-family: var(--font-heading);
-	font-weight: 600;
+	border-radius: var(--md-sys-shape-corner-full);
+	background: var(--md-sys-color-primary-container);
+	color: var(--md-sys-color-on-primary-container);
+	font: var(--type-title-medium);
 }
 .hubmenu__who { display: flex; flex-direction: column; min-width: 0; }
-.hubmenu__login { font-weight: 600; overflow-wrap: anywhere; }
-.hubmenu__role { color: var(--color-text-muted); font-size: var(--font-size-small); }
+.hubmenu__login { font: var(--type-title-small); letter-spacing: var(--md-sys-typescale-title-small-tracking); overflow-wrap: anywhere; }
+.hubmenu__role { color: var(--md-sys-color-on-surface-variant); font: var(--type-body-small); }
 
 .hubmenu__section { margin-top: var(--space-4); }
 /* Разделы текущего экрана: на широком их прячет медиа-блок — там они уже стоят колонкой
@@ -178,29 +253,44 @@ main.wrap { padding-top: var(--space-6); padding-bottom: var(--space-8); min-hei
    стоит в самой шапке, и вторая такая же строка в меню была бы дублем. На телефоне полоса
    ходов спрятана, и это единственное место, где тему можно переключить. */
 .hubmenu__theme { display: block; }
+/* Заголовок группы в ящике навигации Material — title-small приглушённым цветом. */
 .hubmenu__title {
-	margin: 0 0 var(--space-1);
-	color: var(--color-text-muted);
-	font-size: var(--font-size-small);
-	text-transform: uppercase;
-	letter-spacing: 0.04em;
+	margin: 0;
+	padding: var(--space-4) var(--space-4) var(--space-2);
+	color: var(--md-sys-color-on-surface-variant);
+	font: var(--type-title-small);
+	letter-spacing: var(--md-sys-typescale-title-small-tracking);
 }
 
-/* Пункт меню — строка во всю ширину и под палец: кнопка кита сама по себе ужимается
+/* Пункт меню — пункт ящика навигации Material: строка во всю ширину и под палец (56px),
+   пилюлей, без рамки и заливки; текущий ход — индикатор цвета secondary-container. Вид
+   задаёт ящик, какой бы вариант кнопки ни пришёл: кнопка кита сама по себе ужимается
    по содержимому и выравнивается по центру. */
 .hubmenu .button {
-	min-height: 44px;
+	--_bg: transparent;
+	--_fg: var(--md-sys-color-on-surface-variant);
+	width: 100%;
+	min-height: 56px;
+	padding: 0 var(--space-4);
 	justify-content: flex-start;
+	gap: var(--space-3);
 	text-align: left;
+	border-color: transparent;
+	box-shadow: none;
 }
+.hubmenu .button[aria-current] {
+	--_bg: var(--md-sys-color-secondary-container);
+	--_fg: var(--md-sys-color-on-secondary-container);
+}
+.hubmenu .button .icon { width: 24px; height: 24px; }
 
 .hubmenu__foot {
 	display: flex;
 	flex-direction: column;
-	gap: var(--space-2);
-	margin-top: var(--space-5);
+	gap: 0;
+	margin-top: var(--space-3);
 	padding-top: var(--space-3);
-	border-top: 1px solid var(--color-divider);
+	border-top: 1px solid var(--md-sys-color-outline-variant);
 }
 
 /* Шапка страницы с единым меню — прежняя шапка: знак слева, ходы справа. Бургер стоит
@@ -227,7 +317,7 @@ main.wrap { padding-top: var(--space-6); padding-bottom: var(--space-8); min-hei
 		border: 0;
 		overflow-y: auto;
 		overscroll-behavior: contain;
-		box-shadow: var(--shadow-lg);
+		box-shadow: var(--md-sys-elevation-level1);
 	}
 
 	/* Панель — колонка, и содержимого в ней бывает больше, чем высоты: без этого браузер
@@ -250,50 +340,51 @@ main.wrap { padding-top: var(--space-6); padding-bottom: var(--space-8); min-hei
 	   прежнее меню учётки. Крест — привычка телефона, там он и остаётся. */
 	.hubmenu__head { display: none; }
 
-	/* Вид — прежнего меню учётки: компактный дропдаун, а не мобильная шторка. */
+	/* Вид — меню Material: компактный дропдаун цвета surface-container на уровне
+	   возвышения 2, скругление extra-small, а не мобильная шторка. */
 	.hubmenu {
-		padding: var(--space-3);
-		border: 1px solid var(--color-divider);
-		border-radius: var(--radius-md);
-		box-shadow: var(--shadow-md);
+		padding: var(--space-2) 0;
+		border: 0;
+		border-radius: var(--md-sys-shape-corner-extra-small);
+		background: var(--md-sys-color-surface-container);
+		box-shadow: var(--md-sys-elevation-level2);
 	}
 
-	/* Пункт — строка с тонким фоном на наведении: рамка-коробка у каждого пункта дробила
-	   бы список на кнопки, а это список. */
+	/* Пункт — строка меню Material (48px, без скругления, слой состояния на наведении):
+	   рамка-коробка у каждого пункта дробила бы список на кнопки, а это список. */
 	.hubmenu .button {
-		min-height: 0;
+		min-height: 48px;
 		width: 100%;
-		padding: var(--space-1) var(--space-2);
-		border-color: transparent;
-		background: transparent;
-		border-radius: var(--radius-sm);
+		padding: 0 var(--space-3);
+		border-radius: 0;
+		--_fg: var(--md-sys-color-on-surface);
 	}
-	.hubmenu .button:hover { background: var(--color-surface-alt); filter: none; }
+	.hubmenu .button .icon { width: 20px; height: 20px; color: var(--md-sys-color-on-surface-variant); }
 
 	/* Рубрика — мелкая приглушённая подпись над тонким разделителем, а не заголовок:
 	   в дропдауне секции разделяют, а не объявляют. */
 	.hubmenu__section {
-		margin-top: var(--space-3);
+		margin-top: var(--space-2);
 		padding-top: var(--space-2);
-		border-top: 1px solid var(--color-divider);
+		border-top: 1px solid var(--md-sys-color-outline-variant);
 	}
 	.hubmenu__title {
-		margin-bottom: 2px;
-		text-transform: none;
-		letter-spacing: normal;
+		padding: var(--space-1) var(--space-3);
+		font: var(--type-label-medium);
+		letter-spacing: var(--md-sys-typescale-label-medium-tracking);
 	}
 
 	/* Учётка — такая же строка, как пункты: мелкий кружок, имя и роль под ним. Высота
 	   собственная, а не нулевая: с min-height: 0 двухэтажная строка съезжала на аватар. */
 	.hubmenu__account {
-		min-height: 36px;
-		gap: var(--space-2);
-		padding: var(--space-1) var(--space-2);
-		margin-top: var(--space-1);
+		min-height: 56px;
+		gap: var(--space-3);
+		padding: var(--space-2) var(--space-3);
+		margin-top: 0;
+		border-radius: 0;
 	}
-	.hubmenu__avatar { width: 24px; height: 24px; font-size: var(--font-size-small); }
+	.hubmenu__avatar { width: 32px; height: 32px; font: var(--type-label-large); }
 	.hubmenu__who { line-height: 1.25; }
-	.hubmenu__login { font-size: 14px; }
 
 	/* Разделы текущего экрана на широком стоят колонкой на самой странице, а переключатель
 	   оформления — в шапке: второй раз в меню они не нужны. */
@@ -306,7 +397,7 @@ main.wrap { padding-top: var(--space-6); padding-bottom: var(--space-8); min-hei
 	.hubmenu__foot {
 		margin-top: var(--space-2);
 		padding-top: var(--space-2);
-		gap: var(--space-1);
+		gap: 0;
 	}
 
 	@supports selector(:popover-open) {
@@ -325,9 +416,9 @@ main.wrap { padding-top: var(--space-6); padding-bottom: var(--space-8); min-hei
 			right: max(var(--space-5), calc(50% - var(--layout-width) / 2 + var(--space-5)));
 			width: min(92vw, 280px);
 			max-height: min(80vh, 640px);
-			border: 1px solid var(--color-divider);
-			border-radius: var(--radius-md);
-			box-shadow: var(--shadow-md);
+			border: 0;
+			border-radius: var(--md-sys-shape-corner-extra-small);
+			box-shadow: var(--md-sys-elevation-level2);
 		}
 
 	}
@@ -335,25 +426,28 @@ main.wrap { padding-top: var(--space-6); padding-bottom: var(--space-8); min-hei
 }
 
 .bottom {
-	border-top: 1px solid var(--color-divider);
-	color: var(--color-text-muted);
+	border-top: 1px solid var(--md-sys-color-outline-variant);
+	color: var(--md-sys-color-on-surface-variant);
 	padding: var(--space-5) 0;
-	font-size: var(--font-size-small);
+	font: var(--type-body-medium);
+	letter-spacing: var(--md-sys-typescale-body-medium-tracking);
 	margin-top: var(--space-8);
 }
 
 /* --- типографика --- */
 
-h1, h2, h3, h4 { font-family: var(--font-heading); font-weight: var(--font-weight-heading); }
-h1 { font-size: var(--font-size-h1); margin: 0 0 var(--space-3); letter-spacing: -0.01em; }
-h2 {
-	font-size: var(--font-size-h2);
-	margin: var(--space-6) 0 var(--space-3);
-	padding-bottom: var(--space-2);
-	border-bottom: 1px solid var(--color-divider);
+/* Заголовки — ступени шкалы Material: h1 — headline-medium, h2 — title-large,
+   h3 — title-medium. Подчёркивания у h2 нет: в Material раздел отделяет пространство
+   и поверхность, а не линия под заголовком. */
+h1, h2, h3, h4 { font-family: var(--md-ref-typeface-brand); font-weight: 400; }
+h1 { font: var(--type-headline-medium); margin: 0 0 var(--space-3); }
+h2 { font: var(--type-title-large); margin: var(--space-6) 0 var(--space-3); }
+h3 {
+	font: var(--type-title-medium);
+	letter-spacing: var(--md-sys-typescale-title-medium-tracking);
+	margin: var(--space-5) 0 var(--space-2);
 }
-h3 { font-size: 16px; margin: var(--space-5) 0 var(--space-2); }
-.muted { color: var(--color-text-muted); }
+.muted { color: var(--md-sys-color-on-surface-variant); }
 
 /* --- компонент: иконка --- */
 
@@ -366,10 +460,13 @@ h3 { font-size: 16px; margin: var(--space-5) 0 var(--space-2); }
 
 /* --- компонент: карточка --- */
 
+/* Карточка Material, приподнятая (elevated): поверхность surface-container-low, тень
+   уровня 1, скругление medium. */
 .card {
-	background: var(--color-surface);
-	border-radius: var(--radius-lg);
-	box-shadow: var(--shadow-sm);
+	background: var(--md-sys-color-surface-container-low);
+	color: var(--md-sys-color-on-surface);
+	border-radius: var(--md-sys-shape-corner-medium);
+	box-shadow: var(--md-sys-elevation-level1);
 	padding: var(--space-5);
 	margin-bottom: var(--space-4);
 }
@@ -378,12 +475,17 @@ h3 { font-size: 16px; margin: var(--space-5) 0 var(--space-2); }
 	align-items: center;
 	gap: var(--space-2);
 	margin: 0 0 var(--space-2);
-	font-size: var(--font-size-h2);
+	font: var(--type-title-large);
 	border: 0;
 	padding: 0;
 }
-.card__title .icon { color: var(--color-accent); }
-.card__lead { color: var(--color-text-muted); margin: 0 0 var(--space-4); }
+.card__title .icon { color: var(--md-sys-color-primary); }
+.card__lead {
+	color: var(--md-sys-color-on-surface-variant);
+	font: var(--type-body-medium);
+	letter-spacing: var(--md-sys-typescale-body-medium-tracking);
+	margin: 0 0 var(--space-4);
+}
 /* Ритм внутри карточки — та же обязанность, что у .section__body. Тело карточки держит
    произвольное доверенное содержимое, в том числе поля кита, и раньше ритм давали
    маргины самих полей: в витрине кита восемь полей подряд в .card__body слиплись
@@ -392,27 +494,27 @@ h3 { font-size: 16px; margin: var(--space-5) 0 var(--space-2); }
 
    ОХВАТ ПРАВИЛА ПРОВЕРЕН ЧИСЛАМИ.
    Правило кладёт margin-top ВСЕМ не-первым детям тела карточки, поэтому вопрос «не
-   поехала ли вёрстка» законный. Шаг сетки здесь не 4px, а 2.8/5.6/8.4/11.2/16.8
-   (ТокеныТемы.ШагСетки, плотность 1), то есть --space-4 = 11.2px при font-size-body 15px.
+   поехала ли вёрстка» законный. Шаг сетки — 4dp Material: 4/8/12/16/24/32
+   (ТокеныТемы.ШагСетки, плотность 1), то есть --space-4 = 16px при кегле body-large 16px.
    Считаем по факту, помня две вещи: правило трогает только ВЕРХНИЙ маргин, а маргины
    соседей СХЛОПЫВАЮТСЯ (зазор = max, а не сумма):
-     * поля и тумблеры (собственных маргинов у них нет): 0 -> 11.2px — собственно
+     * поля и тумблеры (собственных маргинов у них нет): 0 -> 16px — собственно
        починенный дефект;
-     * <p> + <p> без класса: остаётся 15px. Правило переопределяет margin-top второго
-       абзаца, но margin-bottom первого — браузерный 1em = 15px — остаётся, и схлопывание
-       даёт max(15, 11.2) = 15px. Не «стало плотнее», а «не изменилось»;
-     * pre.code (margin-bottom space-3 = 8.4px) перед <p>: max(8.4, 11.2) = 11.2px;
+     * <p> + <p> без класса: остаётся 16px. Правило переопределяет margin-top второго
+       абзаца, но margin-bottom первого — браузерный 1em = 16px — остаётся, и схлопывание
+       даёт max(16, 16) = 16px. Не «стало плотнее», а «не изменилось»;
+     * pre.code (margin-bottom space-3 = 12px) перед <p>: max(12, 16) = 16px;
      * первый и последний ребёнок: внешние маргины сняты, чтобы не удваивать padding
-       карточки (space-5 = 16.8px).
+       карточки (space-5 = 24px).
    ЗАЗОР ПОД ЗАГОЛОВКОМ СТАНОВИТСЯ ШИРЕ — и это единственное место, где правило не
-   только нормализует. У заголовков собственный нижний маргин МЕНЬШЕ 11.2px, а верхний
+   только нормализует. У заголовков собственный нижний маргин МЕНЬШЕ 16px, а верхний
    больше, так что правило подтягивает их сверху и раздвигает снизу:
-     * h3 (margin: space-5 0 space-2 = 16.8/5.6) — реальный непосредственный ребёнок
-       .card__body (ВитринаКита.os: заголовки блоков витрины): сверху 16.8 -> 11.2,
-       снизу max(5.6, 11.2) = 11.2 (+5.6). Заголовок становится равноудалён от соседей
+     * h3 (margin: space-5 0 space-2 = 24/8) — реальный непосредственный ребёнок
+       .card__body (ВитринаКита.os: заголовки блоков витрины): сверху 24 -> 16,
+       снизу max(8, 16) = 16 (+8). Заголовок становится равноудалён от соседей
        сверху и снизу — практически это ровнее, а не поломка;
-     * h1 (margin-bottom space-3 = 8.4) и h2 (space-6 0 space-3 = 22.4/8.4) — так же:
-       снизу 8.4 -> 11.2.
+     * h1 (margin-bottom space-3 = 12) и h2 (space-6 0 space-3 = 32/12) — так же:
+       снизу 12 -> 16.
    АТОМАРНОМУ ИНЛАЙНУ (inline-block, inline-flex — такова .tag) ЭТОТ МАРГИН УХОДИТ
    В ВЫСОТУ СТРОЧНОГО БОКСА и опускает всю строку вместе с собой; настоящий inline
    вертикальный маргин игнорирует. Поэтому ряд инлайновых элементов печатается ОДНИМ
@@ -431,7 +533,7 @@ h3 { font-size: 16px; margin: var(--space-5) 0 var(--space-2); }
 	gap: var(--space-2);
 	margin-top: var(--space-4);
 	padding-top: var(--space-4);
-	border-top: 1px solid var(--color-divider);
+	border-top: 1px solid var(--md-sys-color-outline-variant);
 }
 /* Карточка В ЯЧЕЙКЕ СЕТКИ — колонка на всю высоту ряда; лекарство то же, что у .objcard.
    Ячейка сетки высоту ряда получает (align-items: stretch), а карточка внутри неё росла
@@ -475,27 +577,112 @@ h3 { font-size: 16px; margin: var(--space-5) 0 var(--space-2); }
    отбора и с подписью источника. Задавая gap, не забудь про display: flex — без
    flex-контекста gap инертен, и правило выглядит рабочим, ничего не делая. */
 
-.field { display: flex; flex-direction: column; gap: var(--space-1); }
-.field__label { font-size: var(--font-size-small); color: var(--color-text-muted); }
-.field__control {
-	width: 100%;
-	padding: var(--space-2) var(--space-3);
-	font: inherit;
-	color: var(--color-text);
-	background: var(--color-surface-alt);
-	border: 1px solid var(--color-divider);
-	border-radius: var(--radius-md);
-	transition: border-color var(--motion-fast) var(--motion-ease),
-	            box-shadow var(--motion-fast) var(--motion-ease);
+/* ТЕКСТОВОЕ ПОЛЕ MATERIAL, ЗАЛИТОЕ (filled). Контейнер surface-container-highest
+   со скруглёнными верхними углами и линией-индикатором снизу; подпись лежит ВНУТРИ
+   контейнера. На фокусе индикатор растёт от середины до краёв цветом primary — это
+   градиент фоном самого контрола (background-size 0 → 100%), отдельного элемента под
+   линию разметке не нужно.
+   Подпись плавает: у пустого поля без фокуса она стоит на месте значения во весь кегль,
+   у заполненного или в фокусе — уменьшается и поднимается к верхнему краю. Пустоту
+   отмечает скрипт кита атрибутом data-empty; без скрипта атрибута нет, и подпись
+   ВСЕГДА стоит наверху — законченный вид, а не сломанный. Подпись первой в разметке,
+   контрол вторым, поэтому верх .field и есть верх контейнера: подпись встаёт по нему
+   абсолютно. Пояснение и ошибка — вспомогательный текст ПОД контейнером, с отступом
+   16px по Material. */
+.field { position: relative; display: flex; flex-direction: column; gap: var(--space-1); }
+.field__label {
+	position: absolute;
+	top: 16px;
+	left: 16px;
+	z-index: 1;
+	max-width: calc(100% - 32px);
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	font: var(--type-body-large);
+	letter-spacing: var(--md-sys-typescale-body-large-tracking);
+	color: var(--md-sys-color-on-surface-variant);
+	pointer-events: none;
+	transform: translateY(-10px) scale(.75);
+	transform-origin: left top;
+	transition: transform var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard),
+	            color var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard),
+	            max-width var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
 }
-.field__control:hover:not([disabled]) { border-color: var(--color-accent); }
-.field__control[disabled], .field__control[readonly] {
-	color: var(--color-text-muted);
+/* Подпись наверху — уменьшенная на 3/4, поэтому ей и места в строке на 4/3 больше. */
+.field:not([data-empty]) > .field__label,
+.field:focus-within > .field__label { max-width: calc((100% - 32px) * 4 / 3); }
+.field[data-empty]:not(:focus-within) > .field__label { transform: none; }
+.field:focus-within > .field__label { color: var(--md-sys-color-primary); }
+.field[data-empty]:not(:focus-within) > .field__control::placeholder { color: transparent; }
+.field__control {
+	--_bg: var(--md-sys-color-surface-container-highest);
+	--_state: 0%;
+	--_line: var(--md-sys-color-primary);
+	width: 100%;
+	min-height: 56px;
+	padding: 24px 16px 8px;
+	font: var(--type-body-large);
+	letter-spacing: var(--md-sys-typescale-body-large-tracking);
+	color: var(--md-sys-color-on-surface);
+	background-color: color-mix(in srgb, var(--md-sys-color-on-surface) var(--_state), var(--_bg));
+	background-image: linear-gradient(var(--_line), var(--_line));
+	background-position: 50% 100%;
+	background-size: 0% 2px;
+	background-repeat: no-repeat;
+	border: 0;
+	border-bottom: 1px solid var(--md-sys-color-on-surface-variant);
+	border-radius: var(--md-sys-shape-corner-extra-small) var(--md-sys-shape-corner-extra-small) 0 0;
+	outline: none;
+	caret-color: var(--md-sys-color-primary);
+	transition: background-color var(--motion-fast) var(--motion-ease),
+	            background-size var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-emphasized-decelerate),
+	            border-color var(--motion-fast) var(--motion-ease);
+}
+.field__control:hover:not([disabled]) { --_state: var(--state-hover); border-bottom-color: var(--md-sys-color-on-surface); }
+.field__control:focus, .field__control:focus-visible { background-size: 100% 2px; outline: none; }
+/* Поле без подписи: значению наверху делать нечего, оно садится посередине. :has() обёрнут
+   в :is(): движок без :has() выбросил бы и всё остальное правило. */
+.field:is(:not(:has(> .field__label))) > .field__control { padding-top: 16px; padding-bottom: 16px; }
+/* Выпадающий список — свой шеврон справа: системная стрелка снята, и место под ней тоже. */
+select.field__control { -webkit-appearance: none; appearance: none; padding-right: 48px; cursor: pointer; }
+.field:has(> select.field__control)::after {
+	content: "";
+	position: absolute;
+	top: 24px;
+	right: 20px;
+	width: 7px;
+	height: 7px;
+	border-right: 2px solid var(--md-sys-color-on-surface-variant);
+	border-bottom: 2px solid var(--md-sys-color-on-surface-variant);
+	transform: rotate(45deg);
+	pointer-events: none;
+}
+.field__control[disabled] {
+	--_bg: color-mix(in srgb, var(--md-sys-color-on-surface) 4%, transparent);
+	color: color-mix(in srgb, var(--md-sys-color-on-surface) var(--state-disabled-content), transparent);
+	border-bottom-color: color-mix(in srgb, var(--md-sys-color-on-surface) var(--state-disabled-content), transparent);
 	cursor: not-allowed;
 }
-.field__hint { font-size: var(--font-size-small); color: var(--color-text-muted); }
-.field__error { font-size: var(--font-size-small); color: var(--color-danger); }
-.field--error .field__control { border-color: var(--color-danger); }
+.field:has(> .field__control[disabled]) > .field__label {
+	color: color-mix(in srgb, var(--md-sys-color-on-surface) var(--state-disabled-content), transparent);
+}
+.field__control[readonly] { color: var(--md-sys-color-on-surface-variant); cursor: not-allowed; }
+.field__hint {
+	padding: 0 var(--space-4);
+	font: var(--type-body-small);
+	letter-spacing: var(--md-sys-typescale-body-small-tracking);
+	color: var(--md-sys-color-on-surface-variant);
+}
+.field__error {
+	padding: 0 var(--space-4);
+	font: var(--type-body-small);
+	letter-spacing: var(--md-sys-typescale-body-small-tracking);
+	color: var(--md-sys-color-error);
+}
+.field--error .field__control { --_line: var(--md-sys-color-error); border-bottom-color: var(--md-sys-color-error); caret-color: var(--md-sys-color-error); }
+.field--error > .field__label,
+.field--error:focus-within > .field__label { color: var(--md-sys-color-error); }
 /* Флажок — сетка в две колонки: галка слева, подпись справа, пояснение и отказ — под
    подписью во второй колонке. Строкой (flex-row) пояснение вставало справа от подписи
    и сжимало её в столбик из слов. */
@@ -506,11 +693,57 @@ h3 { font-size: 16px; margin: var(--space-5) 0 var(--space-2); }
 	column-gap: var(--space-2);
 	row-gap: 2px;
 }
+/* Подпись флажка — обычный текст строки, а не плавающая подпись поля: правила подписи
+   выше здесь сняты целиком. */
 .field--check .field__check { margin: 3px 0 0; }
-.field--check .field__label { color: var(--color-text); }
+.field--check > .field__label {
+	position: static;
+	max-width: none;
+	white-space: normal;
+	transform: none;
+	pointer-events: auto;
+	color: var(--md-sys-color-on-surface);
+}
 .field--check .field__hint,
-.field--check .field__error { grid-column: 2; }
-.field__check { width: 16px; height: 16px; accent-color: var(--color-accent); }
+.field--check .field__error { grid-column: 2; padding: 0; }
+/* ФЛАЖОК MATERIAL. Системная галка снята, коробка 18px с рамкой 2px рисуется заново;
+   отмеченная заливается primary, а сама галочка — два отрезка градиентами цветом
+   on-primary (--_mark): рисунок картинкой не взял бы цвет темы, маска срезала бы обводку
+   фокуса. «Частично» — короткая черта тем же цветом. Тот же флажок у дерева галок. */
+.field__check, .checktree__box {
+	--_mark: var(--md-sys-color-on-primary);
+	-webkit-appearance: none;
+	appearance: none;
+	width: 18px;
+	height: 18px;
+	margin: 0;
+	flex: none;
+	border: 2px solid var(--md-sys-color-on-surface-variant);
+	border-radius: calc(var(--md-sys-shape-corner-extra-small) / 2);
+	background: transparent;
+	cursor: pointer;
+	transition: background-color var(--motion-fast) var(--motion-ease),
+	            border-color var(--motion-fast) var(--motion-ease);
+}
+.field__check:hover, .checktree__box:hover { border-color: var(--md-sys-color-on-surface); }
+.field__check:checked, .checktree__box:checked {
+	border-color: var(--md-sys-color-primary);
+	background: linear-gradient(45deg, transparent calc(50% - 1px), var(--_mark) 0 calc(50% + 1px), transparent 0)
+			1px 5px / 5px 5px no-repeat,
+		linear-gradient(-45deg, transparent calc(50% - 1px), var(--_mark) 0 calc(50% + 1px), transparent 0)
+			4px 1px / 9px 9px no-repeat,
+		var(--md-sys-color-primary);
+}
+.field--error .field__check:not(:checked) { border-color: var(--md-sys-color-error); }
+.field__check[disabled], .checktree__box[disabled] {
+	border-color: color-mix(in srgb, var(--md-sys-color-on-surface) var(--state-disabled-content), transparent);
+	cursor: not-allowed;
+}
+.field__check[disabled]:checked, .checktree__box[disabled]:checked {
+	--_mark: var(--md-sys-color-surface);
+	border-color: transparent;
+	background-color: color-mix(in srgb, var(--md-sys-color-on-surface) var(--state-disabled-content), transparent);
+}
 textarea.field__control { min-height: calc(var(--space-8) * 2); resize: vertical; }
 
 /* Группа полей <fieldset><legend> — тоже КОНТЕЙНЕР полей, а значит владелец интервала:
@@ -529,9 +762,13 @@ fieldset > * + * { margin-top: var(--space-2); }
 /* интервал снизу не ставим — его даёт контейнер (см. комментарий у .field) */
 .toggle { display: flex; flex-direction: column; gap: var(--space-1); }
 .toggle__box { display: flex; align-items: center; gap: var(--space-3); cursor: pointer; }
+/* Переключатель Material: дорожка 52×32 пилюлей, бегунок 16px у выключенного и 24px
+   у включённого, при нажатии — 28px. Бегунок и растёт, и едет — одним переходом размеров
+   и места: так он и движется в Material. Вокруг бегунка на наведении — круг слоя
+   состояния (тень без размытия цветом содержимого). */
 .toggle__input {
 	position: absolute;
-	width: 44px; height: 24px;
+	width: 52px; height: 32px;
 	margin: 0;
 	opacity: 0;
 	cursor: pointer;
@@ -539,60 +776,81 @@ fieldset > * + * { margin-top: var(--space-2); }
 .toggle__track {
 	position: relative;
 	flex: 0 0 auto;
-	width: 44px; height: 24px;
-	border-radius: 999px;
-	background: var(--color-surface-alt);
-	border: 1px solid var(--color-divider);
-	transition: background var(--motion-fast) var(--motion-ease),
+	width: 52px; height: 32px;
+	border-radius: var(--md-sys-shape-corner-full);
+	background: var(--md-sys-color-surface-container-highest);
+	border: 2px solid var(--md-sys-color-outline);
+	transition: background-color var(--motion-fast) var(--motion-ease),
 	            border-color var(--motion-fast) var(--motion-ease);
 }
 .toggle__thumb {
 	position: absolute;
-	top: 2px; left: 2px;
-	width: 18px; height: 18px;
-	border-radius: 50%;
-	background: var(--color-text-muted);
-	transition: transform var(--motion-fast) var(--motion-ease),
-	            background var(--motion-fast) var(--motion-ease);
+	top: 6px; left: 6px;
+	width: 16px; height: 16px;
+	border-radius: var(--md-sys-shape-corner-full);
+	background: var(--md-sys-color-outline);
+	box-shadow: 0 0 0 0 transparent;
+	transition: top var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-emphasized-decelerate),
+	            left var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-emphasized-decelerate),
+	            width var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-emphasized-decelerate),
+	            height var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-emphasized-decelerate),
+	            background-color var(--motion-fast) var(--motion-ease),
+	            box-shadow var(--motion-fast) var(--motion-ease);
 }
-.toggle__input:checked + .toggle__track { background: var(--color-accent); border-color: var(--color-accent); }
-.toggle__input:checked + .toggle__track .toggle__thumb { transform: translateX(20px); background: var(--color-accent-contrast); }
-.toggle__input:focus-visible + .toggle__track { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.toggle__box:hover .toggle__thumb { background: var(--md-sys-color-on-surface-variant); box-shadow: 0 0 0 12px color-mix(in srgb, var(--md-sys-color-on-surface) var(--state-hover), transparent); }
+.toggle__input:active + .toggle__track .toggle__thumb { top: 0; left: 0; width: 28px; height: 28px; }
+.toggle__input:checked + .toggle__track { background: var(--md-sys-color-primary); border-color: var(--md-sys-color-primary); }
+.toggle__input:checked + .toggle__track .toggle__thumb { top: 2px; left: 22px; width: 24px; height: 24px; background: var(--md-sys-color-on-primary); }
+.toggle__box:hover .toggle__input:checked + .toggle__track .toggle__thumb {
+	background: var(--md-sys-color-primary-container);
+	box-shadow: 0 0 0 10px color-mix(in srgb, var(--md-sys-color-primary) var(--state-hover), transparent);
+}
+.toggle__input:checked:active + .toggle__track .toggle__thumb { top: 0; left: 20px; width: 28px; height: 28px; }
+.toggle__input:focus-visible + .toggle__track { outline: 3px solid var(--md-sys-color-secondary); outline-offset: 2px; }
 .toggle__input[disabled] { cursor: not-allowed; }
-.toggle__input[disabled] + .toggle__track { opacity: .55; }
-.toggle__input[disabled] ~ .toggle__text { color: var(--color-text-muted); }
+.toggle__input[disabled] + .toggle__track { opacity: .38; }
+.toggle__input[disabled] ~ .toggle__text { color: var(--md-sys-color-on-surface-variant); }
 .toggle__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.toggle__label { color: var(--color-text); }
-.toggle__state { font-size: var(--font-size-small); color: var(--color-text-muted); }
-.toggle__hint { font-size: var(--font-size-small); color: var(--color-text-muted); }
+.toggle__label { color: var(--md-sys-color-on-surface); }
+.toggle__state { font: var(--type-body-small); color: var(--md-sys-color-on-surface-variant); }
+.toggle__hint { font: var(--type-body-small); color: var(--md-sys-color-on-surface-variant); }
 
 /* --- компонент: проводник (шаги с отметкой пройденного и текущего) --- */
 
 .guide__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+/* Шаги — карточки Material, выделенные обводкой (outlined): пройденный узнаётся значком
+   цвета primary, текущий — обводкой primary и лёгкой заливкой его же цветом. */
 .guide__step {
 	display: flex;
 	gap: var(--space-3);
-	padding: var(--space-3);
-	border: 1px solid var(--color-divider);
-	border-radius: var(--radius-md);
-	background: var(--color-surface-alt);
+	padding: var(--space-4);
+	border: 1px solid var(--md-sys-color-outline-variant);
+	border-radius: var(--md-sys-shape-corner-medium);
+	background: var(--md-sys-color-surface-container-low);
+	transition: border-color var(--motion-fast) var(--motion-ease), background-color var(--motion-fast) var(--motion-ease);
 }
-.guide__step--done { border-color: var(--color-success); }
-.guide__step--current { border-color: var(--color-accent); box-shadow: var(--shadow-sm); }
-.guide__mark { flex: 0 0 auto; color: var(--color-text-muted); }
-.guide__step--done .guide__mark { color: var(--color-success); }
+.guide__step--done { border-color: var(--md-sys-color-outline-variant); }
+.guide__step--current {
+	border-color: var(--md-sys-color-primary);
+	background: color-mix(in srgb, var(--md-sys-color-primary) var(--state-hover), var(--md-sys-color-surface-container-low));
+}
+.guide__mark { flex: 0 0 auto; color: var(--md-sys-color-on-surface-variant); }
+.guide__step--done .guide__mark { color: var(--md-sys-color-primary); }
 .guide__body { min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
-.guide__title { font-weight: 600; }
-.guide__hint { color: var(--color-text-muted); font-size: var(--font-size-small); }
-.guide__progress { color: var(--color-text-muted); font-size: var(--font-size-small); margin: 0 0 var(--space-3); }
+.guide__title { font: var(--type-title-medium); letter-spacing: var(--md-sys-typescale-title-medium-tracking); }
+.guide__hint { color: var(--md-sys-color-on-surface-variant); font: var(--type-body-medium); }
+.guide__progress { color: var(--md-sys-color-on-surface-variant); font: var(--type-body-medium); margin: 0 0 var(--space-3); }
+
 pre.code {
 	margin: 0 0 var(--space-3);
-	padding: var(--space-3);
+	padding: var(--space-3) var(--space-4);
 	overflow-x: auto;
-	background: var(--color-surface-alt);
-	border: 1px solid var(--color-divider);
-	border-radius: var(--radius-md);
-	font-size: var(--font-size-small);
+	background: var(--md-sys-color-surface-container-highest);
+	color: var(--md-sys-color-on-surface);
+	border: 0;
+	border-radius: var(--md-sys-shape-corner-small);
+	font-size: var(--md-sys-typescale-body-medium-size);
+	line-height: var(--md-sys-typescale-body-medium-line-height);
 }
 
 /* --- компонент: поле из конфига --- */
@@ -604,11 +862,11 @@ pre.code {
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2);
-	border: 1px dashed var(--color-divider);
-	border-radius: var(--radius-md);
+	border: 1px dashed var(--md-sys-color-outline-variant);
+	border-radius: var(--md-sys-shape-corner-medium);
 	padding: var(--space-4);
 	margin-bottom: var(--space-4);
-	background: var(--color-surface-alt);
+	background: var(--md-sys-color-surface-container);
 }
 .from-config__source {
 	display: inline-flex;
@@ -617,19 +875,19 @@ pre.code {
 	align-self: flex-start;
 	align-items: center;
 	gap: var(--space-1);
-	font-size: var(--font-size-small);
-	color: var(--color-text-muted);
+	font: var(--type-body-medium);
+	color: var(--md-sys-color-on-surface-variant);
 }
 .from-config__env {
 	display: flex;
 	align-items: center;
 	gap: var(--space-2);
 	padding: var(--space-2) var(--space-3);
-	background: var(--color-bg);
-	border-radius: var(--radius-md);
+	background: var(--md-sys-color-surface-container-highest);
+	border-radius: var(--md-sys-shape-corner-small);
 	overflow-x: auto;
 }
-.from-config__env code { font-size: var(--font-size-small); white-space: nowrap; }
+.from-config__env code { font: var(--type-body-medium); white-space: nowrap; }
 
 /* --- источник значения настройки: дефолт / база / конфигурация --- */
 
@@ -641,10 +899,10 @@ pre.code {
 	gap: var(--space-2);
 	flex-wrap: wrap;
 	margin: calc(-1 * var(--space-2)) 0 var(--space-4);
-	font-size: var(--font-size-small);
-	color: var(--color-text-muted);
+	font: var(--type-body-small);
+	color: var(--md-sys-color-on-surface-variant);
 }
-.text-key code { font-size: var(--font-size-small); white-space: nowrap; }
+.text-key code { font: var(--type-body-medium); white-space: nowrap; }
 
 /* Ключ настройки на телефоне: сначала он уходит на свою строку под плашку источника
    (перенос ряда выше), а ключ длиннее строки переносится внутри себя — иначе он уводит
@@ -667,45 +925,56 @@ pre.code {
 
 /* --- компонент: таблица --- */
 
-.table-scroll { overflow-x: auto; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
+/* Таблица данных — по образцу MUI: лист цвета surface-container-low в обводке
+   outline-variant, шапка — title-small приглушённым цветом, строки body-medium через
+   разделитель, наведение — слой состояния на всю строку. */
+.table-scroll {
+	overflow-x: auto;
+	border: 1px solid var(--md-sys-color-outline-variant);
+	border-radius: var(--md-sys-shape-corner-medium);
+	box-shadow: none;
+}
 table, .table {
 	border-collapse: collapse;
 	width: 100%;
-	background: var(--color-surface);
+	background: var(--md-sys-color-surface-container-low);
+	color: var(--md-sys-color-on-surface);
 }
 th, td {
 	text-align: left;
 	padding: var(--space-3) var(--space-4);
-	border-bottom: 1px solid var(--color-divider);
-	font-size: 14px;
+	border-bottom: 1px solid var(--md-sys-color-outline-variant);
+	font: var(--type-body-medium);
+	letter-spacing: var(--md-sys-typescale-body-medium-tracking);
 }
 th {
-	font-family: var(--font-heading);
-	font-weight: var(--font-weight-heading);
-	color: var(--color-text-muted);
-	background: var(--color-surface-alt);
+	height: 56px;
+	font: var(--type-title-small);
+	letter-spacing: var(--md-sys-typescale-title-small-tracking);
+	color: var(--md-sys-color-on-surface-variant);
+	background: var(--md-sys-color-surface-container);
 }
 tr:last-child td { border-bottom: none; }
-tbody tr { transition: background var(--motion-fast) var(--motion-ease); }
-tbody tr:hover { background: var(--color-surface-alt); }
-caption { text-align: left; padding: var(--space-3) var(--space-4); color: var(--color-text-muted); }
-.note-empty { color: var(--color-text-muted); font-style: italic; }
+tbody tr { transition: background-color var(--motion-fast) var(--motion-ease); }
+tbody tr:hover { background: color-mix(in srgb, var(--md-sys-color-on-surface) var(--state-hover), transparent); }
+caption { text-align: left; padding: var(--space-3) var(--space-4); color: var(--md-sys-color-on-surface-variant); }
+.note-empty { color: var(--md-sys-color-on-surface-variant); font-style: italic; }
 
 /* Строка-разворот: печатается следующим за записью <tr> во всю ширину таблицы.
    Пара «запись + разворот» — ОДНА запись: разделитель между ними снят, отступ сверху
    у разворота тоже, и подсветка записи забирает обе строки. */
 .table__record > td { border-bottom: none; }
 .table__expand > td { padding-top: 0; }
-tbody tr.table__record:hover + .table__expand { background: var(--color-surface-alt); }
+tbody tr.table__record:hover + .table__expand { background: color-mix(in srgb, var(--md-sys-color-on-surface) var(--state-hover), transparent); }
 
 /* Выделенная запись: одна строка списка отвечает на вопрос, ради которого список открыли,
    и заливка находит её раньше, чем человек начнёт читать колонки. Оттенок берётся у дальней
-   ступени акцентной рампы — она переворачивается вместе с темой, поэтому строка светлее
-   поверхности в светлой теме и темнее в тёмной, а текст на ней читается тем же цветом. */
-tbody tr.row-accent { background: var(--color-accent-900); }
-tbody tr.row-accent:hover { background: var(--color-accent-800); }
-tbody tr.row-accent + .table__expand { background: var(--color-accent-900); }
-tbody tr.row-accent.table__record:hover + .table__expand { background: var(--color-accent-800); }
+   роли «выбранного» в Material — secondary-container с его же цветом текста, — и наведение
+   кладёт поверх неё обычный слой состояния. */
+tbody tr.row-accent { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
+tbody tr.row-accent:hover { background: color-mix(in srgb, var(--md-sys-color-on-secondary-container) var(--state-hover), var(--md-sys-color-secondary-container)); }
+tbody tr.row-accent + .table__expand { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
+tbody tr.row-accent.table__record:hover + .table__expand { background: color-mix(in srgb, var(--md-sys-color-on-secondary-container) var(--state-hover), var(--md-sys-color-secondary-container)); }
 
 /* Узкий столбец: сжат по содержимому и не переносится — значок, галочка, счётчик.
    Соседние столбцы забирают освободившуюся ширину себе. */
@@ -713,45 +982,78 @@ tbody tr.row-accent.table__record:hover + .table__expand { background: var(--col
 
 /* --- компонент: тост --- */
 
+/* Тост — сообщение в потоке страницы, как Alert у MUI: тональный контейнер статуса,
+   значок цветом самого статуса, текст цветом «на контейнере». Появляется въездом снизу. */
 .toast {
 	display: flex;
 	align-items: center;
-	gap: var(--space-2);
-	padding: var(--space-3) var(--space-4);
-	border-radius: var(--radius-md);
+	gap: var(--space-3);
+	min-height: 48px;
+	padding: var(--space-2) var(--space-4);
+	border-radius: var(--md-sys-shape-corner-small);
 	margin: var(--space-3) 0;
-	font-size: 14px;
-	border: 1px solid var(--color-divider);
-	animation: ui-toast var(--motion-slow) var(--motion-ease);
+	font: var(--type-body-medium);
+	letter-spacing: var(--md-sys-typescale-body-medium-tracking);
+	border: 0;
+	background: var(--md-sys-color-surface-container-high);
+	color: var(--md-sys-color-on-surface);
+	animation: ui-toast var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-emphasized-decelerate);
 }
-.toast .icon { width: 18px; height: 18px; }
-.toast__title { font-family: var(--font-heading); font-weight: var(--font-weight-heading); }
+.toast .icon { width: 22px; height: 22px; }
+.toast__title { font: var(--type-title-small); letter-spacing: var(--md-sys-typescale-title-small-tracking); }
 .toast__text { flex: 1; }
-.toast__close { background: none; border: 0; color: inherit; cursor: pointer; padding: 0; }
-.toast--ok { background: var(--color-success-bg); border-color: var(--color-success); color: var(--color-success); }
-.toast--warn { background: var(--color-warning-bg); border-color: var(--color-warning); color: var(--color-warning); }
-.toast--err { background: var(--color-danger-bg); border-color: var(--color-danger); color: var(--color-danger); }
-.toast--info { background: var(--color-surface); color: var(--color-text-muted); }
+.toast__close {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 32px;
+	margin-right: calc(-1 * var(--space-2));
+	background: none;
+	border: 0;
+	border-radius: var(--md-sys-shape-corner-full);
+	color: inherit;
+	cursor: pointer;
+	padding: 0;
+}
+.toast__close:hover { background: color-mix(in srgb, currentColor var(--state-hover), transparent); }
+.toast--ok { background: var(--md-sys-color-success-container); color: var(--md-sys-color-on-success-container); }
+.toast--ok .icon { color: var(--md-sys-color-success); }
+.toast--warn { background: var(--md-sys-color-warning-container); color: var(--md-sys-color-on-warning-container); }
+.toast--warn .icon { color: var(--md-sys-color-warning); }
+.toast--err { background: var(--md-sys-color-error-container); color: var(--md-sys-color-on-error-container); }
+.toast--err .icon { color: var(--md-sys-color-error); }
+.toast--info { background: var(--md-sys-color-info-container); color: var(--md-sys-color-on-info-container); }
+.toast--info .icon { color: var(--md-sys-color-info); }
 
 /* --- компонент: плашка --- */
 
+/* Плашка — малый чип Material: высота 24px, скругление small, подпись label-medium.
+   Нейтральная — контейнер surface-container-highest, статусные — тональные контейнеры
+   своих ролей: цвет узнаётся заливкой, а текст на ней остаётся читаемым. */
 .tag {
+	--_bg: var(--md-sys-color-surface-container-highest);
+	--_state: 0%;
+	position: relative;
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-1);
-	padding: 2px var(--space-3);
-	border-radius: 999px;
-	font-size: 12px;
-	background: var(--color-surface-alt);
-	border: 1px solid var(--color-divider);
-	color: var(--color-text-muted);
+	min-height: 24px;
+	padding: 0 var(--space-2);
+	border-radius: var(--md-sys-shape-corner-small);
+	font: var(--type-label-medium);
+	letter-spacing: var(--md-sys-typescale-label-medium-tracking);
+	background-color: color-mix(in srgb, currentColor var(--_state), var(--_bg));
+	border: 0;
+	color: var(--md-sys-color-on-surface-variant);
 	margin-right: var(--space-1);
+	transition: background-color var(--motion-fast) var(--motion-ease);
 }
-a.tag:hover { text-decoration: none; border-color: var(--color-accent); color: var(--color-text); }
-.tag--accent { border-color: var(--color-accent); color: var(--color-accent); }
-.tag--ok { border-color: var(--color-success); color: var(--color-success); }
-.tag--warn { border-color: var(--color-warning); color: var(--color-warning); }
-.tag--err { border-color: var(--color-danger); color: var(--color-danger); }
+a.tag:hover { --_state: var(--state-hover); text-decoration: none; }
+.tag--accent { --_bg: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+.tag--ok { --_bg: var(--md-sys-color-success-container); color: var(--md-sys-color-on-success-container); }
+.tag--warn { --_bg: var(--md-sys-color-warning-container); color: var(--md-sys-color-on-warning-container); }
+.tag--err { --_bg: var(--md-sys-color-error-container); color: var(--md-sys-color-on-error-container); }
 /* Ряд плашек — ОДИН элемент, а не соседние дети контейнера. Плашка — атомарный инлайн
    (inline-flex), и вертикальный маргин, который контейнер ритма даёт своим детям как
    блокам (.card__body > * + *), уходит ей в высоту строчного бокса: строка опускается,
@@ -767,20 +1069,20 @@ a.tag:hover { text-decoration: none; border-color: var(--color-accent); color: v
 .brief { display: flex; flex-direction: column; gap: var(--space-1); flex: 1 1 auto; min-width: 0; }
 .brief__head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); }
 .brief__head .tag { margin-right: 0; }
-.brief__name { font-size: 16px; font-weight: 600; color: var(--color-text); overflow-wrap: anywhere; }
-.brief__sub { font-size: var(--font-size-small); color: var(--color-text-muted); overflow-wrap: anywhere; }
+.brief__name { font: var(--type-title-medium); letter-spacing: var(--md-sys-typescale-title-medium-tracking); color: var(--md-sys-color-on-surface); overflow-wrap: anywhere; }
+.brief__sub { font: var(--type-body-medium); color: var(--md-sys-color-on-surface-variant); overflow-wrap: anywhere; }
 .brief__facts {
 	display: grid;
 	grid-template-columns: max-content minmax(0, 1fr);
 	gap: 2px var(--space-3);
 	margin-top: var(--space-1);
-	font-size: var(--font-size-small);
-	line-height: 1.5;
+	font: var(--type-body-medium);
+	letter-spacing: var(--md-sys-typescale-body-medium-tracking);
 }
 .brief__fact { display: contents; }
-.brief__label { color: var(--color-text-muted); }
-.brief__value { color: var(--color-text); overflow-wrap: anywhere; }
-.brief__value--warn { color: var(--color-warning); }
+.brief__label { color: var(--md-sys-color-on-surface-variant); }
+.brief__value { color: var(--md-sys-color-on-surface); overflow-wrap: anywhere; }
+.brief__value--warn { color: var(--md-sys-color-warning); }
 @media (max-width: 640px) {
 	.brief__facts { grid-template-columns: minmax(0, 1fr); gap: 0; }
 	.brief__fact + .brief__fact .brief__label { margin-top: var(--space-1); }
@@ -806,8 +1108,8 @@ a.tag:hover { text-decoration: none; border-color: var(--color-accent); color: v
 	padding: 2px 0 2px 24px;
 }
 .checktree__item { display: inline-flex; align-items: center; gap: var(--space-2); cursor: pointer; min-width: 0; }
-.checktree__label { color: var(--color-text); overflow-wrap: break-word; }
-.checktree__note { font-size: var(--font-size-small); color: var(--color-text-muted); }
+.checktree__label { color: var(--md-sys-color-on-surface); overflow-wrap: break-word; }
+.checktree__note { font: var(--type-body-small); color: var(--md-sys-color-on-surface-variant); }
 .checktree__marks { display: inline-flex; flex-wrap: wrap; gap: var(--space-1); }
 .checktree__marks .tag { margin-right: 0; }
 .checktree__toggle {
@@ -817,8 +1119,8 @@ a.tag:hover { text-decoration: none; border-color: var(--color-accent); color: v
 	display: flex; align-items: center; justify-content: center;
 	list-style: none;
 	cursor: pointer;
-	border-radius: var(--radius-sm);
-	color: var(--color-text-muted);
+	border-radius: var(--md-sys-shape-corner-full);
+	color: var(--md-sys-color-on-surface-variant);
 }
 .checktree__toggle::-webkit-details-marker { display: none; }
 .checktree__toggle::before {
@@ -830,37 +1132,29 @@ a.tag:hover { text-decoration: none; border-color: var(--color-accent); color: v
 	transition: transform var(--motion-fast) var(--motion-ease);
 }
 .checktree__branch[open] > .checktree__toggle::before { transform: rotate(45deg); }
-.checktree__toggle:hover { color: var(--color-text); background: var(--color-surface-alt); }
-.checktree__toggle:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+.checktree__toggle:hover { color: var(--md-sys-color-on-surface); background: color-mix(in srgb, var(--md-sys-color-on-surface) var(--state-hover), transparent); }
+.checktree__toggle:focus-visible { outline: 3px solid var(--md-sys-color-secondary); outline-offset: 0; }
 .checktree__children {
 	margin: 0 0 var(--space-1) 10px;
 	padding-left: 14px;
-	border-left: 1px solid var(--color-divider);
+	border-left: 1px solid var(--md-sys-color-outline-variant);
 }
 .checktree__children > .checktree__node::before {
 	content: "";
 	position: absolute;
 	top: 16px; left: -14px;
 	width: 10px;
-	border-top: 1px solid var(--color-divider);
+	border-top: 1px solid var(--md-sys-color-outline-variant);
 }
-.checktree__more { margin: var(--space-1) 0 var(--space-1) 34px; font-size: var(--font-size-small); color: var(--color-text-muted); }
-.checktree__box { width: 16px; height: 16px; margin: 0; flex: none; accent-color: var(--color-accent); cursor: pointer; }
-.checktree__box[aria-checked="mixed"], .checktree__box:indeterminate {
-	-webkit-appearance: none;
-	appearance: none;
-	border: 1px solid var(--color-text-muted);
-	border-radius: 3px;
-	background: var(--color-surface-alt);
-}
+.checktree__more { margin: var(--space-1) 0 var(--space-1) 34px; font: var(--type-body-small); color: var(--md-sys-color-on-surface-variant); }
+/* Галка дерева — флажок Material (правило у .field__check). «Частично» — черта вместо
+   галочки: по aria-checked="mixed" от сервера и по :indeterminate от скрипта. */
 .checktree__box[aria-checked="mixed"]:checked, .checktree__box:indeterminate {
-	border-color: var(--color-accent);
-	background: linear-gradient(var(--color-accent-contrast), var(--color-accent-contrast)) center / 8px 2px no-repeat,
-		var(--color-accent);
+	border-color: var(--md-sys-color-primary);
+	background: linear-gradient(var(--_mark), var(--_mark)) center / 10px 2px no-repeat,
+		var(--md-sys-color-primary);
 }
-.checktree__box:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
-.checktree__box[disabled] { cursor: not-allowed; opacity: .55; }
-.checktree__box[disabled] + .checktree__label { color: var(--color-text-muted); }
+.checktree__box[disabled] + .checktree__label { color: var(--md-sys-color-on-surface-variant); }
 
 /* --- компонент: дерево разделов --- */
 
@@ -869,20 +1163,32 @@ a.tag:hover { text-decoration: none; border-color: var(--color-accent); color: v
 .tree--row > .tree__list { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .tree--column > .tree__list { display: flex; flex-direction: column; gap: 2px; }
 .tree__item { min-width: 0; }
+/* Ход дерева — пункт навигации Material: пилюля, label-large, слой состояния на
+   наведении; текущий раздел — индикатор цвета secondary-container. */
 .tree__link {
+	--_bg: transparent;
+	--_state: 0%;
+	position: relative;
 	display: inline-flex;
 	align-items: center;
-	gap: var(--space-1);
-	padding: var(--space-1) var(--space-3);
-	border-radius: var(--radius-md);
-	color: var(--color-text-muted);
-	font-size: 14px;
-	transition: background var(--motion-fast) var(--motion-ease),
+	gap: var(--space-2);
+	min-height: 40px;
+	padding: 0 var(--space-4);
+	border-radius: var(--md-sys-shape-corner-full);
+	color: var(--md-sys-color-on-surface-variant);
+	background-color: color-mix(in srgb, currentColor var(--_state), var(--_bg));
+	font: var(--type-label-large);
+	letter-spacing: var(--md-sys-typescale-label-large-tracking);
+	transition: background-color var(--motion-fast) var(--motion-ease),
 	            color var(--motion-fast) var(--motion-ease);
 }
-.tree__link:hover { color: var(--color-text); background: var(--color-surface-alt); text-decoration: none; }
-.tree__link--active { color: var(--color-accent); background: var(--color-surface-alt); }
-.tree--column .tree__link { display: flex; }
+.tree__link:hover { --_state: var(--state-hover); color: var(--md-sys-color-on-surface); text-decoration: none; }
+.tree__link:active { --_state: var(--state-pressed); }
+.tree__link--active, .tree__link--active:hover {
+	--_bg: var(--md-sys-color-secondary-container);
+	color: var(--md-sys-color-on-secondary-container);
+}
+.tree--column .tree__link { display: flex; min-height: 48px; }
 .tree--column .tree__list--1 { margin-left: var(--space-4); }
 /* Ряд ходов в шапке дышит шире колонки: соседние дороги там читаются как отдельные,
    а не как список. */
@@ -890,7 +1196,7 @@ a.tag:hover { text-decoration: none; border-color: var(--color-accent); color: v
 .office-nav {
 	margin: 0 0 var(--space-5);
 	padding-bottom: var(--space-3);
-	border-bottom: 1px solid var(--color-divider);
+	border-bottom: 1px solid var(--md-sys-color-outline-variant);
 }
 
 /* --- компонент: панель сохранения --- */
@@ -905,13 +1211,13 @@ a.tag:hover { text-decoration: none; border-color: var(--color-accent); color: v
 	flex-wrap: wrap;
 	margin-top: var(--space-5);
 	padding: var(--space-3) var(--space-4);
-	background: var(--color-surface);
-	border-top: 1px solid var(--color-divider);
-	border-radius: var(--radius-md);
-	box-shadow: var(--shadow-md);
+	background: var(--md-sys-color-surface-container);
+	border-top: 0;
+	border-radius: var(--md-sys-shape-corner-large);
+	box-shadow: var(--md-sys-elevation-level2);
 	transition: box-shadow var(--motion-medium) var(--motion-ease);
 }
-.savebar__note { color: var(--color-text-muted); font-size: var(--font-size-small); }
+.savebar__note { color: var(--md-sys-color-on-surface-variant); font: var(--type-body-medium); }
 .savebar__actions { display: flex; gap: var(--space-2); align-items: center; }
 
 /* --- компонент: кнопка ---
@@ -919,86 +1225,152 @@ a.tag:hover { text-decoration: none; border-color: var(--color-accent); color: v
    `.button--primary` печатался разметкой, но правила для него НЕ БЫЛО — класс молча
    падал на базовый `.button`, и кнопка выглядела правильно ровно потому, что базовый
    вид совпадал с первичным. Поэтому у каждого варианта есть собственное правило:
-   класса без правила и правила без класса в этом листе не бывает. */
+   класса без правила и правила без класса в этом листе не бывает.
 
+   Кнопки — общие кнопки Material 3: пилюля высотой 40px, подпись label-large.
+   Вариант задаёт пару «заливка и содержимое» (--_bg, --_fg), а слой состояния считается
+   поверх неё одним правилом: залитая (основная, опасная) на наведении ещё и приподнимается
+   на уровень 1, как у MUI. Варианты кита ложатся на виды Material так:
+   основная — filled, вторичная — outlined, опасная — filled цветом error, ссылка — text. */
 .button {
+	--_bg: var(--md-sys-color-primary);
+	--_fg: var(--md-sys-color-on-primary);
+	--_lift: var(--md-sys-elevation-level1);
+	--_state: 0%;
+	position: relative;
 	display: inline-flex;
 	align-items: center;
-	gap: var(--space-1);
-	padding: var(--space-2) var(--space-4);
-	font: inherit;
-	font-size: 14px;
-	border-radius: var(--radius-md);
-	border: 1px solid var(--color-accent);
-	background: var(--color-accent);
-	color: var(--color-accent-contrast);
+	justify-content: center;
+	gap: var(--space-2);
+	min-height: 40px;
+	padding: 0 var(--space-5);
+	font: var(--type-label-large);
+	letter-spacing: var(--md-sys-typescale-label-large-tracking);
+	border-radius: var(--md-sys-shape-corner-full);
+	border: 1px solid transparent;
+	background-color: color-mix(in srgb, var(--_fg) var(--_state), var(--_bg));
+	color: var(--_fg);
+	box-shadow: none;
 	cursor: pointer;
 	white-space: nowrap;
-	transition: filter var(--motion-fast) var(--motion-ease),
-	            border-color var(--motion-fast) var(--motion-ease);
+	-webkit-user-select: none;
+	user-select: none;
+	-webkit-tap-highlight-color: transparent;
+	transition: background-color var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard),
+	            box-shadow var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard),
+	            border-color var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard),
+	            color var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard);
 }
 .button:hover {
-	filter: brightness(1.08);
+	--_state: var(--state-hover);
+	box-shadow: var(--_lift);
 	text-decoration: none;
 }
-.button[disabled], .button[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
-.button--primary { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-accent-contrast); }
+.button:focus-visible { --_state: var(--state-focus); }
+.button:active { --_state: var(--state-pressed); box-shadow: none; }
+.button[disabled], .button[aria-disabled="true"] {
+	--_bg: color-mix(in srgb, var(--md-sys-color-on-surface) var(--state-disabled-container), transparent);
+	--_fg: color-mix(in srgb, var(--md-sys-color-on-surface) var(--state-disabled-content), transparent);
+	--_state: 0%;
+	box-shadow: none;
+	cursor: not-allowed;
+}
+.button--primary { --_bg: var(--md-sys-color-primary); --_fg: var(--md-sys-color-on-primary); }
 .button--ghost {
-	background: transparent;
-	border-color: var(--color-divider);
-	color: var(--color-text-muted);
+	--_bg: transparent;
+	--_fg: var(--md-sys-color-primary);
+	--_lift: none;
+	border-color: var(--md-sys-color-outline);
 }
-.button--ghost:hover { color: var(--color-text); }
-.button--danger { background: var(--color-danger); border-color: var(--color-danger); color: var(--color-bg); }
+.button--ghost:focus-visible { border-color: var(--md-sys-color-primary); }
+.button--ghost:is([disabled], [aria-disabled="true"]) {
+	--_bg: transparent;
+	border-color: color-mix(in srgb, var(--md-sys-color-on-surface) var(--state-disabled-container), transparent);
+}
+.button--danger { --_bg: var(--md-sys-color-error); --_fg: var(--md-sys-color-on-error); }
 .button--link {
-	background: none;
-	border-color: transparent;
-	color: var(--color-accent);
-	padding-left: 0;
-	padding-right: 0;
+	--_bg: transparent;
+	--_fg: var(--md-sys-color-primary);
+	--_lift: none;
+	padding-left: var(--space-3);
+	padding-right: var(--space-3);
 }
-.button--link:hover { text-decoration: underline; filter: none; }
-.button--sm { padding: 2px var(--space-3); font-size: 12px; }
-.button--lg { padding: var(--space-3) var(--space-5); font-size: 16px; }
+.button--link:is([disabled], [aria-disabled="true"]) { --_bg: transparent; }
+.button--sm {
+	min-height: 32px;
+	padding: 0 var(--space-4);
+	font: var(--type-label-medium);
+	letter-spacing: var(--md-sys-typescale-label-medium-tracking);
+}
+.button--link.button--sm { padding: 0 var(--space-2); }
+.button--lg {
+	min-height: 56px;
+	padding: 0 var(--space-6);
+	font: var(--type-title-medium);
+	letter-spacing: var(--md-sys-typescale-title-medium-tracking);
+}
 /* Кнопка во всю ширину живёт в вертикальном перечне, а не в ряду действий: подпись
    здесь переносится, иначе на узком экране длинная надпись выезжает за контейнер. */
 .button--block { display: flex; width: 100%; justify-content: center; white-space: normal; }
+/* Занятая кнопка — круговой индикатор Material перед подписью: дуга цветом содержимого
+   вращается, пока сервер работает. */
 .button--busy { cursor: progress; }
-/* Кнопка-иконка: подпись у неё есть, но живёт в aria-label — значит нужен квадрат под
-   иконку, а не прямоугольник под текст. Поворот на наведении — движение 120 мс;
-   глобальное правило в конце файла гасит его при prefers-reduced-motion,
-   а собственное правило ниже снимает и конечное состояние, иначе иконка осталась бы
-   повёрнутой рывком. */
+.button--busy::before {
+	content: "";
+	width: 18px;
+	height: 18px;
+	flex: none;
+	border-radius: var(--md-sys-shape-corner-full);
+	border: 2px solid currentColor;
+	border-right-color: transparent;
+	animation: ui-spin var(--motion-pulse) linear infinite;
+}
+/* Кнопка-иконка: подпись у неё есть, но живёт в aria-label — значит нужен круг под
+   иконку, а не пилюля под текст. Кнопка-значок Material: круг 40px со значком 24px;
+   вторичная и ссылка — стандартная кнопка-значок без заливки и рамки, цветом
+   on-surface-variant, основная — залитая. */
 /* Картинка кнопки (произвольный значок вместо глифа набора) занимает РОВНО ту же
    коробку, что иконка набора (.icon): сторона в 1em и flex: none — иначе она тянется
    вместе с подписью, перерастает текст и меняет высоту кнопки. */
 .button__pic { width: 1em; height: 1em; flex: none; vertical-align: -0.125em; }
 
-.button--icon { padding: var(--space-1); }
-.button--icon .icon { width: 18px; height: 18px; transition: transform var(--motion-fast) var(--motion-ease); }
-.button--icon:hover .icon { transform: rotate(20deg); }
+.button--icon { width: 40px; min-height: 40px; padding: 0; }
+.button--icon .icon { width: 24px; height: 24px; }
+.button--icon.button--sm { width: 36px; min-height: 36px; }
+.button--icon.button--sm .icon { width: 20px; height: 20px; }
+/* :where() держит специфичность этого правила на уровне варианта: пункт меню, который
+   перебивает варианты, перебивает и его. */
+.button--icon:where(.button--ghost, .button--link) {
+	--_fg: var(--md-sys-color-on-surface-variant);
+	border-color: transparent;
+}
 
 /* Счётчик на кнопке — сколько ждёт человека за её панелью. Фон и цвет у пилюли
    СОБСТВЕННЫЕ, а не унаследованные от кнопки: приглушённый вариант делает надпись
    кнопки бледной, и счётчик на ней потерялся бы вместе с надписью. Ширина в 1.4em
    держит однозначное число круглым, а не сплюснутым. */
+/* Бейдж Material — большой: 16px высотой, цвета error, подпись label-small. На любой
+   заливке кнопки он остаётся красным пятном: значит «ждёт человека». */
 .button__count {
 	flex: none;
-	min-width: 1.4em;
+	min-width: 16px;
+	height: 16px;
 	padding: 0 var(--space-1);
-	border-radius: 999px;
-	background: var(--color-accent);
-	color: var(--color-accent-contrast);
-	font-size: 11px;
-	line-height: 1.5;
+	border-radius: var(--md-sys-shape-corner-full);
+	background: var(--md-sys-color-error);
+	color: var(--md-sys-color-on-error);
+	font: var(--type-label-small);
+	letter-spacing: var(--md-sys-typescale-label-small-tracking);
 	text-align: center;
 }
-/* На первичной кнопке фон пилюли совпал бы с фоном самой кнопки — цвета меняются местами. */
-.button--primary .button__count { background: var(--color-accent-contrast); color: var(--color-accent); }
+/* У кнопки-значка бейдж садится на угол значка, а не встаёт рядом и не раздвигает круг. */
+.button--icon .button__count { position: absolute; top: 2px; right: 2px; }
 
 /* Шеврон раскрытия — подсказка, а не второй значок: он мельче значка кнопки и приглушён,
    иначе спорит с ним за внимание. Коробку значка (.icon) он и так не растягивает. */
-.button__chevron { width: 12px; height: 12px; opacity: .6; }
+.button__chevron { width: 18px; height: 18px; opacity: .8; margin-right: calc(-1 * var(--space-2)); transition: transform var(--motion-medium) var(--md-sys-motion-easing-emphasized); }
+.button[popovertarget]:has(+ :popover-open) .button__chevron,
+.menu:has(:popover-open) .button__chevron { transform: rotate(180deg); }
 
 /* --- меню строки и учётки -----------------------------------------------------------
    Панель меню лежит в ВЕРХНЕМ СЛОЕ браузера: у панели атрибут popover, у кнопки —
@@ -1018,17 +1390,21 @@ a.tag:hover { text-decoration: none; border-color: var(--color-accent); color: v
    панель остаётся ОБЫЧНЫМ блоком в потоке ячейки: видна на месте со всеми пунктами, как
    раскрытая раскрывашка до перехода. Вырви её из потока безусловно — старый движок
    показал бы её обрезанной обёрткой прокрутки или вовсе за краем экрана. */
+/* Меню Material: surface-container на уровне возвышения 2, скругление extra-small, поля
+   8px сверху и снизу; пункты — строки 48px во всю ширину. */
 .menu__panel {
 	margin: var(--space-1) 0 0 0;
 	width: max-content;
-	max-width: 16rem;
-	padding: var(--space-3);
+	min-width: 112px;
+	max-width: 280px;
+	padding: var(--space-2) 0;
 	flex-direction: column;
-	gap: var(--space-1);
-	background: var(--color-surface);
-	border: 1px solid var(--color-divider);
-	border-radius: var(--radius-md);
-	box-shadow: var(--shadow-md);
+	gap: 0;
+	background: var(--md-sys-color-surface-container);
+	color: var(--md-sys-color-on-surface);
+	border: 0;
+	border-radius: var(--md-sys-shape-corner-extra-small);
+	box-shadow: var(--md-sys-elevation-level2);
 }
 
 /* Подпись меню — заголовок листа на телефоне: лист встаёт у нижнего края окна, вдали
@@ -1037,7 +1413,9 @@ a.tag:hover { text-decoration: none; border-color: var(--color-accent); color: v
 .menu__title {
 	display: none;
 	margin: 0 0 var(--space-2);
-	font-weight: 600;
+	padding: 0 var(--space-4);
+	font: var(--type-title-medium);
+	letter-spacing: var(--md-sys-typescale-title-medium-tracking);
 	overflow-wrap: anywhere;
 }
 
@@ -1050,26 +1428,31 @@ a.tag:hover { text-decoration: none; border-color: var(--color-accent); color: v
    а так теряет только форму. */
 .menu__panel > .button,
 .menu__panel > form:is(:not(:has(.field))) > .button {
+	--_bg: transparent;
+	--_fg: var(--md-sys-color-on-surface);
+	--_lift: none;
 	width: 100%;
+	min-height: 48px;
 	justify-content: flex-start;
-	padding: var(--space-1) var(--space-2);
-	font-size: 14px;
+	gap: var(--space-3);
+	padding: 0 var(--space-3);
+	font: var(--type-label-large);
+	letter-spacing: var(--md-sys-typescale-label-large-tracking);
 	text-align: left;
 	white-space: normal;
 	border-color: transparent;
-	background: transparent;
-	color: var(--color-text);
-	border-radius: var(--radius-sm);
+	border-radius: 0;
 }
-.menu__panel > .button:hover,
-.menu__panel > form:is(:not(:has(.field))) > .button:hover { background: var(--color-surface-alt); filter: none; }
-
+.menu__panel > .button .icon,
+.menu__panel > form:is(:not(:has(.field))) > .button .icon { width: 24px; height: 24px; color: var(--md-sys-color-on-surface-variant); }
 /* Опасный пункт узнаётся цветом подписи, а не заливкой: залитая кнопка перекрикивала бы
    весь список. */
 .menu__panel > .button--danger,
-.menu__panel > form:is(:not(:has(.field))) > .button--danger { color: var(--color-danger); }
-.menu__panel > .button--danger:hover,
-.menu__panel > form:is(:not(:has(.field))) > .button--danger:hover { background: var(--color-danger-bg); }
+.menu__panel > form:is(:not(:has(.field))) > .button--danger { --_fg: var(--md-sys-color-error); }
+.menu__panel > .button--danger .icon,
+.menu__panel > form:is(:not(:has(.field))) > .button--danger .icon { color: var(--md-sys-color-error); }
+/* Форма с полями внутри меню — маленькая форма, не пункт: ей нужны поля по краям. */
+.menu__panel > form:has(.field) { padding: var(--space-2) var(--space-3); }
 
 @supports selector(:popover-open) {
 
@@ -1130,14 +1513,20 @@ a.tag:hover { text-decoration: none; border-color: var(--color-accent); color: v
    «плашка и случайно оказавшаяся рядом кнопка».
 
    Цвет НЕ наследуется от плашки сознательно: у вариантов плашки свои цвета, а крестик
-   служебный и обязан оставаться контрастным в обеих темах — поэтому он берёт
-   --color-text-muted, а не currentColor. */
+   служебный и обязан оставаться контрастным в обеих темах — поэтому он берёт цвет
+   содержимого плашки: тональная заливка у каждого вида своя, и «на ней» читается только
+   её же пара. */
 .tag__action .button {
-	padding: 0 2px;
+	--_bg: transparent;
+	--_fg: currentColor;
+	--_lift: none;
+	width: 18px;
+	min-height: 18px;
+	padding: 0;
+	margin-right: calc(-1 * var(--space-1));
 	border: 0;
-	background: none;
-	border-radius: var(--radius-sm);
-	color: var(--color-text-muted);
+	border-radius: var(--md-sys-shape-corner-full);
+	color: inherit;
 	/* .7, а не «поглуше»: на поверхности карточки более низкое значение уводит глиф
 	   ниже 3:1, а это нетекстовый элемент управления. */
 	opacity: .7;
@@ -1149,17 +1538,12 @@ a.tag:hover { text-decoration: none; border-color: var(--color-accent); color: v
    и спорил с её текстом за внимание. */
 .tag__action .button .icon { width: 12px; height: 12px; }
 
-.tag__action .button:hover {
-	opacity: 1;
-	filter: none;
-	color: var(--color-text);
-	background: var(--color-surface-alt);
-}
+.tag__action .button:hover { opacity: 1; box-shadow: none; }
 
 /* Фокус обязателен: это кнопка, по ней ходят с клавиатуры. Обводка от глобального
    правила, здесь только прижатый offset — вокруг 12-пиксельного глифа зазор в 2px
    выглядит нимбом. */
-.tag__action .button:focus-visible { opacity: 1; color: var(--color-text); outline-offset: 1px; }
+.tag__action .button:focus-visible { opacity: 1; outline-offset: 1px; }
 
 /* Поворот крестика на наведении читается как «закрыть окно», а не «снять плашку». */
 .tag__action .button:hover .icon { transform: none; }
@@ -1189,9 +1573,9 @@ a.tag:hover { text-decoration: none; border-color: var(--color-accent); color: v
 	gap: var(--space-2);
 	flex: 0 1 14rem;
 	padding: var(--space-4);
-	background: var(--color-surface-alt);
-	border: 1px solid var(--color-divider);
-	border-radius: var(--radius-md);
+	background: var(--md-sys-color-surface-container);
+	border: 1px solid var(--md-sys-color-outline-variant);
+	border-radius: var(--md-sys-shape-corner-medium);
 }
 
 /* Ряд, прижатый к правому краю: вторичное действие формы стоит там же, где кнопки
@@ -1200,7 +1584,7 @@ a.tag:hover { text-decoration: none; border-color: var(--color-accent); color: v
 
 /* Нативная пипетка рисует сплошную заливку во всю площадь ввода: у поля кита
    с его паддингом она выглядела бы серой рамкой вокруг цветного пятна. */
-input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: pointer; }
+input[type="color"].field__control { padding: 24px 12px 6px; height: 56px; cursor: pointer; }
 
 /* Подпись только для скринридера: видимая часть меню — символ «⋯», и без текстовой
    пары кнопка безымянна (та же беда, что у кнопки-иконки в ките). */
@@ -1216,10 +1600,6 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 	border: 0;
 }
 
-@media (prefers-reduced-motion: reduce) {
-	.button--icon:hover .icon { transform: none; }
-}
-
 /* --- переключатель темы ---
    Не слово в шапке, а кнопка-иконка кита (вариант «только иконка»): солнце или луна
    по ТЕКУЩЕЙ теме, которую печатает сервер. Форма POST-ит смену, поэтому переключатель
@@ -1230,17 +1610,18 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 
 /* --- компонент: блок команды --- */
 
-.cmd__note { color: var(--color-text-muted); font-size: var(--font-size-small); margin: 0 0 var(--space-2); }
+.cmd__note { color: var(--md-sys-color-on-surface-variant); font: var(--type-body-medium); margin: 0 0 var(--space-2); }
 .cmd {
 	display: flex;
 	/* flex-start, а не center: у многострочного сниппета центрирование уводило
 	   кнопку копирования на середину блока */
 	align-items: flex-start;
 	gap: var(--space-2);
-	background: var(--color-surface-alt);
-	border: 1px solid var(--color-divider);
-	border-radius: var(--radius-md);
-	padding: var(--space-2) var(--space-3);
+	background: var(--md-sys-color-surface-container-highest);
+	color: var(--md-sys-color-on-surface);
+	border: 0;
+	border-radius: var(--md-sys-shape-corner-small);
+	padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
 	overflow-x: auto;
 }
 /* ОДНО правило на .cmd code, и в нём pre-wrap.
@@ -1249,55 +1630,100 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
    на nowrap. Побеждало второе, и многострочный сниппет печатался одной строкой.
    Не «поправить второе», а слить в одно: два правила на один селектор — это и есть
    механизм, которым дефект вернётся. */
-.cmd code { font-size: 14px; white-space: pre-wrap; tab-size: 4; }
+/* Строка кода стоит на высоте кнопки копирования (32px) за счёт полей, а не интерлиньяжа:
+   у многострочного сниппета интерлиньяж 32px развёл бы строки вдвое. */
+.cmd code {
+	padding: 6px 0;
+	font-size: var(--md-sys-typescale-body-medium-size);
+	line-height: var(--md-sys-typescale-body-medium-line-height);
+	white-space: pre-wrap;
+	tab-size: 4;
+}
 .cmd .copy, .from-config__env .copy {
 	margin-left: auto;
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-1);
-	border: 1px solid var(--color-divider);
-	background: var(--color-surface);
-	color: var(--color-text-muted);
-	border-radius: var(--radius-sm);
-	padding: 2px var(--space-3);
+	position: relative;
+	min-height: 32px;
+	border: 1px solid var(--md-sys-color-outline);
+	background: transparent;
+	color: var(--md-sys-color-primary);
+	border-radius: var(--md-sys-shape-corner-full);
+	padding: 0 var(--space-3);
 	cursor: pointer;
-	font: inherit;
-	font-size: 12px;
+	font: var(--type-label-medium);
+	letter-spacing: var(--md-sys-typescale-label-medium-tracking);
 	white-space: nowrap;
-	transition: color var(--motion-fast) var(--motion-ease),
+	transition: background-color var(--motion-fast) var(--motion-ease),
 	            border-color var(--motion-fast) var(--motion-ease);
 }
-.cmd .copy:hover, .from-config__env .copy:hover { color: var(--color-text); border-color: var(--color-accent); }
+.cmd .copy:hover, .from-config__env .copy:hover { background: color-mix(in srgb, var(--md-sys-color-primary) var(--state-hover), transparent); }
 
 /* --- компонент: табы ---
    Вкладка — обычная ссылка на свой URL, активная помечена aria-current="page":
    подсветка берётся из атрибута, а не из отдельного состояния на JS. */
 
-.tabs { margin: var(--space-4) 0; border-bottom: 1px solid var(--color-divider); }
-.tabs__list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-2); }
+/* Основные вкладки Material: высота 48px, подпись title-small, текущая — цвета primary
+   с индикатором 3px шириной в подпись и скруглённым верхом. Индикатор — псевдоэлемент
+   ссылки: у текущей он развёрнут, у остальных сжат в ноль, поэтому смена вкладки внутри
+   страницы (без перехода) разворачивает его движением.
+   Переход по вкладке — это смена страницы, и индикатор, как в MUI, ЕДЕТ со старого места
+   на новое: скрипт кита называет индикатор старой и новой страницы одним именем перехода
+   (атрибут data-vt), и движок браузера анимирует его между документами (View Transitions).
+   Без поддержки переходов или без скрипта страница меняется как обычно. */
+.tabs { margin: var(--space-4) 0; border-bottom: 1px solid var(--md-sys-color-surface-variant); }
+.tabs__list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0; }
 .tabs__item { min-width: 0; }
 .tabs__link {
+	--_bg: transparent;
+	--_state: 0%;
+	position: relative;
 	display: inline-flex;
 	align-items: center;
-	gap: var(--space-1);
-	padding: var(--space-2) var(--space-3);
-	color: var(--color-text-muted);
-	border-bottom: 2px solid transparent;
-	margin-bottom: -1px;
+	justify-content: center;
+	gap: var(--space-2);
+	min-height: 48px;
+	padding: 0 var(--space-4);
+	color: var(--md-sys-color-on-surface-variant);
+	background-color: color-mix(in srgb, currentColor var(--_state), var(--_bg));
+	font: var(--type-title-small);
+	letter-spacing: var(--md-sys-typescale-title-small-tracking);
+	border-bottom: 0;
+	margin-bottom: 0;
 	transition: color var(--motion-fast) var(--motion-ease),
-	            border-color var(--motion-fast) var(--motion-ease);
+	            background-color var(--motion-fast) var(--motion-ease);
 }
-.tabs__link:hover { color: var(--color-text); text-decoration: none; }
-.tabs__link--active { color: var(--color-accent); border-bottom-color: var(--color-accent); }
+.tabs__link::after {
+	content: "";
+	position: absolute;
+	left: var(--space-4);
+	right: var(--space-4);
+	bottom: 0;
+	height: 3px;
+	border-radius: var(--md-sys-shape-corner-extra-small) var(--md-sys-shape-corner-extra-small) 0 0;
+	background: var(--md-sys-color-primary);
+	transform: scaleX(0);
+	transition: transform var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-emphasized);
+}
+.tabs__link:hover { --_state: var(--state-hover); color: var(--md-sys-color-on-surface); text-decoration: none; }
+.tabs__link:active { --_state: var(--state-pressed); }
+.tabs__link--active, .tabs__link--active:hover { color: var(--md-sys-color-primary); }
+.tabs__link--active::after { transform: none; }
+.tabs__link[data-vt]::after { view-transition-name: oscript-ui-tabs-indicator; }
 .tabs__link--plain { cursor: default; }
+.tabs__link--plain:hover { --_state: 0%; }
 .tabs--settings { margin-top: 0; }
 .tabs__count {
-	font-size: 12px;
-	padding: 0 var(--space-2);
-	border-radius: 999px;
-	background: var(--color-surface-alt);
-	color: var(--color-text-muted);
+	min-width: 16px;
+	padding: 0 var(--space-1);
+	border-radius: var(--md-sys-shape-corner-full);
+	font: var(--type-label-small);
+	text-align: center;
+	background: var(--md-sys-color-surface-container-highest);
+	color: var(--md-sys-color-on-surface-variant);
 }
+.tabs__link--active .tabs__count { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); }
 
 /* --- компонент: пустое состояние --- */
 
@@ -1307,26 +1733,41 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 	align-items: center;
 	gap: var(--space-2);
 	text-align: center;
-	padding: var(--space-6) var(--space-5);
-	border: 1px dashed var(--color-divider);
-	border-radius: var(--radius-lg);
-	color: var(--color-text-muted);
+	padding: var(--space-7) var(--space-5);
+	border: 0;
+	border-radius: var(--md-sys-shape-corner-large);
+	background: var(--md-sys-color-surface-container-low);
+	color: var(--md-sys-color-on-surface-variant);
+	font: var(--type-body-medium);
+	letter-spacing: var(--md-sys-typescale-body-medium-tracking);
 }
-.empty__icon { font-size: 28px; line-height: 1; color: var(--color-text-muted); }
-.empty__title { margin: 0; font-family: var(--font-heading); font-size: 16px; color: var(--color-text); }
+.empty__icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 64px;
+	height: 64px;
+	margin-bottom: var(--space-2);
+	border-radius: var(--md-sys-shape-corner-full);
+	background: var(--md-sys-color-surface-container-highest);
+	font-size: 32px;
+	line-height: 1;
+	color: var(--md-sys-color-on-surface-variant);
+}
+.empty__title { margin: 0; font: var(--type-title-medium); letter-spacing: var(--md-sys-typescale-title-medium-tracking); color: var(--md-sys-color-on-surface); }
 .empty__text { margin: 0; max-width: 60ch; }
 .empty__action { margin-top: var(--space-2); }
 .empty--compact { padding: var(--space-4) var(--space-3); gap: var(--space-1); }
-.empty--compact .empty__icon { font-size: 18px; }
+.empty--compact .empty__icon { width: 40px; height: 40px; margin-bottom: 0; font-size: 20px; }
 
 /* --- компонент: опасная зона ---
    Формы компонент не печатает (вложенная форма — невалидный HTML): он живёт внутри
    формы секции настроек и добавляет к ней подтверждение и опасную кнопку. */
 
 .danger-zone {
-	border: 1px solid var(--color-danger);
-	border-radius: var(--radius-lg);
-	background: var(--color-danger-bg);
+	border: 1px solid var(--md-sys-color-error);
+	border-radius: var(--md-sys-shape-corner-medium);
+	background: color-mix(in srgb, var(--md-sys-color-error) var(--state-hover), transparent);
 	padding: var(--space-5);
 	margin: var(--space-4) 0;
 }
@@ -1336,10 +1777,10 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 	align-items: center;
 	gap: var(--space-2);
 	margin: 0;
-	font-size: var(--font-size-h2);
-	color: var(--color-danger);
+	font: var(--type-title-large);
+	color: var(--md-sys-color-error);
 }
-.danger-zone__text { margin: var(--space-2) 0 0; color: var(--color-text); max-width: 70ch; }
+.danger-zone__text { margin: var(--space-2) 0 0; color: var(--md-sys-color-on-surface); max-width: 70ch; }
 .danger-zone__body > :first-child { margin-top: 0; }
 .danger-zone__confirm { margin-top: var(--space-3); max-width: 420px; }
 .danger-zone__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
@@ -1349,7 +1790,7 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 .objhead { margin-bottom: var(--space-5); }
 .objhead__top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
 .objhead__title { display: flex; align-items: baseline; gap: var(--space-2); margin: 0; flex-wrap: wrap; }
-.objhead__title .icon { color: var(--color-accent); align-self: center; }
+.objhead__title .icon { color: var(--md-sys-color-primary); align-self: center; }
 /* Признак у имени — значок размером с букву имени, по средней линии строки. Последний
    символ имени и значки — неразрывный кусок: значок не уходит на строку один, а перенос
    внутри самого имени остаётся прежним. */
@@ -1357,21 +1798,20 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 .objhead__mark { margin-left: var(--space-1); }
 .objhead__mark .icon { width: 1em; height: 1em; vertical-align: middle; }
 .objhead__kind {
-	font-size: var(--font-size-small);
-	font-family: var(--font-body);
-	font-weight: 400;
-	color: var(--color-text-muted);
+	font: var(--type-body-medium);
+	letter-spacing: var(--md-sys-typescale-body-medium-tracking);
+	color: var(--md-sys-color-on-surface-variant);
 }
 .objhead__actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 .objhead__chips { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-top: var(--space-2); }
-.objhead__lead { color: var(--color-text-muted); margin: var(--space-2) 0 0; max-width: 70ch; }
+.objhead__lead { color: var(--md-sys-color-on-surface-variant); margin: var(--space-2) 0 0; max-width: 70ch; }
 .objhead__meta {
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--space-1) var(--space-3);
 	margin-top: var(--space-2);
-	color: var(--color-text-muted);
-	font-size: var(--font-size-small);
+	color: var(--md-sys-color-on-surface-variant);
+	font: var(--type-body-medium);
 }
 /* Разделитель — флекс-элемент строки, поэтому к его margin добавляется gap строки:
    вместе они дают тот же отступ, что был у ряда без значков. */
@@ -1390,13 +1830,13 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 	display: flex;
 	flex-direction: column;
 	height: 100%;
-	background: var(--color-surface);
-	border-radius: var(--radius-lg);
-	box-shadow: var(--shadow-sm);
+	background: var(--md-sys-color-surface-container-low);
+	border-radius: var(--md-sys-shape-corner-medium);
+	box-shadow: var(--md-sys-elevation-level1);
 	padding: var(--space-4) var(--space-5);
-	transition: box-shadow var(--motion-fast) var(--motion-ease);
+	transition: box-shadow var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-standard);
 }
-.objcard:hover { box-shadow: var(--shadow-md); }
+.objcard:hover { box-shadow: var(--md-sys-elevation-level2); }
 /* Строка заголовка не переносится: плашка состояния и кнопки держат свою ширину, а имя
    объекта усекается многоточием — длинное имя больше не ломает ряд. */
 .objcard__head { display: flex; align-items: center; gap: var(--space-3); flex-wrap: nowrap; }
@@ -1405,21 +1845,23 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 	align-items: center;
 	gap: var(--space-2);
 	margin: 0;
-	font-size: 16px;
+	font: var(--type-title-medium);
+	letter-spacing: var(--md-sys-typescale-title-medium-tracking);
 	min-width: 0;
 	flex: 1 1 auto;
 	overflow: hidden;
 }
-.objcard__name .icon { color: var(--color-accent); flex: 0 0 auto; }
+.objcard__name .icon { color: var(--md-sys-color-primary); flex: 0 0 auto; }
 .objcard__name a { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .objcard__chips { display: flex; gap: var(--space-1); flex: 0 0 auto; }
 .objcard__actions { margin-left: auto; display: flex; gap: var(--space-2); flex: 0 0 auto; }
 /* Описание — ровно две строки с многоточием: карточка перестаёт расти под текст, а ряд
    остаётся ровным. Обрезает БРАУЗЕР по строкам, сервер отдаёт описание целиком. */
 .objcard__desc {
-	color: var(--color-text-muted);
+	color: var(--md-sys-color-on-surface-variant);
 	margin: var(--space-1) 0 0;
-	font-size: 13px;
+	font: var(--type-body-medium);
+	letter-spacing: var(--md-sys-typescale-body-medium-tracking);
 	display: -webkit-box;
 	-webkit-box-orient: vertical;
 	-webkit-line-clamp: 2;
@@ -1432,8 +1874,9 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 	gap: var(--space-1) var(--space-3);
 	margin-top: auto;
 	padding-top: var(--space-2);
-	color: var(--color-text-muted);
-	font-size: 12px;
+	color: var(--md-sys-color-on-surface-variant);
+	font: var(--type-body-small);
+	letter-spacing: var(--md-sys-typescale-body-small-tracking);
 }
 /* Значок вместо слова-подписи: пара «значок + значение» не разрывается переносом, а сам
    ряд переносится по элементам. Цвет значка — унаследованный muted ряда, своего у него
@@ -1457,21 +1900,30 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 	margin-top: var(--space-5);
 	flex-wrap: wrap;
 }
+/* Шаг пагинации — кнопка Material с обводкой: пилюля 40px, подпись label-large цветом
+   primary, слой состояния на наведении. */
 .pagination__link {
+	--_bg: transparent;
+	--_state: 0%;
+	position: relative;
 	display: inline-flex;
 	align-items: center;
-	gap: var(--space-1);
-	padding: var(--space-1) var(--space-3);
-	border: 1px solid var(--color-divider);
-	border-radius: var(--radius-md);
-	color: var(--color-text-muted);
-	transition: color var(--motion-fast) var(--motion-ease),
-	            border-color var(--motion-fast) var(--motion-ease);
+	gap: var(--space-2);
+	min-height: 40px;
+	padding: 0 var(--space-4);
+	border: 1px solid var(--md-sys-color-outline);
+	border-radius: var(--md-sys-shape-corner-full);
+	color: var(--md-sys-color-primary);
+	background-color: color-mix(in srgb, currentColor var(--_state), var(--_bg));
+	font: var(--type-label-large);
+	letter-spacing: var(--md-sys-typescale-label-large-tracking);
+	transition: background-color var(--motion-fast) var(--motion-ease);
 }
-.pagination__link:hover { color: var(--color-text); border-color: var(--color-accent); text-decoration: none; }
+.pagination__link:hover { --_state: var(--state-hover); text-decoration: none; }
+.pagination__link:active { --_state: var(--state-pressed); }
 .pagination__link--prev { margin-right: auto; }
 .pagination__link--next { margin-left: auto; }
-.pagination__status { color: var(--color-text-muted); font-size: var(--font-size-small); }
+.pagination__status { color: var(--md-sys-color-on-surface-variant); font: var(--type-body-medium); }
 
 /* --- компонент: плитка показателя ---
    Плитка кликабельна целиком (вариант .tile--link), а не только её значение: показатель,
@@ -1481,32 +1933,31 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 	display: flex;
 	flex-direction: column;
 	gap: 2px;
-	background: var(--color-surface);
-	border: 1px solid var(--color-divider);
-	border-radius: var(--radius-lg);
-	box-shadow: var(--shadow-sm);
+	position: relative;
+	background: var(--md-sys-color-surface-container-low);
+	border: 0;
+	border-radius: var(--md-sys-shape-corner-medium);
+	box-shadow: var(--md-sys-elevation-level1);
 	padding: var(--space-4) var(--space-5);
 	min-width: 140px;
-	color: var(--color-text);
-	transition: box-shadow var(--motion-fast) var(--motion-ease),
-	            border-color var(--motion-fast) var(--motion-ease);
+	color: var(--md-sys-color-on-surface);
+	transition: box-shadow var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-standard),
+	            background-color var(--motion-fast) var(--motion-ease);
 }
 .tile__value {
 	display: flex;
 	align-items: center;
 	gap: var(--space-2);
-	font-family: var(--font-heading);
-	font-size: var(--font-size-h1);
-	line-height: 1.1;
+	font: var(--type-headline-medium);
 }
-.tile__value .icon { color: var(--color-accent); font-size: var(--font-size-body); }
-.tile__label { color: var(--color-text-muted); font-size: var(--font-size-small); }
-.tile__hint { color: var(--color-text-muted); font-size: 12px; }
-.tile--link:hover { text-decoration: none; border-color: var(--color-accent); box-shadow: var(--shadow-md); }
-.tile--ok .tile__value { color: var(--color-success); }
-.tile--warn .tile__value { color: var(--color-warning); }
-.tile--err .tile__value { color: var(--color-danger); }
-.tile--accent .tile__value { color: var(--color-accent); }
+.tile__value .icon { color: var(--md-sys-color-primary); font-size: 24px; }
+.tile__label { color: var(--md-sys-color-on-surface-variant); font: var(--type-body-medium); }
+.tile__hint { color: var(--md-sys-color-on-surface-variant); font: var(--type-body-small); }
+.tile--link:hover { text-decoration: none; box-shadow: var(--md-sys-elevation-level2); }
+.tile--ok .tile__value { color: var(--md-sys-color-success); }
+.tile--warn .tile__value { color: var(--md-sys-color-warning); }
+.tile--err .tile__value { color: var(--md-sys-color-error); }
+.tile--accent .tile__value { color: var(--md-sys-color-primary); }
 
 /* --- ряд плашек в строку и его свёрнутый хвост ---
    Раскладку даёт .tag-row, здесь — только «в строку» и сама свёртка: хвост прячется
@@ -1519,14 +1970,14 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 .tag-row__count {
 	cursor: pointer;
 	list-style: none;
-	font-size: 12px;
-	color: var(--color-text-muted);
-	border: 1px dashed var(--color-divider);
-	border-radius: 999px;
+	font: var(--type-label-medium);
+	color: var(--md-sys-color-on-surface-variant);
+	border: 1px solid var(--md-sys-color-outline-variant);
+	border-radius: var(--md-sys-shape-corner-small);
 	padding: 2px var(--space-3);
 }
 .tag-row__count::-webkit-details-marker { display: none; }
-.tag-row__count:hover { color: var(--color-text); border-color: var(--color-accent); }
+.tag-row__count:hover { color: var(--md-sys-color-on-surface); background: color-mix(in srgb, var(--md-sys-color-on-surface) var(--state-hover), transparent); }
 .tag-row__rest { display: inline-flex; flex-wrap: wrap; gap: var(--space-1); margin-left: var(--space-1); }
 
 /* --- компонент: сетка ---
@@ -1562,16 +2013,16 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
    отделяет черта сверху. Легенда плавает на всю ширину — так она остаётся первым ребёнком
    fieldset и при этом не рвёт черту. Вложенные группы внутри раздела — без рамок, их
    подпись — как подпись поля. */
-.form-section { border: 0; margin: 0; padding: var(--space-4) 0 0; min-width: 0; border-top: 1px solid var(--color-divider); }
+.form-section { border: 0; margin: 0; padding: var(--space-4) 0 0; min-width: 0; border-top: 1px solid var(--md-sys-color-outline-variant); }
 .form-section:first-child { border-top: 0; padding-top: 0; }
 .form-section > legend {
 	float: left;
 	width: 100%;
 	padding: 0;
 	margin: 0 0 var(--space-3);
-	font-size: 15px;
-	font-weight: 600;
-	color: var(--color-text);
+	font: var(--type-title-medium);
+	letter-spacing: var(--md-sys-typescale-title-medium-tracking);
+	color: var(--md-sys-color-on-surface);
 }
 /* clear — у каждого, а не у соседа легенды: соседом бывает скрытое поле, а у него обтекание
    не действует, и легенда вложенной группы уезжала вправо за край. */
@@ -1579,10 +2030,10 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 .form-section > legend + * { margin-top: 0; }
 .form-section > * + * { margin-top: var(--space-3); }
 .form-section fieldset { border: 0; margin-left: 0; margin-right: 0; padding: 0; min-width: 0; }
-.form-section fieldset > legend { padding: 0; margin-bottom: var(--space-1); font-size: var(--font-size-small); color: var(--color-text-muted); }
+.form-section fieldset > legend { padding: 0; margin-bottom: var(--space-1); font: var(--type-body-medium); color: var(--md-sys-color-on-surface-variant); }
 /* Примечание внутри раздела формы — пояснение к полям, а не основной текст: размер подсказки
    поля, чтобы не спорить с подписью раздела. */
-.form-section p.muted { font-size: var(--font-size-small); }
+.form-section p.muted { font: var(--type-body-medium); }
 .form-stack > .button { align-self: flex-start; }
 
 /* Форма-строка внутри ячейки таблицы: кнопка (и иногда пара полей) в одну линию. */
@@ -1599,26 +2050,42 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 .filters > .field { flex: 1; min-width: 0; }
 .chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
+/* Чип фильтра Material: высота 32px, скругление small, обводка outline-variant;
+   выбранный — заливка secondary-container без обводки и галочка перед подписью. */
 .chip {
+	--_bg: transparent;
+	--_state: 0%;
+	position: relative;
 	display: inline-flex;
 	align-items: center;
-	padding: var(--space-1) var(--space-3);
-	border: 1px solid var(--color-divider);
-	border-radius: 999px;
-	background: var(--color-surface);
-	color: var(--color-text-muted);
-	font-size: var(--font-size-small);
-	line-height: 1.6;
+	gap: var(--space-2);
+	min-height: 32px;
+	padding: 0 var(--space-4);
+	border: 1px solid var(--md-sys-color-outline-variant);
+	border-radius: var(--md-sys-shape-corner-small);
+	background-color: color-mix(in srgb, currentColor var(--_state), var(--_bg));
+	color: var(--md-sys-color-on-surface-variant);
+	font: var(--type-label-large);
+	letter-spacing: var(--md-sys-typescale-label-large-tracking);
 	text-decoration: none;
+	transition: background-color var(--motion-fast) var(--motion-ease), padding var(--motion-fast) var(--motion-ease);
 }
-
-.chip:hover { color: var(--color-text); border-color: var(--color-accent); text-decoration: none; }
-
+.chip:hover { --_state: var(--state-hover); text-decoration: none; }
+.chip:active { --_state: var(--state-pressed); }
 .chip--active {
-	color: var(--color-text);
-	border-color: var(--color-accent);
-	background: var(--color-bg);
-	font-weight: 600;
+	--_bg: var(--md-sys-color-secondary-container);
+	color: var(--md-sys-color-on-secondary-container);
+	border-color: transparent;
+	padding-left: var(--space-2);
+}
+.chip--active::before {
+	content: "";
+	width: 5px;
+	height: 10px;
+	margin: -3px var(--space-1) 0 var(--space-1);
+	border-right: 2px solid currentColor;
+	border-bottom: 2px solid currentColor;
+	transform: rotate(45deg);
 }
 
 /* Раскладку чипов держит .tag-row внутри, здесь — только отбивка от списка ниже. */
@@ -1626,21 +2093,21 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 
 /* Свёрнутая группа списка: раскрытие без JS. */
 .fold {
-	background: var(--color-surface);
-	border-radius: var(--radius-lg);
-	box-shadow: var(--shadow-sm);
+	background: var(--md-sys-color-surface-container-low);
+	border-radius: var(--md-sys-shape-corner-medium);
+	box-shadow: var(--md-sys-elevation-level1);
 	padding: var(--space-3) var(--space-4);
 	margin-top: var(--space-4);
 }
-.fold__head { cursor: pointer; color: var(--color-text-muted); font-size: var(--font-size-small); }
-.fold__head:hover { color: var(--color-text); }
+.fold__head { cursor: pointer; color: var(--md-sys-color-on-surface-variant); font: var(--type-label-large); }
+.fold__head:hover { color: var(--md-sys-color-on-surface); }
 
 /* Отрендеренный README: чужой (санитизированный) HTML, которому нужны свои отступы. */
 .prose { overflow-x: auto; }
 .prose pre {
-	background: var(--color-surface-alt);
-	padding: var(--space-3);
-	border-radius: var(--radius-md);
+	background: var(--md-sys-color-surface-container-highest);
+	padding: var(--space-3) var(--space-4);
+	border-radius: var(--md-sys-shape-corner-small);
 	overflow-x: auto;
 }
 .prose img { max-width: 100%; }
@@ -1651,7 +2118,7 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 .settings { display: block; }
 .settings__head { margin-bottom: var(--space-5); }
 .settings__title {
-	font-size: var(--font-size-h1);
+	font: var(--type-headline-medium);
 	margin: 0;
 	display: flex;
 	align-items: baseline;
@@ -1659,11 +2126,11 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 	flex-wrap: wrap;
 }
 .settings__object {
-	font-family: var(--font-mono);
-	font-size: var(--font-size-body);
-	color: var(--color-accent);
+	font-family: var(--md-ref-typeface-mono);
+	font-size: var(--md-sys-typescale-body-large-size);
+	color: var(--md-sys-color-primary);
 }
-.settings__lead { color: var(--color-text-muted); margin: var(--space-2) 0 0; max-width: 70ch; }
+.settings__lead { color: var(--md-sys-color-on-surface-variant); margin: var(--space-2) 0 0; max-width: 70ch; }
 
 /* align-items у колонки — поперечный размер, то есть ШИРИНА: с flex-start панелям хватало
    ширины по содержимому, и широкая таблица уносила вбок всю страницу вместо того, чтобы
@@ -1684,21 +2151,24 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--space-2);
-	font-size: var(--font-size-small);
-	color: var(--color-text-muted);
+	font: var(--type-body-medium);
+	letter-spacing: var(--md-sys-typescale-body-medium-tracking);
+	color: var(--md-sys-color-on-surface-variant);
 }
 .crumbs__item + .crumbs__item::before { content: "/"; margin-right: var(--space-2); opacity: .6; }
 
+/* Секция настроек — карточка Material, залитая (filled) цветом surface-container-low:
+   на странице настроек секций много, и тень у каждой рябила бы. */
 .section {
-	background: var(--color-surface);
-	border-radius: var(--radius-lg);
-	box-shadow: var(--shadow-sm);
+	background: var(--md-sys-color-surface-container-low);
+	border-radius: var(--md-sys-shape-corner-medium);
+	box-shadow: none;
 	padding: var(--space-5);
 	margin-bottom: var(--space-4);
 }
 .section__head { margin-bottom: var(--space-4); }
 .section__title {
-	font-size: var(--font-size-h2);
+	font: var(--type-title-large);
 	margin: 0;
 	display: flex;
 	align-items: center;
@@ -1706,8 +2176,8 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 	border: 0;
 	padding: 0;
 }
-.section__title .icon { color: var(--color-accent); }
-.section__lead { color: var(--color-text-muted); margin: var(--space-2) 0 0; max-width: 70ch; }
+.section__title .icon { color: var(--md-sys-color-primary); }
+.section__lead { color: var(--md-sys-color-on-surface-variant); margin: var(--space-2) 0 0; max-width: 70ch; }
 /* Ритм внутри секции настроек. Тело секции — тот самый контейнер, в котором лежит
    большинство полей приложения: РендерерНастроек.СекцияHTML всегда заворачивает Тело
    секции в .section__body, а поля туда кладут дома настроек. Собственных маргинов
@@ -1731,19 +2201,24 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
    не говорит, что на неё можно нажать. Нативный маркер снят (кнопочной формы у него нет),
    взамен — шеврон, глядящий вниз у закрытого ката и вверх у раскрытого. */
 .section__fold > .fold__head {
+	--_bg: transparent;
+	--_state: 0%;
 	list-style: none;
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2);
-	padding: var(--space-2) var(--space-3);
-	border: 1px solid var(--color-divider);
-	border-radius: var(--radius-md);
-	color: var(--color-text);
-	font-size: var(--font-size-body);
-	font-weight: 600;
+	min-height: 40px;
+	padding: 0 var(--space-4) 0 var(--space-5);
+	border: 1px solid var(--md-sys-color-outline);
+	border-radius: var(--md-sys-shape-corner-full);
+	color: var(--md-sys-color-primary);
+	background-color: color-mix(in srgb, currentColor var(--_state), var(--_bg));
+	font: var(--type-label-large);
+	letter-spacing: var(--md-sys-typescale-label-large-tracking);
+	transition: background-color var(--motion-fast) var(--motion-ease);
 }
 .section__fold > .fold__head::-webkit-details-marker { display: none; }
-.section__fold > .fold__head:hover { background: var(--color-bg); border-color: var(--color-accent); }
+.section__fold > .fold__head:hover { --_state: var(--state-hover); }
 .section__fold > .fold__head::after {
 	content: "";
 	width: .45em;
@@ -1752,15 +2227,17 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 	border-right: 2px solid currentColor;
 	border-bottom: 2px solid currentColor;
 	transform: rotate(45deg);
+	transition: transform var(--motion-medium) var(--md-sys-motion-easing-emphasized),
+	            margin-top var(--motion-medium) var(--md-sys-motion-easing-emphasized);
 }
 .section__fold[open] > .fold__head::after { margin-top: .2em; transform: rotate(-135deg); }
 .section__fold[open] > .fold__head { margin-bottom: var(--space-4); }
 
-.section--danger { box-shadow: 0 0 0 1px var(--color-danger); }
-.section--danger .section__title { color: var(--color-danger); }
-.section--danger .section__title .icon { color: var(--color-danger); }
+.section--danger { box-shadow: inset 0 0 0 1px var(--md-sys-color-error); }
+.section--danger .section__title { color: var(--md-sys-color-error); }
+.section--danger .section__title .icon { color: var(--md-sys-color-error); }
 
-.list-note { color: var(--color-text-muted); font-size: var(--font-size-small); margin: var(--space-2) 0 0; padding-left: var(--space-5); }
+.list-note { color: var(--md-sys-color-on-surface-variant); font: var(--type-body-medium); margin: var(--space-2) 0 0; padding-left: var(--space-5); }
 
 .section table, .section .table-scroll { margin-bottom: var(--space-4); }
 
@@ -1770,35 +2247,42 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
    строка отвечает «что это», развёрнутая отдаёт содержимое, и раскрытие работает без
    единой строки JS. */
 
+/* Панель — карточка Material с обводкой (outlined), раскрывается как аккордеон MUI:
+   высота содержимого едет, шеврон поворачивается (правила движения внизу листа). */
 .panel {
-	border: 1px solid var(--color-divider);
-	border-radius: var(--radius-md);
-	background: var(--color-surface);
+	border: 1px solid var(--md-sys-color-outline-variant);
+	border-radius: var(--md-sys-shape-corner-medium);
+	background: var(--md-sys-color-surface-container-low);
+	overflow: clip;
 }
 
 .panel + .panel { margin-top: var(--space-2); }
 
 .panel__head {
+	--_bg: transparent;
+	--_state: 0%;
+	position: relative;
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
 	gap: var(--space-2);
-	padding: var(--space-3);
+	min-height: 48px;
+	padding: var(--space-2) var(--space-4);
 	cursor: pointer;
 	line-height: 1.6;
+	background-color: color-mix(in srgb, var(--md-sys-color-on-surface) var(--_state), var(--_bg));
+	transition: background-color var(--motion-fast) var(--motion-ease);
 }
-
 .panel__head::-webkit-details-marker { display: none; }
-.panel__head:hover { background: var(--color-bg); }
+.panel__head:hover { --_state: var(--state-hover); }
 
 .image-icon { width: 20px; height: 20px; flex: none; }
 .text-name code { white-space: nowrap; }
-.text-hint { color: var(--color-text-muted); font-size: var(--font-size-small); }
-.text-note code { font-size: var(--font-size-small); color: var(--color-text-muted); }
-
+.text-hint { color: var(--md-sys-color-on-surface-variant); font: var(--type-body-medium); }
+.text-note code { font-size: var(--md-sys-typescale-body-medium-size); color: var(--md-sys-color-on-surface-variant); }
 .panel__body {
 	padding: var(--space-4);
-	border-top: 1px solid var(--color-divider);
+	border-top: 1px solid var(--md-sys-color-outline-variant);
 }
 
 .panel__body > * + * { margin-top: var(--space-4); }
@@ -1808,23 +2292,25 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
    на странице не двигает, и его не обрезает предок с overflow. Открытие, закрытие
    по Esc и щелчку мимо, удержание фокуса и гашение фона — работа движка, скрипта
    здесь нет. Движок постарше покажет содержимое на месте: это ровно сегодняшний вид,
-   а не пустой экран. */
+   а не пустой экран.
+   Вид — диалог Material: surface-container-high, скругление extra-large (28px), уровень
+   возвышения 3, скрим 32%. Появление — проявление с небольшим ростом, как Dialog у MUI
+   (правила движения внизу листа). */
 
 .modal {
 	padding: 0;
 	max-width: min(40rem, calc(100vw - var(--space-6)));
 	width: 100%;
-	border: 1px solid var(--color-divider);
-	border-radius: var(--radius-md);
-	background: var(--color-surface);
-	color: var(--color-text);
-	box-shadow: var(--shadow-lg);
+	border: 0;
+	border-radius: var(--md-sys-shape-corner-extra-large);
+	background: var(--md-sys-color-surface-container-high);
+	color: var(--md-sys-color-on-surface);
+	box-shadow: var(--md-sys-elevation-level3);
 }
-
-/* фон гасится тем же ambient, что лежит под тенями: своего токена окно не заводит */
-.modal::backdrop { background: var(--color-ambient); }
-
+/* фон гасится скримом Material — тем же, что под шторкой и листом меню */
+.modal::backdrop { background: color-mix(in srgb, var(--md-sys-color-scrim) 32%, transparent); }
 .modal__box { padding: var(--space-5); }
+.modal__box > h2:first-child, .modal__box > h3:first-child { font: var(--type-headline-small); margin: 0; }
 .modal__box > * + * { margin-top: var(--space-4); }
 
 .modal__actions {
@@ -1842,9 +2328,9 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 
 .inset {
 	padding: var(--space-4);
-	border: 1px dashed var(--color-divider);
-	border-radius: var(--radius-md);
-	background: var(--color-bg);
+	border: 1px dashed var(--md-sys-color-outline-variant);
+	border-radius: var(--md-sys-shape-corner-medium);
+	background: var(--md-sys-color-surface-container);
 }
 
 .inset > * + * { margin-top: var(--space-3); }
@@ -1853,13 +2339,13 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 	display: flex;
 	align-items: center;
 	gap: var(--space-2);
-	font-weight: 600;
+	font: var(--type-title-small);
+	letter-spacing: var(--md-sys-typescale-title-small-tracking);
 }
-
 .inset__lead {
 	display: block;
-	color: var(--color-text-muted);
-	font-size: var(--font-size-small);
+	color: var(--md-sys-color-on-surface-variant);
+	font: var(--type-body-medium);
 }
 
 .choice-row { display: flex; flex-wrap: wrap; gap: var(--space-2); }
@@ -1868,9 +2354,9 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
    скриптом при мгновенном переключении, поэтому вид кнопки и её доступное имя разъехаться
    не могут: вариант кнопки у всех ссылок ряда одинаковый. */
 .choice-row .button[aria-current] {
-	background: var(--color-accent);
-	border-color: var(--color-accent);
-	color: var(--color-accent-contrast);
+	--_bg: var(--md-sys-color-secondary-container);
+	--_fg: var(--md-sys-color-on-secondary-container);
+	border-color: transparent;
 }
 
 /* Взаимоисключающий набор полей. Сервер печатает ВСЕ наборы, а невыбранные — с `disabled`
@@ -1883,8 +2369,86 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 /* --- движение --- */
 
 @keyframes ui-toast {
-	from { opacity: 0; transform: translateY(4px); }
+	from { opacity: 0; transform: translateY(8px); }
 	to { opacity: 1; transform: none; }
+}
+
+/* Рябь расходится от точки нажатия до размера, который скрипт задал кругу. */
+@keyframes ui-ripple {
+	from { transform: scale(0); }
+	to { transform: scale(1); }
+}
+
+@keyframes ui-spin {
+	to { transform: rotate(360deg); }
+}
+
+/* Раскрывашки — как аккордеон и Collapse у MUI: высота содержимого едет от нуля до своей.
+   Анимировать до height: auto умеет только движок с interpolate-size и ::details-content;
+   остальные открывают мгновенно, как раньше. */
+@supports (interpolate-size: allow-keywords) and selector(::details-content) {
+	details { interpolate-size: allow-keywords; }
+	details::details-content {
+		height: 0;
+		overflow: clip;
+		transition: height var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-emphasized),
+		            content-visibility var(--md-sys-motion-duration-medium2) allow-discrete;
+	}
+	details[open]::details-content { height: auto; }
+}
+
+/* Диалог появляется, как Dialog у MUI: проявляется и чуть вырастает, скрим набирает
+   плотность вместе с ним. Закрытый <dialog> снимается из верхнего слоя дискретно, поэтому
+   overlay и display названы в переходе отдельно; движок, который так не умеет, открывает
+   и закрывает окно мгновенно. */
+.modal {
+	opacity: 0;
+	transform: scale(.92);
+	transition: opacity var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard),
+	            transform var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-emphasized-decelerate),
+	            overlay var(--md-sys-motion-duration-medium2) allow-discrete,
+	            display var(--md-sys-motion-duration-medium2) allow-discrete;
+}
+.modal[open] { opacity: 1; transform: none; }
+@starting-style {
+	.modal[open] { opacity: 0; transform: scale(.92); }
+}
+.modal::backdrop {
+	transition: background-color var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-standard),
+	            overlay var(--md-sys-motion-duration-medium2) allow-discrete,
+	            display var(--md-sys-motion-duration-medium2) allow-discrete;
+}
+@starting-style {
+	.modal[open]::backdrop { background-color: transparent; }
+}
+
+/* Выпадающие панели широкого экрана растут из угла у кнопки, как Grow у MUI: проявляются
+   и разворачиваются из уменьшенных. На телефоне у них свой выезд — листом и шторкой. */
+@supports selector(:popover-open) {
+	@media (min-width: 901px) {
+		.menu__panel, .hubmenu {
+			opacity: 0;
+			transform: scale(.85, .7);
+			transform-origin: top right;
+			transition: opacity var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard),
+			            transform var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-emphasized-decelerate),
+			            overlay var(--md-sys-motion-duration-medium1) allow-discrete,
+			            display var(--md-sys-motion-duration-medium1) allow-discrete;
+		}
+		.menu__panel:popover-open, .hubmenu:popover-open { opacity: 1; transform: none; }
+		@starting-style {
+			.menu__panel:popover-open, .hubmenu:popover-open { opacity: 0; transform: scale(.85, .7); }
+		}
+	}
+}
+
+/* Индикатор вкладок едет между страницами (имя перехода ставит скрипт кита), а сама
+   страница меняется сразу: двигается только индикатор, как у Tabs в MUI. */
+@view-transition { navigation: auto; }
+::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+::view-transition-group(oscript-ui-tabs-indicator) {
+	animation-duration: var(--md-sys-motion-duration-medium2);
+	animation-timing-function: var(--md-sys-motion-easing-emphasized);
 }
 
 /* --- компонент: полоса заполнения ---
@@ -1897,35 +2461,37 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 	gap: var(--space-1);
 	min-width: 0;
 }
+/* Линейный индикатор Material: дорожка 4px пилюлей цвета surface-container-highest,
+   заполнение — цветом роли. */
 .meter__track {
 	position: relative;
-	height: 8px;
-	border-radius: var(--radius-sm);
-	background: var(--color-neutral-800);
-	border: 1px solid var(--color-divider);
+	height: 4px;
+	border-radius: var(--md-sys-shape-corner-full);
+	background: var(--md-sys-color-surface-container-highest);
+	border: 0;
 	overflow: hidden;
 }
 .meter__fill {
 	height: 100%;
-	min-width: 2px;
+	min-width: 4px;
 	border-radius: inherit;
-	background: var(--color-accent);
-	transition: width var(--motion-medium) var(--motion-ease);
+	background: var(--md-sys-color-primary);
+	transition: width var(--md-sys-motion-duration-long2) var(--md-sys-motion-easing-emphasized-decelerate);
 }
-.meter--warn .meter__fill { background: var(--color-warning); }
-.meter--err .meter__fill { background: var(--color-danger); }
-.meter--ok .meter__fill { background: var(--color-success); }
+.meter--warn .meter__fill { background: var(--md-sys-color-warning); }
+.meter--err .meter__fill { background: var(--md-sys-color-error); }
+.meter--ok .meter__fill { background: var(--md-sys-color-success); }
 .meter__value {
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--space-1) var(--space-2);
 	margin: 0;
-	font-size: var(--font-size-small);
-	color: var(--color-text-muted);
+	font: var(--type-body-medium);
+	color: var(--md-sys-color-on-surface-variant);
 }
-.meter__label { color: var(--color-text); }
+.meter__label { color: var(--md-sys-color-on-surface); }
 .meter--compact { gap: 0; }
-.meter--compact .meter__track { height: 6px; min-width: 56px; }
+.meter--compact .meter__track { height: 4px; min-width: 56px; }
 
 .meter__fill--0 { width: 0%; }
 .meter__fill--5 { width: 5%; }
@@ -1980,17 +2546,21 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 		   мгновенно — поведение то же, просто без анимации. */
 		.hubmenu {
 			translate: -100% 0;
-			transition: translate var(--motion-medium) var(--motion-ease),
-			            overlay var(--motion-medium) allow-discrete,
-			            display var(--motion-medium) allow-discrete;
+			transition: translate var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-emphasized-decelerate),
+			            overlay var(--md-sys-motion-duration-medium2) allow-discrete,
+			            display var(--md-sys-motion-duration-medium2) allow-discrete;
 		}
 
+		/* Ящик навигации Material: surface-container-low, скругление large у свободного
+		   края, поля 12px. */
 		.hubmenu:popover-open {
 			inset: 0 auto 0 0;
-			width: min(80vw, 320px);
+			width: min(85vw, 360px);
 			height: auto;
 			max-height: none;
-			border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+			padding: var(--space-3);
+			border-bottom: 0;
+			border-radius: 0 var(--md-sys-shape-corner-large) var(--md-sys-shape-corner-large) 0;
 			translate: 0 0;
 		}
 
@@ -1999,7 +2569,7 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 		}
 
 		/* Затемнение — признак того, что страница за шторкой сейчас не работает. */
-		.hubmenu::backdrop { background: var(--color-scrim); }
+		.hubmenu::backdrop { background: color-mix(in srgb, var(--md-sys-color-scrim) 32%, transparent); }
 
 	}
 
@@ -2015,18 +2585,20 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 
 	.menu__title { display: block; }
 
+	/* Пункт листа — строка списка Material под палец: 56px, пилюлей, подпись body-large. */
 	.menu__panel > .button,
 	.menu__panel > form:is(:not(:has(.field))) > .button {
-		min-height: 44px;
-		padding: var(--space-2) var(--space-3);
-		font-size: var(--font-size-body);
-		border-color: var(--color-divider);
-		border-radius: var(--radius-md);
+		min-height: 56px;
+		padding: 0 var(--space-4);
+		font: var(--type-body-large);
+		letter-spacing: var(--md-sys-typescale-body-large-tracking);
+		border-color: transparent;
+		border-radius: var(--md-sys-shape-corner-full);
 	}
 
 	/* Кнопка формы с полями в листе — та же цель под палец. Форма тянет её во всю ширину,
 	   и подпись встаёт по центру, как у кнопки, а не у строки: строкой она не стала. */
-	.menu__panel > form:has(.field) > .button { min-height: 44px; justify-content: center; }
+	.menu__panel > form:has(.field) > .button { min-height: 48px; justify-content: center; }
 
 	@supports selector(:popover-open) {
 
@@ -2043,15 +2615,30 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 			margin: 0 auto;
 			max-height: 80vh;
 			max-height: 80dvh;
-			padding: var(--space-4);
-			border-width: 1px 1px 0;
-			border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-			box-shadow: var(--shadow-lg);
+			padding: var(--space-2) var(--space-3) var(--space-5);
+			border-width: 0;
+			border-radius: var(--md-sys-shape-corner-extra-large) var(--md-sys-shape-corner-extra-large) 0 0;
+			background: var(--md-sys-color-surface-container-low);
+			box-shadow: var(--md-sys-elevation-level1);
 			translate: 0 100%;
 			position-try-fallbacks: none;
-			transition: translate var(--motion-medium) var(--motion-ease),
-			            overlay var(--motion-medium) allow-discrete,
-			            display var(--motion-medium) allow-discrete;
+			transition: translate var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-emphasized-decelerate),
+			            overlay var(--md-sys-motion-duration-medium2) allow-discrete,
+			            display var(--md-sys-motion-duration-medium2) allow-discrete;
+		}
+
+		/* Ручка нижнего листа Material: полоска 32×4 вверху по центру — знак того, что лист
+		   выехал снизу и туда же уйдёт. */
+		.menu__panel::before {
+			content: "";
+			flex: none;
+			align-self: center;
+			width: 32px;
+			height: 4px;
+			margin: var(--space-2) 0 var(--space-4);
+			border-radius: var(--md-sys-shape-corner-full);
+			background: var(--md-sys-color-on-surface-variant);
+			opacity: .4;
 		}
 
 		.menu__panel:popover-open { translate: 0 0; }
@@ -2062,7 +2649,7 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 
 		/* Затемнение — признак того, что страница за листом сейчас не работает;
 		   щелчок по нему закрывает лист, как и щелчок мимо шторки. */
-		.menu__panel::backdrop { background: var(--color-scrim); }
+		.menu__panel::backdrop { background: color-mix(in srgb, var(--md-sys-color-scrim) 32%, transparent); }
 
 	}
 
@@ -2088,7 +2675,7 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 	.settings__nav .tree__link {
 		min-height: 44px;
 		padding: var(--space-2) var(--space-3);
-		font-size: var(--font-size-body);
+		font: var(--type-body-large);
 	}
 
 }
@@ -2113,7 +2700,7 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 
 /* --- таблица карточками: длинный список читается без горизонтальной прокрутки --- */
 
-.cell-value { white-space: nowrap; color: var(--color-text-muted); }
+.cell-value { white-space: nowrap; color: var(--md-sys-color-on-surface-variant); }
 
 /* Машинное значение в такой таблице не переносится: разорванный путь читается как два.
    На узком экране запрет снимается — там строка уже стала карточкой во всю ширину. */
@@ -2130,20 +2717,20 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 @media (max-width: 720px) {
 	.table-cards, .table-cards tbody, .table-cards tr, .table-cards td { display: block; }
 	.table-cards thead { display: none; }
-	.table-cards tr { padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-divider); }
+	.table-cards tr { padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--md-sys-color-outline-variant); }
 	.table-cards tr:last-child { border-bottom: none; }
 	.table-cards td { width: auto; white-space: normal; border-bottom: none; padding: var(--space-1) 0; }
 	.table-cards td.cell-empty { display: none; }
 	.table-cards td[data-label]::before {
 		content: attr(data-label);
 		display: block;
-		color: var(--color-text-muted);
-		font-size: var(--font-size-small);
+		color: var(--md-sys-color-on-surface-variant);
+		font: var(--type-body-medium);
 	}
 	.table-cards code { white-space: normal; overflow-wrap: anywhere; }
 }
 
-.text-below { display: block; margin-top: var(--space-1); color: var(--color-text-muted); font-size: var(--font-size-small); }
+.text-below { display: block; margin-top: var(--space-1); color: var(--md-sys-color-on-surface-variant); font: var(--type-body-medium); }
 
 /* --- подробность в ячейке: содержимое раскрывается на месте ----------------------
    Свёрнутая строка не мешает читать список, развёрнутая отвечает «что именно».
@@ -2151,8 +2738,8 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 
 .fold-detail > summary {
 	cursor: pointer;
-	color: var(--color-text-muted);
-	font-size: var(--font-size-small);
+	color: var(--md-sys-color-on-surface-variant);
+	font: var(--type-body-medium);
 }
 
 /* Свойства объекта — сетка «имя | значение». Потолок ширины — мера ЧИТАЕМОСТИ, как
@@ -2163,11 +2750,11 @@ input[type="color"].field__control { padding: 2px; height: 2.2rem; cursor: point
 	grid-template-columns: auto 1fr;
 	gap: var(--space-1) var(--space-3);
 	margin-top: var(--space-2);
-	font-size: var(--font-size-small);
+	font: var(--type-body-medium);
 	max-width: 70ch;
 }
 
-.props dt { color: var(--color-text-muted); white-space: nowrap; }
+.props dt { color: var(--md-sys-color-on-surface-variant); white-space: nowrap; }
 /* anywhere — ради хешей и адресов: слово длиннее колонки переносится, а не вылезает из
    таблицы. Обычные слова им не режутся: ширину даёт строка во всю таблицу. */
 .props dd { margin: 0; overflow-wrap: anywhere; }
