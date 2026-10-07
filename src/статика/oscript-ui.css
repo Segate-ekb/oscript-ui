@@ -1228,9 +1228,14 @@ a.tag:hover { --_state: var(--state-hover); text-decoration: none; }
 	border-top: 0;
 	border-radius: var(--md-sys-shape-corner-large);
 	box-shadow: var(--md-sys-elevation-level2);
-	transition: box-shadow var(--motion-medium) var(--motion-ease);
+	transition: box-shadow var(--motion-medium) var(--motion-ease),
+		background-color var(--motion-medium) var(--motion-ease);
 }
 .savebar__note { color: var(--md-sys-color-on-surface-variant); font: var(--type-body-medium); }
+/* Несохранённые правки: класс ставит скрипт кита на первом же вводе в форму, а снимает
+   ответ сервера — после сохранения панель приходит без него. */
+.savebar--dirty { background: var(--md-sys-color-secondary-container); }
+.savebar--dirty .savebar__note { color: var(--md-sys-color-on-secondary-container); }
 .savebar__actions { display: flex; gap: var(--space-2); align-items: center; }
 
 /* --- компонент: кнопка ---
@@ -1620,6 +1625,12 @@ input[type="color"].field__control { padding: 24px 12px 6px; height: 56px; curso
    собственного здесь ровно одно правило — раскладка формы. */
 
 .theme-toggle { display: inline-flex; margin: 0; }
+
+/* --- тихая отправка ---
+   Форма с data-quiet уходит запросом в фоне (скрипт кита), и пока ответ в пути, она
+   помечена aria-busy: курсор говорит «сервер работает», а страница не перезагружается. */
+
+form[data-quiet][aria-busy="true"] { cursor: progress; }
 
 /* --- компонент: блок команды --- */
 

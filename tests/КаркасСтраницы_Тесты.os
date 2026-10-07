@@ -418,13 +418,14 @@
 КонецПроцедуры
 
 // Переключатель темы работает без единой строки скрипта: обычная форма, значок выбирает
-// сервер по текущему оформлению.
+// сервер по текущему оформлению. Признаки quiet и theme-toggle отдают её скрипту кита:
+// тот перекрашивает страницу сразу и отправляет форму в фоне, без перезагрузки.
 &Тест
 Процедура ПереключательТемыЭтоФормаБезТокена() Экспорт
 
 	Шапка = МеждуМаркеров(Страница(), "<header", "</header>");
 
-	Ожидаем.Что(СтрНайти(Шапка, "<form method=""post"" action=""/вид"" class=""theme-toggle"">") > 0,
+	Ожидаем.Что(СтрНайти(Шапка, "<form method=""post"" action=""/вид"" class=""theme-toggle"" data-quiet="""" data-theme-toggle="""">") > 0,
 		"форма переключателя на адрес инсталляции: " + Шапка).ЭтоИстина();
 	Ожидаем.Что(СтрНайти(Шапка, "Включить светлую тему") > 0,
 		"тёмной теме предлагают светлую: " + Шапка).ЭтоИстина();
@@ -1003,7 +1004,7 @@
 		+ "ass=""tree__item""><a href=""/витрина"" class=""tree__link""><svg class=""icon"" viewBox=""%1"" a"
 		+ "ria-hidden=""true"" focusable=""false"" fill=""currentColor"" xmlns=""http://www.w3.org/2000/svg"">%2"
 		+ "</svg>Витрина</a></li></ul></nav><form method=""post"" action=""/вид"" cl"
-		+ "ass=""theme-toggle""><button type=""submit"" class=""button button--link button--sm button--icon"" tit"
+		+ "ass=""theme-toggle"" data-quiet="""" data-theme-toggle=""""><button type=""submit"" class=""button button--link button--sm button--icon"" tit"
 		+ "le=""Включить светлую тему"" aria-label=""Переключить тему""><svg class=""icon"" viewBox=""%3"""
 		+ " aria-hidden=""true"" focusable=""false"" fill=""currentColor"" xmlns=""http://www.w3.org/2000/svg"">%4"
 		+ "</svg></button></form></nav><"

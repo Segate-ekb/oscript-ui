@@ -2,15 +2,21 @@
  *
  * ТОЛЬКО УЛУЧШЕНИЕ. Страница без этого файла работает целиком и выглядит законченной:
  * ссылки, формы, меню, окна и раскрывашки — разметка и движок браузера. Скрипт добавляет
- * четыре вещи и ничего не решает за сервер:
+ * вот что и ничего не решает за сервер:
  *   1. рябь — круг от точки нажатия на кнопке, ссылке-пункте, вкладке, чипе;
  *   2. пустоту поля (data-empty) — по ней лист опускает подпись на место значения;
  *   3. признак прокрутки шапки (data-scrolled) — по нему шапка меняет цвет и даёт тень;
  *   4. имя перехода индикатора вкладок (data-vt) — по нему движок везёт индикатор
  *      со старой страницы на новую (View Transitions между документами);
- *   5. крестик закрываемого тоста — тост гаснет и уходит со страницы.
+ *   5. крестик закрываемого тоста — тост гаснет и уходит со страницы;
+ *   6. тихую отправку (data-quiet) — форма уходит запросом в фоне, а ответ сервера
+ *      ложится на страницу НА МЕСТО: без перезагрузки, с прежней прокруткой, фокусом
+ *      и раскрытыми раскрывашками; плюс мгновенная смена темы (data-theme-toggle),
+ *      отправка по изменению (data-autosubmit) и подсветка несохранённого (data-savebar).
  *
  * Глобальных имён скрипт не заводит, разметку не печатает — только атрибуты и рябь.
+ * Обновив страницу на месте, он сообщает об этом событием «oscript-ui:update» на document:
+ * скрипт инсталляции, который оживляет элементы при загрузке, оживляет по нему новые.
  * Отдаётся файлом с хешем содержимого в адресе, как и базовый лист.
  */
 (function () {
@@ -158,24 +164,23 @@
 
 	/* --- 3. шапка при прокрутке ----------------------------------------------------- */
 
-	var tops = doc.querySelectorAll('.top');
-	if (tops.length) {
-		var ticking = false;
-		var paint = function () {
-			ticking = false;
-			var scrolled = window.scrollY > 0;
-			for (var i = 0; i < tops.length; i++) {
-				tops[i].toggleAttribute('data-scrolled', scrolled);
-			}
-		};
-		window.addEventListener('scroll', function () {
-			if (!ticking) {
-				ticking = true;
-				requestAnimationFrame(paint);
-			}
-		}, { passive: true });
-		paint();
+	// Шапку ищем на каждом кадре, а не один раз: тихая отправка может заменить её узел.
+	var ticking = false;
+	function paintTop() {
+		ticking = false;
+		var tops = doc.querySelectorAll('.top');
+		var scrolled = window.scrollY > 0;
+		for (var i = 0; i < tops.length; i++) {
+			tops[i].toggleAttribute('data-scrolled', scrolled);
+		}
 	}
+	window.addEventListener('scroll', function () {
+		if (!ticking) {
+			ticking = true;
+			requestAnimationFrame(paintTop);
+		}
+	}, { passive: true });
+	paintTop();
 
 	/* --- 5. закрываемый тост --------------------------------------------------------- */
 
@@ -281,5 +286,345 @@
 			marked[i].removeAttribute('data-vt');
 		}
 		markAll();
+	});
+	/* --- 6. тихая отправка ----------------------------------------------------------- */
+
+	// Форма с data-quiet уходит fetch-ем, а не навигацией. Сервер ничего нового не учит:
+	// он отвечает тем же, чем ответил бы браузеру, — обычно перенаправлением обратно на
+	// страницу (POST → 303 → GET), и пришедший HTML ложится на текущую страницу морфингом:
+	// узел, который не изменился, остаётся тем же узлом. Поэтому не прыгает прокрутка,
+	// не теряется фокус, раскрытая раскрывашка остаётся раскрытой, а бегунок тумблера
+	// доезжает своей анимацией, а не появляется заново.
+	//
+	// Всё, что пошло не так (сеть, не-HTML ответ, другие листы и скрипты), уводит в обычную
+	// навигацию: страница хуже не становится, она просто перезагружается, как без скрипта.
+
+	var NATIVE = 'oscriptUiNative'; // отметка формы: следующую отправку пропустить к браузеру
+	var queues = new WeakMap();      // форма → очередь её отправок
+	var pushed = false;              // уводили ли адрес вкладки pushState-ом
+
+	function quietForm(form) {
+		return form && form.hasAttribute && form.hasAttribute('data-quiet')
+			&& !form.hasAttribute('target') && window.fetch && window.DOMParser;
+	}
+
+	function sameOrigin(url) {
+		try {
+			return new URL(url, location.href).origin === location.origin;
+		} catch (err) {
+			return false;
+		}
+	}
+
+	function attr(el, name) {
+		return el && el.getAttribute ? el.getAttribute(name) : null;
+	}
+
+	// Куда и как уходит форма с учётом кнопки, которой её отправили: у кнопки свои
+	// formaction, formmethod, formtarget, formenctype.
+	function plan(form, submitter) {
+		var action = attr(submitter, 'formaction') || form.getAttribute('action') || location.href;
+		var method = (attr(submitter, 'formmethod') || form.getAttribute('method') || 'get').toLowerCase();
+		var enctype = attr(submitter, 'formenctype') || form.getAttribute('enctype') || '';
+		var data;
+		try {
+			data = submitter ? new FormData(form, submitter) : new FormData(form);
+		} catch (err) {
+			// движок без второго аргумента FormData: имя нажатой кнопки докладываем сами
+			data = new FormData(form);
+			if (submitter && submitter.name) {
+				data.append(submitter.name, submitter.value);
+			}
+		}
+		var url = new URL(action, location.href);
+		var init = { method: method === 'post' ? 'POST' : 'GET', credentials: 'same-origin',
+			headers: { 'Accept': 'text/html' } };
+		if (init.method === 'GET') {
+			url.search = new URLSearchParams(data).toString();
+		} else if (/multipart/i.test(enctype)) {
+			init.body = data;
+		} else {
+			// заголовок — ровно как у браузера при обычной отправке: fetch сам дописал бы
+			// «;charset=UTF-8», а сервер, который сверяет тип целиком (winow), тело с таким
+			// заголовком не разбирает и получает форму пустой
+			init.headers['Content-Type'] = 'application/x-www-form-urlencoded';
+			init.body = new URLSearchParams(data).toString();
+		}
+		return { url: url.href, init: init,
+			blank: (attr(submitter, 'formtarget') || '') !== '' };
+	}
+
+	function native(form, submitter) {
+		form[NATIVE] = true;
+		if (form.requestSubmit) {
+			form.requestSubmit(submitter && submitter.form === form ? submitter : undefined);
+		} else {
+			form.submit();
+		}
+	}
+
+	doc.addEventListener('submit', function (e) {
+		var form = e.target;
+		if (form[NATIVE]) {
+			form[NATIVE] = false;
+			return;
+		}
+		if (e.defaultPrevented || !quietForm(form)) {
+			return;
+		}
+		var p = plan(form, e.submitter);
+		if (p.blank || !sameOrigin(p.url)) {
+			return; // новая вкладка или чужой сайт — это навигация, её делает браузер
+		}
+		e.preventDefault();
+		if (form.hasAttribute('data-theme-toggle')) {
+			flipTheme();
+		}
+		enqueue(form, e.submitter, p);
+	});
+
+	// Отправки одной формы идут строго по очереди и каждая — со своими данными: два щелчка
+	// по теме — две смены, два щелчка по тумблеру — два сохранения. Ответ ложится на
+	// страницу только последним: промежуточный устарел ещё в дороге.
+	function enqueue(form, submitter, p) {
+		var q = queues.get(form) || { tail: Promise.resolve(), size: 0 };
+		queues.set(form, q);
+		q.size++;
+		form.setAttribute('aria-busy', 'true');
+		form.removeAttribute('data-edited');
+		q.tail = q.tail.then(function () {
+			return send(form, submitter, p, function () { return q.size === 1; });
+		}).finally(function () {
+			q.size--;
+			if (!q.size) {
+				form.removeAttribute('aria-busy');
+			}
+		});
+	}
+
+	function send(form, submitter, p, last) {
+		return fetch(p.url, p.init).then(function (response) {
+			var type = response.headers.get('Content-Type') || '';
+			if (!/text\/html/i.test(type) || !sameOrigin(response.url)) {
+				fallback(form, submitter, p, response);
+				return null;
+			}
+			return response.text().then(function (html) {
+				if (last()) {
+					land(form, response, html);
+				}
+			});
+		}).catch(function () {
+			fallback(form, submitter, p, null);
+		});
+	}
+
+	function fallback(form, submitter, p, response) {
+		if (response && p.init.method === 'GET') {
+			location.assign(response.url);
+		} else if (response && response.ok && response.redirected) {
+			location.assign(response.url); // POST уже исполнен: повторять его нельзя
+		} else {
+			native(form, submitter);
+		}
+	}
+
+	function resources(root) {
+		var list = root.querySelectorAll('link[rel~="stylesheet"][href], script[src]');
+		var out = [];
+		for (var i = 0; i < list.length; i++) {
+			out.push(list[i].getAttribute('href') || list[i].getAttribute('src'));
+		}
+		return out.join('\n');
+	}
+
+	function land(form, response, html) {
+		var next = new DOMParser().parseFromString(html, 'text/html');
+		// другой лист или скрипт — у новой страницы другое окружение, морфинг не годится
+		if (resources(next) !== resources(doc)) {
+			location.assign(response.url);
+			return;
+		}
+
+		var url = new URL(response.url);
+		var here = new URL(location.href);
+		var moved = url.pathname !== here.pathname || url.search !== here.search;
+
+		// Удачно сохранённая форма сбрасывается к умолчаниям, и значения берутся с сервера:
+		// поле комментария после отправки пустеет, сохранённый тумблер — то, что запомнил
+		// сервер. Ответ с ошибкой (4xx) несёт введённое и подсказки — его поля не трогаем.
+		// Не трогаем и форму, в которой человек успел что-то поменять, пока шёл запрос.
+		if (response.ok && form.isConnected && !form.hasAttribute('data-edited')) {
+			form.reset();
+		}
+
+		doc.title = next.title;
+		syncAttributes(doc.documentElement, next.documentElement);
+		var tokens = doc.getElementById('токены-темы');
+		var fresh = next.getElementById('токены-темы');
+		if (tokens && fresh && tokens.textContent !== fresh.textContent) {
+			tokens.textContent = fresh.textContent;
+		}
+		morphChildren(doc.body, next.body);
+		syncAttributes(doc.body, next.body);
+
+		if (moved) {
+			history.pushState({ oscriptUi: true }, '', url.href + here.hash);
+			pushed = true;
+			window.scrollTo(0, 0);
+		}
+		markAll();
+		paintTop();
+		doc.dispatchEvent(new CustomEvent('oscript-ui:update', { detail: { url: url.href } }));
+	}
+
+	// Адрес вкладки, уведённый pushState-ом, показывает страницу, которой в истории
+	// браузера нет: назад и вперёд по такой истории честно загружают страницу заново.
+	window.addEventListener('popstate', function () {
+		if (pushed) {
+			location.reload();
+		}
+	});
+
+	/* морфинг: старое дерево подстраивается под новое, неизменное остаётся на месте */
+
+	// Состояние, которое знает только браузер: раскрыта ли раскрывашка, открыто ли окно.
+	// Сервер о нём не знает и печатает узел закрытым, поэтому атрибут берётся у текущего.
+	var KEEP = { DETAILS: 'open', DIALOG: 'open' };
+	// Атрибуты, которые ставит сам скрипт кита.
+	var OWN = { 'data-empty': 1, 'data-scrolled': 1, 'data-vt': 1, 'data-edited': 1, 'aria-busy': 1 };
+
+	function syncAttributes(from, to) {
+		var keep = KEEP[from.tagName];
+		var i, a;
+		for (i = from.attributes.length - 1; i >= 0; i--) {
+			a = from.attributes[i];
+			if (!to.hasAttribute(a.name) && a.name !== keep && !OWN[a.name]) {
+				from.removeAttribute(a.name);
+			}
+		}
+		for (i = 0; i < to.attributes.length; i++) {
+			a = to.attributes[i];
+			if (a.name !== keep && from.getAttribute(a.name) !== a.value) {
+				from.setAttribute(a.name, a.value);
+			}
+		}
+	}
+
+	function sameKind(a, b) {
+		if (a.nodeType !== b.nodeType) {
+			return false;
+		}
+		if (a.nodeType !== 1) {
+			return true;
+		}
+		return a.tagName === b.tagName && (a.id || '') === (b.id || '')
+			&& (a.tagName !== 'INPUT' || a.type === b.type);
+	}
+
+	function morphNode(from, to) {
+		if (from.nodeType !== 1) {
+			if (from.nodeValue !== to.nodeValue) {
+				from.nodeValue = to.nodeValue;
+			}
+			return;
+		}
+		syncAttributes(from, to);
+		if (from.tagName === 'TEXTAREA') {
+			// значение textarea — её текст по умолчанию; введённое человеком браузер держит
+			// сам, пока его не сбросили
+			if (from.defaultValue !== to.defaultValue) {
+				from.defaultValue = to.defaultValue;
+			}
+			return;
+		}
+		morphChildren(from, to);
+	}
+
+	function morphChildren(from, to) {
+		var a = from.firstChild;
+		var b = to.firstChild;
+		while (b) {
+			var nextB = b.nextSibling;
+			if (a && a.classList && a.classList.contains('ripple')) {
+				var gone = a;
+				a = a.nextSibling;
+				from.removeChild(gone);
+				continue;
+			}
+			if (a && sameKind(a, b)) {
+				morphNode(a, b);
+				a = a.nextSibling;
+			} else {
+				var twin = b.id ? doc.getElementById(b.id) : null;
+				if (twin && twin.parentNode === from && sameKind(twin, b)) {
+					from.insertBefore(twin, a);
+					morphNode(twin, b);
+				} else {
+					from.insertBefore(doc.importNode(b, true), a);
+				}
+			}
+			b = nextB;
+		}
+		while (a) {
+			var rest = a.nextSibling;
+			from.removeChild(a);
+			a = rest;
+		}
+	}
+
+	/* смена темы: обе палитры уже в голове страницы, переключение — один атрибут */
+
+	// Сервер о смене узнаёт тем же запросом, что и без скрипта, — просто в фоне: cookie
+	// пишет он один, второго источника правды о теме нет. Скрипт лишь не ждёт его ответа
+	// и перекрашивает страницу сразу; ответ потом поменяет значок и подсказку кнопки.
+	function flipTheme() {
+		var root = doc.documentElement;
+		// цель считается сейчас, а не в колбэке перехода: колбэк зовётся кадром позже,
+		// и успей к нему ответ сервера поставить новую тему, он перевернул бы её обратно
+		var next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+		var apply = function () {
+			root.setAttribute('data-theme', next);
+		};
+		if (doc.startViewTransition && !(calm && calm.matches)) {
+			doc.startViewTransition(apply);
+		} else {
+			apply();
+		}
+	}
+
+	/* отправка по изменению и несохранённое */
+
+	doc.addEventListener('change', function (e) {
+		var control = e.target;
+		if (!control || !control.form) {
+			return;
+		}
+		if (control.hasAttribute('data-autosubmit')) {
+			if (control.form.requestSubmit) {
+				control.form.requestSubmit();
+			} else {
+				control.form.submit();
+			}
+		}
+	});
+
+	['input', 'change'].forEach(function (type) {
+		doc.addEventListener(type, function (e) {
+			var form = e.target && e.target.form;
+			if (!form) {
+				return;
+			}
+			if (e.target.hasAttribute('data-autosubmit')) {
+				return; // уйдёт на сервер сейчас же — несохранённым его не назвать
+			}
+			if (form.hasAttribute('aria-busy')) {
+				form.setAttribute('data-edited', '');
+			}
+			var bars = form.querySelectorAll('[data-savebar]');
+			for (var i = 0; i < bars.length; i++) {
+				bars[i].classList.add('savebar--dirty');
+			}
+		});
 	});
 })();
