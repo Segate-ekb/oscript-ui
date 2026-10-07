@@ -7,7 +7,8 @@
  *   2. пустоту поля (data-empty) — по ней лист опускает подпись на место значения;
  *   3. признак прокрутки шапки (data-scrolled) — по нему шапка меняет цвет и даёт тень;
  *   4. имя перехода индикатора вкладок (data-vt) — по нему движок везёт индикатор
- *      со старой страницы на новую (View Transitions между документами).
+ *      со старой страницы на новую (View Transitions между документами);
+ *   5. крестик закрываемого тоста — тост гаснет и уходит со страницы.
  *
  * Глобальных имён скрипт не заводит, разметку не печатает — только атрибуты и рябь.
  * Отдаётся файлом с хешем содержимого в адресе, как и базовый лист.
@@ -175,6 +176,27 @@
 		}, { passive: true });
 		paint();
 	}
+
+	/* --- 5. закрываемый тост --------------------------------------------------------- */
+
+	doc.addEventListener('click', function (e) {
+		var close = e.target.closest ? e.target.closest('.toast [data-close]') : null;
+		if (!close) {
+			return;
+		}
+		var toast = close.closest('.toast');
+		var gone = function () {
+			if (toast.parentNode) {
+				toast.parentNode.removeChild(toast);
+			}
+		};
+		if (calm && calm.matches) {
+			gone();
+			return;
+		}
+		toast.classList.add('toast--closing');
+		setTimeout(gone, 250);
+	});
 
 	/* --- 4. индикатор вкладок между страницами -------------------------------------- */
 

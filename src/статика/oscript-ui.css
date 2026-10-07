@@ -488,7 +488,7 @@ h3 {
 }
 /* Ритм внутри карточки — та же обязанность, что у .section__body. Тело карточки держит
    произвольное доверенное содержимое, в том числе поля кита, и раньше ритм давали
-   маргины самих полей: в витрине кита восемь полей подряд в .card__body слиплись
+   маргины самих полей: в документации кита восемь полей подряд в .card__body слиплись
    в ноль пикселей. Маргин, а не flex+gap — по той же причине, что и у .section__body:
    в потоке маргины детей схлопываются, а не складываются с зазором.
 
@@ -510,7 +510,7 @@ h3 {
    только нормализует. У заголовков собственный нижний маргин МЕНЬШЕ 16px, а верхний
    больше, так что правило подтягивает их сверху и раздвигает снизу:
      * h3 (margin: space-5 0 space-2 = 24/8) — реальный непосредственный ребёнок
-       .card__body (ВитринаКита.os: заголовки блоков витрины): сверху 24 -> 16,
+       .card__body (заголовки блоков страницы): сверху 24 -> 16,
        снизу max(8, 16) = 16 (+8). Заголовок становится равноудалён от соседей
        сверху и снизу — практически это ровнее, а не поломка;
      * h1 (margin-bottom space-3 = 12) и h2 (space-6 0 space-3 = 32/12) — так же:
@@ -519,7 +519,7 @@ h3 {
    В ВЫСОТУ СТРОЧНОГО БОКСА и опускает всю строку вместе с собой; настоящий inline
    вертикальный маргин игнорирует. Поэтому ряд инлайновых элементов печатается ОДНИМ
    ребёнком тела (.tag-row), а не несколькими. Одиночный атомарный инлайн после
-   заголовка — законный случай (витрина кита): там маргин отбивает образец от подписи
+   заголовка — законный случай (образец документации): там маргин отбивает образец от подписи
    своего блока.
    Сужать правило нельзя: «> * + *» владеет интервалом между ЛЮБЫМИ соседями тела,
    а «> .field + .field» не покрывает даже пару .field + .toggle — стоит поставить
@@ -614,7 +614,9 @@ h3 {
 .field:focus-within > .field__label { max-width: calc((100% - 32px) * 4 / 3); }
 .field[data-empty]:not(:focus-within) > .field__label { transform: none; }
 .field:focus-within > .field__label { color: var(--md-sys-color-primary); }
-.field[data-empty]:not(:focus-within) > .field__control::placeholder { color: transparent; }
+/* Плейсхолдер прячется, только пока на его месте стоит опущенная подпись: у поля без
+   подписи он единственная подсказка и виден всегда. */
+.field[data-empty]:not(:focus-within):has(> .field__label) > .field__control::placeholder { color: transparent; }
 .field__control {
 	--_bg: var(--md-sys-color-surface-container-highest);
 	--_state: 0%;
@@ -1017,6 +1019,13 @@ tbody tr.row-accent.table__record:hover + .table__expand { background: color-mix
 	padding: 0;
 }
 .toast__close:hover { background: color-mix(in srgb, currentColor var(--state-hover), transparent); }
+/* Закрытый тост уходит, как Snackbar у MUI: гаснет и сжимается; убирает его скрипт кита. */
+.toast--closing {
+	opacity: 0;
+	transform: translateY(8px);
+	transition: opacity var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-emphasized-accelerate),
+	            transform var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-emphasized-accelerate);
+}
 .toast--ok { background: var(--md-sys-color-success-container); color: var(--md-sys-color-on-success-container); }
 .toast--ok .icon { color: var(--md-sys-color-success); }
 .toast--warn { background: var(--md-sys-color-warning-container); color: var(--md-sys-color-on-warning-container); }
@@ -2052,6 +2061,13 @@ input[type="color"].field__control { padding: 24px 12px 6px; height: 56px; curso
 .filters { display: flex; align-items: flex-start; gap: var(--space-2); margin: var(--space-4) 0; }
 .filters > .field { flex: 1; min-width: 0; }
 .filters > .button { margin-top: var(--space-2); }
+/* На телефоне поля отбора встают каждое во всю строку, а кнопка — под ними: в одну строку
+   три поля и кнопка сжимались до нечитаемого. */
+@media (max-width: 640px) {
+	.filters { flex-wrap: wrap; }
+	.filters > .field { flex: 1 1 100%; }
+	.filters > .button { margin-top: 0; }
+}
 .chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
 /* Чип фильтра Material: высота 32px, скругление small, обводка outline-variant;
@@ -2453,6 +2469,10 @@ input[type="color"].field__control { padding: 24px 12px 6px; height: 56px; curso
 ::view-transition-group(oscript-ui-tabs-indicator) {
 	animation-duration: var(--md-sys-motion-duration-medium2);
 	animation-timing-function: var(--md-sys-motion-easing-emphasized);
+}
+/* Псевдоэлементы перехода живут вне дерева документа, и общее правило «*» их не гасит. */
+@media (prefers-reduced-motion: reduce) {
+	::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none; }
 }
 
 /* --- компонент: полоса заполнения ---
