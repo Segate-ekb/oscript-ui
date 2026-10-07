@@ -253,6 +253,9 @@ main.wrap { padding-top: var(--space-6); padding-bottom: var(--space-8); min-hei
    стоит в самой шапке, и вторая такая же строка в меню была бы дублем. На телефоне полоса
    ходов спрятана, и это единственное место, где тему можно переключить. */
 .hubmenu__theme { display: block; }
+/* Действия инсталляции в подвале панели — по той же причине: на телефоне полоса ходов
+   спрятана, и панель единственное место, где их видно. На широком они стоят в шапке. */
+.hubmenu__actions { display: flex; flex-direction: column; }
 /* Заголовок группы в ящике навигации Material — title-small приглушённым цветом. */
 .hubmenu__title {
 	margin: 0;
@@ -390,6 +393,7 @@ main.wrap { padding-top: var(--space-6); padding-bottom: var(--space-8); min-hei
 	   оформления — в шапке: второй раз в меню они не нужны. */
 	.hubmenu__section--screen { display: none; }
 	.hubmenu__theme { display: none; }
+	.hubmenu__actions { display: none; }
 
 	/* Скрим под дропдауном не нужен: прежнее меню учётки страницу не затемняло. */
 	.hubmenu::backdrop { background: transparent; }
