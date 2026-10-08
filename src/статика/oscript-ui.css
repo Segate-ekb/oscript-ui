@@ -2442,6 +2442,89 @@ form[data-quiet][aria-busy="true"] { cursor: progress; }
 	margin-top: var(--space-5);
 }
 
+/* --- окно со слотами, подтверждение, окно по адресу (выпуск 0.11) ----------------
+   Узел Кит.Окно: шапка (заголовок и крестик), лид, тело, действия. Рамка та же, что у окна
+   объявленной формы выше. Подтверждение — окно вида «опасное»: заголовок цветом ошибки,
+   последствия читаются в полный цвет текста, эхо-поле и кнопка цвета ошибки. Кнопка
+   подтверждения выглядит недоступной, пока эхо-поле не совпало с образцом: без скрипта
+   это делает лист (:has(:invalid)), а отправку с несовпавшим полем не пускает сам браузер
+   (pattern + required); скрипт ещё и ставит кнопке disabled. */
+
+.modal__head { display: flex; align-items: flex-start; gap: var(--space-2); }
+.modal__title {
+	flex: 1;
+	min-width: 0;
+	margin: 0;
+	font: var(--type-headline-small);
+	color: var(--md-sys-color-on-surface);
+}
+/* крестик — кнопка-значок кита; в угол шапки его ставит отрицательный отступ, чтобы
+   слой состояния не упирался в заголовок */
+.modal__head > .button { flex: none; margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-2)) 0 0; }
+.modal__box > .modal__lead {
+	margin-top: var(--space-2);
+	color: var(--md-sys-color-on-surface-variant);
+	font: var(--type-body-medium);
+	letter-spacing: var(--md-sys-typescale-body-medium-tracking);
+}
+.modal__body > :first-child { margin-top: 0; }
+.modal__body > * + * { margin-top: var(--space-4); }
+
+.modal--wide { max-width: min(64rem, calc(100vw - var(--space-6))); }
+.modal--danger .modal__title { color: var(--md-sys-color-error); }
+.modal--confirm .modal__box > .modal__lead { color: var(--md-sys-color-on-surface); font: var(--type-body-large); }
+.modal__echo { max-width: 420px; }
+.modal--confirm:has(.modal__echo :invalid) .modal__actions [name="confirmed"] {
+	--_bg: color-mix(in srgb, var(--md-sys-color-on-surface) var(--state-disabled-container), transparent);
+	--_fg: color-mix(in srgb, var(--md-sys-color-on-surface) var(--state-disabled-content), transparent);
+	box-shadow: none;
+	cursor: not-allowed;
+}
+
+/* Оболочка окна по адресу пуста, пока скрипт не положил в неё окно; тост ошибки загрузки
+   стоит рядом с ней и всплывает снизу экрана поверх содержимого. */
+.window-error {
+	position: fixed;
+	z-index: 30;
+	left: var(--space-4);
+	right: var(--space-4);
+	bottom: var(--space-4);
+	display: flex;
+	justify-content: center;
+	pointer-events: none;
+}
+.window-error[hidden] { display: none; }
+.window-error > .toast { pointer-events: auto; max-width: 40rem; margin: 0; box-shadow: var(--md-sys-elevation-level3); }
+
+/* До 640 px открытое окно — лист во весь экран, как полноэкранный диалог Material:
+   прокручивается само окно, а действия прилипают к его низу и всегда под пальцем.
+   Только у модального (:modal): окно, которое сервер напечатал открытым без скрипта,
+   стоит в потоке страницы и листом не становится. */
+@media (max-width: 640px) {
+	.modal:modal {
+		width: 100%;
+		max-width: 100%;
+		height: 100%;
+		max-height: 100%;
+		margin: 0;
+		border-radius: 0;
+	}
+	.modal:modal .modal__box { display: flex; flex-direction: column; min-height: 100%; padding-bottom: 0; }
+	.modal:modal .modal__body { flex: 1 0 auto; }
+	.modal:modal .modal__actions {
+		position: sticky;
+		bottom: 0;
+		margin: var(--space-5) calc(-1 * var(--space-5)) 0;
+		padding: var(--space-3) var(--space-5) calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+		background: var(--md-sys-color-surface-container-high);
+		border-top: 1px solid var(--md-sys-color-outline-variant);
+	}
+	.modal:modal .modal__actions > .button { flex: 1 1 auto; }
+	/* у прежнего окна формы последним идёт форма, а подвал — внутри неё */
+	.modal:modal .modal__box > form:last-child { flex: 1 0 auto; display: flex; flex-direction: column; }
+	.modal:modal .modal__box > form:last-child > .modal__actions { margin-top: auto; }
+}
+
 /* --- врезка: шаг ВНУТРИ формы, а не своя секция ---------------------------------
    Пунктир и означает «часть формы»: карточка рисует сплошную рамку и читалась бы
    как самостоятельный блок. Так собирают подготовительный шаг — собственная кнопка
