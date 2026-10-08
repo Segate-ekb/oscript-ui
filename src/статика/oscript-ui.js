@@ -13,7 +13,11 @@
  *      ложится на страницу НА МЕСТО: без перезагрузки, с прежней прокруткой, фокусом
  *      и раскрытыми раскрывашками; плюс мгновенная смена темы (data-theme-toggle),
  *      отправка по изменению (data-autosubmit) и подсветка несохранённого (data-savebar);
- *   7. шаги (data-steps) — одна панель длинной формы за раз, «Дальше» проверяет поля шага.
+ *      форма в окне: успех закрывает окно и ставит фокус на data-focus, отказ остаётся в нём;
+ *   7. окно — команды show-modal и close там, где движок их ещё не знает, окно, которое
+ *      сервер напечатал открытым, — модальным, окно по адресу (data-window-link) в одной
+ *      на страницу оболочке и подтверждение отправки формы (data-confirm).
+ *   8. шаги (data-steps) — одна панель длинной формы за раз, «Дальше» проверяет поля шага.
  *
  * Глобальных имён скрипт не заводит, разметку не печатает — только атрибуты и рябь.
  * Обновив страницу на месте, он сообщает об этом событием «oscript-ui:update» на document:
@@ -412,7 +416,7 @@
 			}
 			return response.text().then(function (html) {
 				if (last()) {
-					land(form, response, html);
+					land(form, submitter, response, html);
 				}
 			});
 		}).catch(function () {
@@ -439,12 +443,28 @@
 		return out.join('\n');
 	}
 
-	function land(form, response, html) {
+	function land(form, submitter, response, html) {
 		var next = new DOMParser().parseFromString(html, 'text/html');
 		// другой лист или скрипт — у новой страницы другое окружение, морфинг не годится
 		if (resources(next) !== resources(doc)) {
 			location.assign(response.url);
 			return;
+		}
+
+		// Форма в окне. Отказ (4xx) ложится внутрь открытого окна — введённое и подсказки
+		// у полей на месте, остальная страница не трогается. Успех (перенаправление)
+		// закрывает окно, страница морфится по ответу, и фокус встаёт на то, что сервер
+		// пометил data-focus, — обычно только что созданную запись.
+		var box = windowOf(form, submitter);
+		var closing = false;
+		if (box && box.open) {
+			if (response.status >= 400 && response.status < 500 && landInWindow(box, next, response)) {
+				return;
+			}
+			if (response.ok && response.redirected) {
+				box.close();
+				closing = true;
+			}
 		}
 
 		var url = new URL(response.url);
@@ -477,6 +497,56 @@
 		markAll();
 		paintTop();
 		doc.dispatchEvent(new CustomEvent('oscript-ui:update', { detail: { url: url.href } }));
+		if (closing) {
+			focusMarked();
+		}
+	}
+
+	// Окно формы — то, в котором стоит кнопка отправки (подтверждение отправляет форму вне
+	// себя атрибутом form), либо то, в котором стоит сама форма.
+	function windowOf(form, submitter) {
+		var box = submitter && submitter.closest ? submitter.closest('dialog') : null;
+		return box || (form.closest ? form.closest('dialog') : null);
+	}
+
+	// Ответ с отказом несёт то же окно (тот же id; у оболочки окна по адресу — id окна,
+	// которое в ней лежит): его содержимое морфится в открытое окно.
+	function landInWindow(box, next, response) {
+		var twin = next.getElementById(box.id);
+		var shell = box.hasAttribute('data-window-shell');
+		if (shell && box[SOURCE]) {
+			twin = next.getElementById(box[SOURCE]);
+		}
+		if (!twin || twin.tagName !== 'DIALOG') {
+			return false;
+		}
+		if (!shell) {
+			syncAttributes(box, twin);
+		}
+		morphChildren(box, twin);
+		if (shell) {
+			retarget(box);
+		}
+		markAll(box);
+		doc.dispatchEvent(new CustomEvent('oscript-ui:update', { detail: { url: response.url } }));
+		var bad = box.querySelector('[aria-invalid="true"]');
+		if (bad && bad.focus) {
+			bad.focus();
+		}
+		return true;
+	}
+
+	// Элемент, который сервер пометил data-focus, получает фокус; не умеет его принять —
+	// принимает программно (tabindex="-1"), в порядок обхода Tab он от этого не встаёт.
+	function focusMarked() {
+		var target = doc.querySelector('[data-focus]');
+		if (!target) {
+			return;
+		}
+		if (target.tabIndex < 0 && !target.hasAttribute('tabindex')) {
+			target.setAttribute('tabindex', '-1');
+		}
+		target.focus();
 	}
 
 	// Адрес вкладки, уведённый pushState-ом, показывает страницу, которой в истории
@@ -629,7 +699,250 @@
 		});
 	});
 
-	/* --- 7. шаги (выпуск 0.11, шаг 10) --------------------------------------------------- */
+	/* --- 7. окно ------------------------------------------------------------------- */
+
+	// Окно — нативный <dialog>: открывает его кнопка с командой show-modal (command +
+	// commandfor), закрывают крестик (close), Esc и щелчок мимо — движок, и он же держит
+	// фокус внутри и возвращает его на открывашку. Скрипт добавляет вот что:
+	//   — доучивает командам движок, который их ещё не знает;
+	//   — поднимает модальным окно, которое сервер напечатал открытым (?окно=… или отбитая
+	//     форма): без скрипта оно стоит в потоке страницы;
+	//   — окно по адресу (data-window-link): берёт страницу кнопки запросом в фоне, кладёт её
+	//     окно в одну на страницу оболочку (data-window-shell) и открывает; не вышло —
+	//     показывает тост ошибки, напечатанный сервером рядом с оболочкой (data-window-error);
+	//   — подтверждение (data-confirm у формы): отправка формы открывает окно подтверждения,
+	//     а уходит форма его кнопкой; эхо-поле держит эту кнопку недоступной до совпадения.
+	// Закрытие окна по успеху тихой отправки — в разделе 6 (land).
+
+	var COMMANDS = !!(window.HTMLButtonElement && 'command' in HTMLButtonElement.prototype);
+	var SHELL = '[data-window-shell]';
+	var SOURCE = 'oscriptUiWindow';  // свойство оболочки: идентификатор окна, которое в ней лежит
+	var LOCKED = 'oscriptUiLocked';  // свойство эхо-поля: сервер напечатал его заблокированным
+
+	if (!COMMANDS) {
+		doc.addEventListener('click', function (e) {
+			var button = e.target.closest ? e.target.closest('button[commandfor]') : null;
+			if (!button || button.disabled) {
+				return;
+			}
+			var target = doc.getElementById(button.getAttribute('commandfor'));
+			if (!target || target.tagName !== 'DIALOG' || !target.showModal) {
+				return;
+			}
+			var command = button.getAttribute('command');
+			if (command === 'show-modal' && !target.open) {
+				prepareConfirm(target);
+				target.showModal();
+			} else if (command === 'close' && target.open) {
+				target.close();
+			}
+		});
+	} else {
+		// команду исполнит движок, но эхо-поле подтверждения надо открыть до него
+		doc.addEventListener('click', function (e) {
+			var button = e.target.closest ? e.target.closest('button[commandfor][command="show-modal"]') : null;
+			var target = button && doc.getElementById(button.getAttribute('commandfor'));
+			if (target && !target.open) {
+				prepareConfirm(target);
+			}
+		}, true);
+	}
+
+	// Окно, напечатанное открытым, стоит в потоке страницы без фона и без удержания фокуса;
+	// модальным его делает только showModal.
+	function lift() {
+		var list = doc.querySelectorAll('dialog.modal[open]');
+		for (var i = 0; i < list.length; i++) {
+			var d = list[i];
+			var modal = false;
+			try { modal = d.matches(':modal'); } catch (err) { /* движок без :modal */ }
+			if (!modal && d.showModal) {
+				d.close();
+				d.showModal();
+			}
+		}
+	}
+	lift();
+
+	/* окно по адресу */
+
+	doc.addEventListener('click', function (e) {
+		if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) {
+			return;
+		}
+		var link = e.target.closest ? e.target.closest('a[data-window-link][href]') : null;
+		var shell = doc.querySelector('dialog' + SHELL);
+		if (!link || !shell || !shell.showModal || !window.fetch || !window.DOMParser
+			|| !sameOrigin(link.href)) {
+			return; // ссылка ведёт на страницу с окном — обычная навигация
+		}
+		e.preventDefault();
+		link.setAttribute('aria-busy', 'true');
+		fetch(link.href, { credentials: 'same-origin', headers: { 'Accept': 'text/html' } })
+			.then(function (response) {
+				var type = response.headers.get('Content-Type') || '';
+				if (!response.ok || !/text\/html/i.test(type)) {
+					throw new Error('окно не загрузилось');
+				}
+				return response.text();
+			})
+			.then(function (html) {
+				var next = new DOMParser().parseFromString(html, 'text/html');
+				var picked = next.querySelector('dialog.modal[open]:not(' + SHELL + ')')
+					|| next.querySelector('dialog.modal:not(' + SHELL + ')');
+				if (!picked) {
+					throw new Error('в ответе нет окна');
+				}
+				fill(shell, picked);
+				hideError();
+				prepareConfirm(shell);
+				shell.showModal();
+				var back = function () {
+					shell.removeEventListener('close', back);
+					if (!doc.activeElement || doc.activeElement === doc.body) {
+						link.focus();
+					}
+				};
+				shell.addEventListener('close', back);
+			})
+			.catch(showError)
+			.finally(function () { link.removeAttribute('aria-busy'); });
+	});
+
+	// Оболочка берёт у окна его вид и имя (класс, aria-*), содержимое — целиком; свои id
+	// и признак оставляет: она одна на страницу и постоянна. Кнопки окна, которые звали
+	// его по идентификатору (крестик, отмена), теперь зовут оболочку.
+	function fill(shell, picked) {
+		var i, a;
+		for (i = shell.attributes.length - 1; i >= 0; i--) {
+			a = shell.attributes[i].name;
+			if (a !== 'id' && a !== 'data-window-shell' && a !== 'open') {
+				shell.removeAttribute(a);
+			}
+		}
+		for (i = 0; i < picked.attributes.length; i++) {
+			a = picked.attributes[i];
+			if (a.name !== 'id' && a.name !== 'open') {
+				shell.setAttribute(a.name, a.value);
+			}
+		}
+		while (shell.firstChild) {
+			shell.removeChild(shell.firstChild);
+		}
+		for (var child = picked.firstChild; child; child = child.nextSibling) {
+			shell.appendChild(doc.importNode(child, true));
+		}
+		shell[SOURCE] = picked.id;
+		retarget(shell);
+		markAll(shell);
+		doc.dispatchEvent(new CustomEvent('oscript-ui:update', { detail: { url: location.href } }));
+	}
+
+	function retarget(shell) {
+		var from = shell[SOURCE];
+		if (!from) {
+			return;
+		}
+		var list = shell.querySelectorAll('[commandfor]');
+		for (var i = 0; i < list.length; i++) {
+			if (list[i].getAttribute('commandfor') === from) {
+				list[i].setAttribute('commandfor', shell.id);
+			}
+		}
+	}
+
+	var errorTimer = 0;
+	function showError() {
+		var box = doc.querySelector('[data-window-error]');
+		if (!box) {
+			return;
+		}
+		box.hidden = false;
+		clearTimeout(errorTimer);
+		errorTimer = setTimeout(hideError, 6000);
+	}
+	function hideError() {
+		var box = doc.querySelector('[data-window-error]');
+		if (box) {
+			box.hidden = true;
+		}
+	}
+
+	/* подтверждение */
+
+	// Форма с data-confirm не уходит сразу: её отправка открывает окно подтверждения,
+	// а уходит она кнопкой этого окна (атрибут form). Ловим в фазе погружения — раньше
+	// тихой отправки, которая иначе унесла бы форму в фоне.
+	doc.addEventListener('submit', function (e) {
+		var form = e.target;
+		var id = form && form.getAttribute ? form.getAttribute('data-confirm') : null;
+		if (!id || form[NATIVE]) {
+			return;
+		}
+		var box = doc.getElementById(id);
+		if (!box || box.tagName !== 'DIALOG' || !box.showModal) {
+			return; // окна нет — форма уходит, и подтверждение спросит сервер
+		}
+		if (e.submitter && box.contains(e.submitter)) {
+			return; // это и есть подтверждение
+		}
+		e.preventDefault();
+		if (!box.open) {
+			prepareConfirm(box);
+			box.showModal();
+		}
+	}, true);
+
+	// Эхо-поле закрытого подтверждения сервер печатает заблокированным: заблокированное поле
+	// не держит обязательность, и форма страницы, к которой оно приписано, отправляется
+	// без него. Открывая окно, поле открываем, закрывая — блокируем снова.
+	function echoOf(box) {
+		return box.classList && box.classList.contains('modal--confirm')
+			? box.querySelector('.modal__echo input') : null;
+	}
+
+	function confirmButton(box) {
+		return box.querySelector('.modal__actions [name="confirmed"]');
+	}
+
+	function prepareConfirm(box) {
+		var echo = echoOf(box);
+		if (!echo) {
+			return;
+		}
+		if (echo.disabled) {
+			echo[LOCKED] = true;
+			echo.disabled = false;
+		}
+		echo.value = '';
+		markEmpty(echo);
+		paintConfirm(box);
+	}
+
+	function paintConfirm(box) {
+		var echo = echoOf(box);
+		var ok = confirmButton(box);
+		if (echo && ok) {
+			ok.disabled = !echo.validity.valid;
+		}
+	}
+
+	doc.addEventListener('input', function (e) {
+		var box = e.target && e.target.closest ? e.target.closest('dialog.modal--confirm') : null;
+		if (box && e.target === echoOf(box)) {
+			paintConfirm(box);
+		}
+	});
+
+	doc.addEventListener('close', function (e) {
+		var echo = e.target && e.target.tagName === 'DIALOG' ? echoOf(e.target) : null;
+		if (echo && echo[LOCKED]) {
+			echo.disabled = true;
+			echo[LOCKED] = false;
+		}
+	}, true);
+
+	/* --- 8. шаги (выпуск 0.11, шаг 10) --------------------------------------------------- */
 
 	// Без скрипта шаги — панели <details> подряд, и форма уходит целиком: проверяет её
 	// сервер. Скрипт показывает одну панель, полосу номеров и «Назад / Дальше» (сервер
