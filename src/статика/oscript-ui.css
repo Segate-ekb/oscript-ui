@@ -246,9 +246,23 @@ main.wrap { padding-top: var(--space-6); padding-bottom: var(--space-8); min-hei
 .hubmenu__role { color: var(--md-sys-color-on-surface-variant); font: var(--type-body-small); }
 
 .hubmenu__section { margin-top: var(--space-4); }
-/* Разделы текущего экрана: на широком их прячет медиа-блок — там они уже стоят колонкой
-   на самой странице. На телефоне колонки нет, и это единственная дорога к ним. */
+/* Разделы текущего экрана — первая группа под учёткой: на широком их прячет медиа-блок —
+   там они уже стоят колонкой на самой странице. На телефоне колонки нет, и это
+   единственная дорога к ним. */
 .hubmenu__section--screen { display: block; }
+/* Дороги инсталляции: на широком их прячет медиа-блок — там они стоят в самой шапке.
+   На телефоне полоса ходов спрятана, и шторка — единственное место, где они есть. */
+.hubmenu__section--roads { display: block; }
+/* Рубрика внутри группы разделов — та же подпись, что над разделами колонки дома:
+   label-medium прописными, приглушённо, с воздухом сверху. */
+.hubmenu__rubric {
+	margin: 0;
+	padding: var(--space-3) var(--space-4) var(--space-1);
+	color: var(--md-sys-color-on-surface-variant);
+	font: var(--type-label-medium);
+	letter-spacing: var(--md-sys-typescale-label-medium-tracking);
+	text-transform: uppercase;
+}
 /* Строка переключателя оформления: на широком её прячет медиа-блок — там переключатель
    стоит в самой шапке, и вторая такая же строка в меню была бы дублем. На телефоне полоса
    ходов спрятана, и это единственное место, где тему можно переключить. */
@@ -286,6 +300,15 @@ main.wrap { padding-top: var(--space-6); padding-bottom: var(--space-8); min-hei
 	--_fg: var(--md-sys-color-on-secondary-container);
 }
 .hubmenu .button .icon { width: 24px; height: 24px; }
+/* Опасный раздел — цветом ошибки, значок тоже; текущий опасный залит error-container,
+   а не secondary: индикатор не должен выдавать необратимое за обычный раздел. */
+.hubmenu .button--danger { --_fg: var(--md-sys-color-error); }
+.hubmenu .button--danger .icon { color: var(--md-sys-color-error); }
+.hubmenu .button--danger[aria-current] {
+	--_bg: var(--md-sys-color-error-container);
+	--_fg: var(--md-sys-color-on-error-container);
+}
+.hubmenu .button--danger[aria-current] .icon { color: var(--md-sys-color-on-error-container); }
 
 .hubmenu__foot {
 	display: flex;
@@ -389,9 +412,11 @@ main.wrap { padding-top: var(--space-6); padding-bottom: var(--space-8); min-hei
 	.hubmenu__avatar { width: 32px; height: 32px; font: var(--type-label-large); }
 	.hubmenu__who { line-height: 1.25; }
 
-	/* Разделы текущего экрана на широком стоят колонкой на самой странице, а переключатель
-	   оформления — в шапке: второй раз в меню они не нужны. */
+	/* Разделы текущего экрана на широком стоят колонкой на самой странице, дороги
+	   и переключатель оформления — в шапке: второй раз в меню они не нужны. В выпадающем
+	   меню остаются учётка, дела и выход. */
 	.hubmenu__section--screen { display: none; }
+	.hubmenu__section--roads { display: none; }
 	.hubmenu__theme { display: none; }
 	.hubmenu__actions { display: none; }
 
@@ -1203,6 +1228,22 @@ a.tag:hover { --_state: var(--state-hover); text-decoration: none; }
 }
 .tree--column .tree__link { display: flex; min-height: 48px; }
 .tree--column .tree__list--1 { margin-left: var(--space-4); }
+/* Рубрика — подпись над первым разделом своей группы: label-medium прописными,
+   приглушённо и с отступом сверху, чтобы группа читалась отдельно. В ряду шапки рубрик
+   нет: их там не печатает компонент. */
+.tree__rubric {
+	padding: var(--space-3) var(--space-4) var(--space-1);
+	color: var(--md-sys-color-on-surface-variant);
+	font: var(--type-label-medium);
+	letter-spacing: var(--md-sys-typescale-label-medium-tracking);
+	text-transform: uppercase;
+}
+/* Опасный раздел — цветом ошибки и на наведении; текущий опасный залит error-container. */
+.tree__link--danger, .tree__link--danger:hover { color: var(--md-sys-color-error); }
+.tree__link--danger.tree__link--active, .tree__link--danger.tree__link--active:hover {
+	--_bg: var(--md-sys-color-error-container);
+	color: var(--md-sys-color-on-error-container);
+}
 /* Ряд ходов в шапке дышит шире колонки: соседние дороги там читаются как отдельные,
    а не как список. */
 .tree--top > .tree__list { gap: var(--space-3); }
@@ -2166,6 +2207,19 @@ form[data-quiet][aria-busy="true"] { cursor: progress; }
 	color: var(--md-sys-color-primary);
 }
 .settings__lead { color: var(--md-sys-color-on-surface-variant); margin: var(--space-2) 0 0; max-width: 70ch; }
+/* Имя и значок текущего раздела под заголовком дома. На широком экране не нужно — там
+   колонка разделов с подсвеченным пунктом; видно оно на телефоне с единым меню, где
+   колонку заменяет группа разделов в шторке (см. медиа-блок дома настроек). */
+.settings__current {
+	display: none;
+	align-items: center;
+	gap: var(--space-2);
+	margin: var(--space-3) 0 0;
+	color: var(--md-sys-color-on-surface-variant);
+	font: var(--type-title-small);
+	letter-spacing: var(--md-sys-typescale-title-small-tracking);
+}
+.settings__current .icon { width: 20px; height: 20px; }
 
 /* align-items у колонки — поперечный размер, то есть ШИРИНА: с flex-start панелям хватало
    ширины по содержимому, и широкая таблица уносила вбок всю страницу вместо того, чтобы
@@ -2699,9 +2753,11 @@ form[data-quiet][aria-busy="true"] { cursor: progress; }
 }
 
 /* --- дом настроек на узком экране ----------------------------------------------------
-   Колонка разделов встаёт над секциями и читается пальцем. Выдвижного меню здесь нет:
-   те же разделы едут секцией в ЕДИНОЕ меню инсталляции (см. панель выше), и два выдвижных
-   меню на одном экране спорили бы друг с другом. */
+   Меню на телефоне одно — бургер: разделы дома едут в его шторку первой группой, под
+   учёткой, с рубриками (см. панель выше), а на странице под заголовком дома остаётся имя
+   текущего раздела. Своего выдвижного меню у дома нет: два выдвижных меню на одном
+   экране спорили бы друг с другом. У инсталляции без единого меню колонка разделов
+   встаёт над секциями и читается пальцем. */
 @media (max-width: 900px) {
 
 	.settings__layout { flex-direction: column; align-items: stretch; }
@@ -2713,6 +2769,10 @@ form[data-quiet][aria-busy="true"] { cursor: progress; }
 	   классом-маркером на теле. У инсталляции без слота колонка — единственный вход
 	   в соседний раздел, и она остаётся. */
 	.hubmenu ~ main .settings__nav { display: none; }
+
+	/* Где стоит человек, говорит строка под заголовком: колонки с подсвеченным пунктом
+	   на этой странице нет. Без меню колонка на месте, и вторая подсказка не нужна. */
+	.hubmenu ~ main .settings__current { display: flex; }
 
 	/* Пункт под палец: 44 px — нижняя граница, ниже которой в него не попадают. */
 	.settings__nav .tree__link {

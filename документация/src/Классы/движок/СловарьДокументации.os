@@ -32,6 +32,7 @@
 	Тексты.Вставить("chrome.menu.section.deeds", "Дела");
 	Тексты.Вставить("chrome.menu.section.nav", "Документация");
 	Тексты.Вставить("chrome.menu.section.screen", "Страницы раздела");
+	Тексты.Вставить("chrome.menu.count", "ждёт внимания: %1");
 	Тексты.Вставить("settings.frame.nav.title", "Разделы настроек");
 	Тексты.Вставить("form.error.required", "Заполните поле");
 	Тексты.Вставить("form.error.number", "Нужно число");
