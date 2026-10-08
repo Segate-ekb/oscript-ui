@@ -47,6 +47,7 @@
 	Тексты.Вставить("chrome.menu.section.deeds", "Мои дела");
 	Тексты.Вставить("chrome.menu.section.nav", "Ромашка");
 	Тексты.Вставить("chrome.menu.section.screen", "Разделы экрана");
+	Тексты.Вставить("chrome.menu.count", "ждёт внимания: %1");
 	Тексты.Вставить("settings.frame.nav.title", "Разделы настроек");
 	Тексты.Вставить("settings.frame.crumbs.label", "Путь к настройкам");
 	Тексты.Вставить("chrome.crumbs", "Путь к странице");
