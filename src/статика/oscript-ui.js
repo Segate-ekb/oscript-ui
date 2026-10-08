@@ -12,7 +12,8 @@
  *   6. тихую отправку (data-quiet) — форма уходит запросом в фоне, а ответ сервера
  *      ложится на страницу НА МЕСТО: без перезагрузки, с прежней прокруткой, фокусом
  *      и раскрытыми раскрывашками; плюс мгновенная смена темы (data-theme-toggle),
- *      отправка по изменению (data-autosubmit) и подсветка несохранённого (data-savebar).
+ *      отправка по изменению (data-autosubmit) и подсветка несохранённого (data-savebar);
+ *   7. шаги (data-steps) — одна панель длинной формы за раз, «Дальше» проверяет поля шага.
  *
  * Глобальных имён скрипт не заводит, разметку не печатает — только атрибуты и рябь.
  * Обновив страницу на месте, он сообщает об этом событием «oscript-ui:update» на document:
@@ -627,4 +628,222 @@
 			}
 		});
 	});
+
+	/* --- 7. шаги (выпуск 0.11, шаг 10) --------------------------------------------------- */
+
+	// Без скрипта шаги — панели <details> подряд, и форма уходит целиком: проверяет её
+	// сервер. Скрипт показывает одну панель, полосу номеров и «Назад / Дальше» (сервер
+	// печатает их hidden), а «Дальше» пускает на следующий шаг только тогда, когда поля
+	// текущего годны: первому негодному браузер показывает свой отказ (reportValidity).
+	// Признаки (data-steps, -bar, -go, -panel, -back, -next, -submit) объявлены
+	// в холст/Шаги.os; скрипт ставит только data-steps-live, data-steps-done, aria-current,
+	// hidden и open.
+
+	var stepsAt = new WeakMap(); // корень шагов → номер текущей панели с нуля
+
+	function stepsOwn(root, selector) {
+		return root.querySelectorAll(':scope > ' + selector);
+	}
+
+	function stepsParts(root) {
+		var bar = stepsOwn(root, '[data-steps-bar]')[0];
+		var nav = stepsOwn(root, '.steps__nav')[0];
+		var pick = function (name) {
+			return nav ? nav.querySelector(':scope > [' + name + ']') : null;
+		};
+		return {
+			bar: bar,
+			items: bar ? bar.querySelectorAll(':scope > li') : [],
+			panels: stepsOwn(root, '[data-steps-panel]'),
+			back: pick('data-steps-back'),
+			next: pick('data-steps-next'),
+			submit: pick('data-steps-submit')
+		};
+	}
+
+	// Мастер ведёт по порядку; вид «вкладки» (правка) печатается без «Дальше»: любой шаг
+	// открывается сразу, отправка видна всегда.
+	function stepsFree(parts) {
+		return !parts.next;
+	}
+
+	function stepsShow(root, index, focus) {
+		var parts = stepsParts(root);
+		var last = parts.panels.length - 1;
+		var free = stepsFree(parts);
+		index = Math.max(0, Math.min(index, last));
+		stepsAt.set(root, index);
+		for (var i = 0; i <= last; i++) {
+			parts.panels[i].open = true;
+			parts.panels[i].hidden = i !== index;
+			var item = parts.items[i];
+			if (item) {
+				if (i === index) {
+					item.setAttribute('aria-current', 'step');
+				} else {
+					item.removeAttribute('aria-current');
+				}
+				item.toggleAttribute('data-steps-done', !free && i < index);
+			}
+		}
+		if (parts.back) {
+			parts.back.hidden = index === 0;
+		}
+		if (parts.next) {
+			parts.next.hidden = index === last;
+		}
+		if (parts.submit) {
+			parts.submit.hidden = !free && index !== last;
+		}
+		if (focus) {
+			// фокус на панель: скринридер называет её «Шаг 2 из 3: Участники»
+			var panel = parts.panels[index];
+			panel.setAttribute('tabindex', '-1');
+			panel.focus({ preventScroll: true });
+			if (root.getBoundingClientRect().top < 0) {
+				root.scrollIntoView({ block: 'start', behavior: calm && calm.matches ? 'auto' : 'smooth' });
+			}
+		}
+	}
+
+	// Годны ли поля панели. Первое негодное получает отказ браузера и фокус; поля
+	// отключённой группы браузер не проверяет (willValidate).
+	function stepsValid(panel) {
+		var controls = panel.querySelectorAll('input, select, textarea');
+		for (var i = 0; i < controls.length; i++) {
+			if (controls[i].willValidate && !controls[i].checkValidity()) {
+				controls[i].reportValidity();
+				return false;
+			}
+		}
+		return true;
+	}
+
+	// Вперёд мастер идёт через каждый шаг по дороге: прыжок с первого на третий по полосе
+	// проверяет и второй, и останавливается на первом шаге с негодным полем.
+	function stepsGo(root, target) {
+		var parts = stepsParts(root);
+		var current = stepsAt.has(root) ? stepsAt.get(root) : 0;
+		target = Math.max(0, Math.min(target, parts.panels.length - 1));
+		if (target === current) {
+			return;
+		}
+		if (!stepsFree(parts) && target > current) {
+			for (var i = current; i < target; i++) {
+				if (i !== current) {
+					stepsShow(root, i, false);
+				}
+				if (!stepsValid(parts.panels[i])) {
+					return;
+				}
+			}
+		}
+		stepsShow(root, target, true);
+	}
+
+	// Шаг, с которого начать: тот, где у поля отказ сервера; иначе прежний (страницу
+	// поменяла чужая тихая отправка — человек остаётся там, где был); иначе тот, что
+	// назвал сервер (data-steps).
+	function stepsStart(root) {
+		var panels = stepsParts(root).panels;
+		for (var i = 0; i < panels.length; i++) {
+			if (panels[i].querySelector('[aria-invalid="true"]')) {
+				return i;
+			}
+		}
+		if (stepsAt.has(root)) {
+			return stepsAt.get(root);
+		}
+		return (parseInt(root.getAttribute('data-steps'), 10) || 1) - 1;
+	}
+
+	function stepsInit(scope) {
+		var roots = (scope || doc).querySelectorAll('[data-steps]');
+		for (var i = 0; i < roots.length; i++) {
+			var root = roots[i];
+			var parts = stepsParts(root);
+			if (!parts.panels.length) {
+				continue;
+			}
+			root.setAttribute('data-steps-live', '');
+			if (parts.bar) {
+				parts.bar.hidden = false;
+			}
+			stepsShow(root, stepsStart(root), false);
+		}
+	}
+
+	doc.addEventListener('click', function (e) {
+		var hit = e.target.closest
+			? e.target.closest('[data-steps-go], [data-steps-back] button, [data-steps-next] button')
+			: null;
+		var root = hit ? hit.closest('[data-steps-live]') : null;
+		if (!root) {
+			return;
+		}
+		var current = stepsAt.get(root) || 0;
+		if (hit.hasAttribute('data-steps-go')) {
+			stepsGo(root, (parseInt(hit.getAttribute('data-steps-go'), 10) || 1) - 1);
+		} else if (hit.closest('[data-steps-back]')) {
+			stepsGo(root, current - 1);
+		} else {
+			stepsGo(root, current + 1);
+		}
+	});
+
+	// Enter в поле мастера — «Дальше», а не отправка всей формы с середины: кнопка
+	// отправки ждёт последнего шага.
+	doc.addEventListener('keydown', function (e) {
+		var field = e.target;
+		if (e.key !== 'Enter' || e.defaultPrevented || e.isComposing || !field
+			|| field.tagName !== 'INPUT' || /^(button|submit|reset|checkbox|radio|file|image)$/.test(field.type)) {
+			return;
+		}
+		var panel = field.closest('[data-steps-panel]');
+		var root = panel ? panel.parentNode : null;
+		if (!root || !root.hasAttribute || !root.hasAttribute('data-steps-live')) {
+			return;
+		}
+		var parts = stepsParts(root);
+		var current = stepsAt.get(root) || 0;
+		if (stepsFree(parts) || current >= parts.panels.length - 1) {
+			return;
+		}
+		e.preventDefault();
+		stepsGo(root, current + 1);
+	});
+
+	// Отправка, чьё негодное поле лежит на скрытой панели (вид «вкладки»), открывает эту
+	// панель: иначе браузер молча не отправил бы форму — показать отказ ему негде.
+	var stepsReported = false;
+	doc.addEventListener('invalid', function (e) {
+		var panel = e.target.closest ? e.target.closest('[data-steps-panel]') : null;
+		var root = panel ? panel.parentNode : null;
+		if (stepsReported || !panel || !panel.hidden || !root.hasAttribute('data-steps-live')) {
+			return;
+		}
+		stepsReported = true;
+		var panels = stepsParts(root).panels;
+		stepsShow(root, Array.prototype.indexOf.call(panels, panel), false);
+		var control = e.target;
+		setTimeout(function () {
+			stepsReported = false;
+			if (doc.activeElement !== control) {
+				control.reportValidity();
+			}
+		}, 0);
+	}, true);
+
+	// Удачно отправленная форма сброшена тихой отправкой — её шаги начинаются сначала.
+	doc.addEventListener('reset', function (e) {
+		var roots = e.target.querySelectorAll ? e.target.querySelectorAll('[data-steps]') : [];
+		for (var i = 0; i < roots.length; i++) {
+			stepsAt.delete(roots[i]);
+		}
+	});
+
+	// Морфинг ответа возвращает разметке серверный вид (hidden у полосы и кнопок):
+	// шаги оживают заново.
+	doc.addEventListener('oscript-ui:update', function () { stepsInit(); });
+	stepsInit();
 })();

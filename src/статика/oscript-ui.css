@@ -2889,3 +2889,155 @@ form[data-quiet][aria-busy="true"] { cursor: progress; }
 /* anywhere — ради хешей и адресов: слово длиннее колонки переносится, а не вылезает из
    таблицы. Обычные слова им не режутся: ширину даёт строка во всю таблицу. */
 .props dd { margin: 0; overflow-wrap: anywhere; }
+
+/* --- шаги: длинная форма по одному экрану за раз (выпуск 0.11, шаг 10) ---------------
+   Без скрипта шаги — панели подряд (те же .panel, что у раскрывашки), открыт один,
+   кнопка отправки под ними: форма видна и уходит целиком. Скрипт кита ставит корню
+   data-steps-live: тогда видна одна панель без своей строки-шапки, над ней — полоса
+   номеров, под ней — «Назад / Дальше». Полоса — как Stepper у MUI в облике Material 3:
+   круг 24px с номером, у текущего и пройденных залит primary, у пройденного вместо
+   номера галка, между кругами — линия. До 640 px подписи шагов, кроме текущего, уходят
+   из вида (скринридер их читает), остаются номера. */
+
+.steps > * + * { margin-top: var(--space-4); }
+.steps__bar[hidden], .steps__act[hidden], .steps__panel[hidden] { display: none; }
+
+.steps__bar {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+}
+.steps__item { display: flex; align-items: center; gap: var(--space-2); flex: 1 1 0; min-width: 0; }
+.steps__item:last-child { flex: 0 1 auto; }
+/* линия к следующему шагу; у пройденного — цвета primary: путь уже пройден */
+.steps__item:not(:last-child)::after {
+	content: "";
+	flex: 1 1 var(--space-4);
+	min-width: var(--space-4);
+	height: 1px;
+	background: var(--md-sys-color-outline-variant);
+}
+.steps__item[data-steps-done]::after { background: var(--md-sys-color-primary); }
+
+.steps__go {
+	--_bg: transparent;
+	--_state: 0%;
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-2);
+	min-width: 0;
+	min-height: 40px;
+	padding: var(--space-1) var(--space-3) var(--space-1) var(--space-1);
+	border: 0;
+	border-radius: var(--md-sys-shape-corner-full);
+	background-color: color-mix(in srgb, var(--md-sys-color-on-surface) var(--_state), var(--_bg));
+	color: var(--md-sys-color-on-surface-variant);
+	font: var(--type-label-large);
+	letter-spacing: var(--md-sys-typescale-label-large-tracking);
+	cursor: pointer;
+	transition: background-color var(--motion-fast) var(--motion-ease),
+	            color var(--motion-fast) var(--motion-ease);
+}
+.steps__go:hover { --_state: var(--state-hover); }
+.steps__go:active { --_state: var(--state-pressed); }
+.steps__item[aria-current] .steps__go, .steps__item[data-steps-done] .steps__go { color: var(--md-sys-color-on-surface); }
+
+.steps__mark {
+	flex: none;
+	display: inline-grid;
+	place-items: center;
+	width: 24px;
+	height: 24px;
+	border: 1px solid var(--md-sys-color-outline);
+	border-radius: 50%;
+	color: var(--md-sys-color-on-surface-variant);
+	font: var(--type-label-medium);
+	letter-spacing: var(--md-sys-typescale-label-medium-tracking);
+	transition: background-color var(--motion-fast) var(--motion-ease),
+	            border-color var(--motion-fast) var(--motion-ease),
+	            color var(--motion-fast) var(--motion-ease);
+}
+.steps__mark .icon { display: none; width: 16px; height: 16px; }
+.steps__item[aria-current] .steps__mark, .steps__item[data-steps-done] .steps__mark {
+	border-color: var(--md-sys-color-primary);
+	background: var(--md-sys-color-primary);
+	color: var(--md-sys-color-on-primary);
+}
+.steps__item[data-steps-done] .steps__num { display: none; }
+.steps__item[data-steps-done] .steps__mark .icon { display: block; }
+.steps__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Строка-шапка панели без скрипта: номер шага кругом, подпись — заголовком строки. */
+.steps__head { font: var(--type-title-small); letter-spacing: var(--md-sys-typescale-title-small-tracking); }
+/* длинная подпись шага переносится в строке-шапке, а не раздвигает её */
+.steps__title { min-width: 0; overflow-wrap: anywhere; }
+.steps__head .steps__mark { border-color: var(--md-sys-color-primary); color: var(--md-sys-color-primary); }
+/* Без скрипта отказ поля в свёрнутой панели браузеру показать негде — отправка просто
+   не идёт. После попытки отправки такое поле :user-invalid, и шапка его панели берёт цвет
+   ошибки: видно, какой шаг открыть. */
+.steps__panel:has(:user-invalid) > .steps__head { color: var(--md-sys-color-error); }
+.steps__panel:has(:user-invalid) > .steps__head .steps__mark { border-color: var(--md-sys-color-error); color: var(--md-sys-color-error); }
+
+/* Шаги со скриптом: панель одна, её шапку заменяет полоса номеров. Фокус на панель
+   ставит скрипт при смене шага — обводка только с клавиатуры. */
+.steps[data-steps-live] > .steps__panel > .panel__head { display: none; }
+.steps[data-steps-live] > .steps__panel > .panel__body { border-top: 0; }
+.steps[data-steps-live] > .steps__panel:focus { outline: none; }
+.steps[data-steps-live] > .steps__panel:focus-visible {
+	outline: 3px solid var(--md-sys-color-secondary);
+	outline-offset: 2px;
+}
+
+/* «Назад» слева, «Дальше» и отправка справа — как у Stepper в MUI. */
+.steps__nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2); }
+.steps__act { display: inline-flex; }
+.steps__act--back { margin-right: auto; }
+
+/* Вид «вкладки»: правка уже заполненного — любой шаг открывается сразу. Полоса — основные
+   вкладки Material: подпись без кругов и линий, текущая — цвета primary с индикатором
+   3px снизу. */
+.steps--tabs .steps__bar { gap: 0; border-bottom: 1px solid var(--md-sys-color-surface-variant); }
+.steps--tabs .steps__item { flex: 0 1 auto; }
+.steps--tabs .steps__item::after { display: none; }
+.steps--tabs .steps__go {
+	min-height: 48px;
+	padding: 0 var(--space-4);
+	border-radius: 0;
+	border-bottom: 3px solid transparent;
+	font: var(--type-title-small);
+	letter-spacing: var(--md-sys-typescale-title-small-tracking);
+	transition: background-color var(--motion-fast) var(--motion-ease),
+	            color var(--motion-fast) var(--motion-ease),
+	            border-color var(--motion-fast) var(--motion-ease);
+}
+.steps--tabs .steps__item[aria-current] .steps__go {
+	color: var(--md-sys-color-primary);
+	border-bottom-color: var(--md-sys-color-primary);
+}
+@media (min-width: 641px) {
+	.steps--tabs .steps__bar .steps__mark { display: none; }
+}
+
+@media (max-width: 640px) {
+	.steps__go { padding-right: var(--space-1); }
+	/* место в полосе — подписи текущего: остальные шаги сжаты до номера */
+	.steps__item[aria-current] { flex: 1 0 auto; }
+	.steps__item[aria-current] .steps__go { flex-shrink: 0; padding-right: var(--space-2); }
+	.steps__item:not([aria-current]):not(:last-child) { flex: 1 1 0; }
+	.steps__item:not([aria-current]) .steps__label {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		margin: -1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
+	.steps--tabs .steps__go { padding: 0 var(--space-2); }
+	/* вкладки стоят у левого края, а не растянуты линиями мастера */
+	.steps--tabs > .steps__bar > .steps__item { flex: 0 1 auto; }
+}
