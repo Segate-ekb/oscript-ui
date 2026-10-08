@@ -2191,6 +2191,10 @@ form[data-quiet][aria-busy="true"] { cursor: progress; }
 	color: var(--md-sys-color-on-surface-variant);
 }
 .crumbs__item + .crumbs__item::before { content: "/"; margin-right: var(--space-2); opacity: .6; }
+/* Крошка-ссылка — того же тона, что и строка крошек: путь читается подряд, а не пёстрой
+   цепочкой ссылок; ссылкой её выдаёт подчёркивание под указателем и фокусом. */
+.crumbs__link { color: inherit; text-decoration: none; }
+.crumbs__link:hover, .crumbs__link:focus-visible { color: var(--md-sys-color-primary); text-decoration: underline; }
 
 /* Секция настроек — карточка Material, залитая (filled) цветом surface-container-low:
    на странице настроек секций много, и тень у каждой рябила бы. */
