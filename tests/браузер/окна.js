@@ -218,6 +218,22 @@ async function безСкрипта(b) {
   await ctx.close();
 }
 
+// Страница «Окно» сайта документации: живой образец открывается, кнопка окна по адресу
+// грузит окно образца в оболочку, которую каркас напечатал для содержимого-строки.
+async function страницаОкно(b) {
+  const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
+  const p = await ctx.newPage();
+  await p.goto(B + '/' + encodeURIComponent('окно'), { waitUntil: 'networkidle' });
+  await p.click('button[command="show-modal"][commandfor="novyi-proekt-obrazec"]');
+  проверить((await открытоеОкно(p) || {}).id === 'novyi-proekt-obrazec', 'страница «Окно»: образец открывается');
+  await p.keyboard.press('Escape');
+  проверить(await p.locator('[data-window-shell]').count() === 1, 'страница «Окно»: оболочка для содержимого строкой');
+  await p.locator('a[data-window-link]').first().click();
+  await p.waitForSelector('dialog[data-window-shell][open]');
+  проверить((await открытоеОкно(p) || {}).имя === 'Переименовать «Альфа»', 'страница «Окно»: окно по адресу загружено');
+  await ctx.close();
+}
+
 async function снимки(b) {
   for (const ширина of [1280, 390]) {
     for (const тема of ['light', 'dark']) {
@@ -257,6 +273,7 @@ async function снимки(b) {
   await шаг8(b);
   await шаг9(b);
   await безСкрипта(b);
+  await страницаОкно(b);
   await снимки(b);
   await b.close();
   if (беды.length) { console.error('\nБЕДЫ:\n' + беды.join('\n')); process.exit(1); }
