@@ -33,6 +33,8 @@
 	Тексты.Вставить("chrome.menu.section.nav", "Документация");
 	Тексты.Вставить("chrome.menu.section.screen", "Страницы раздела");
 	Тексты.Вставить("settings.frame.nav.title", "Разделы настроек");
+	Тексты.Вставить("settings.frame.crumbs.label", "Путь к настройкам");
+	Тексты.Вставить("chrome.crumbs", "Путь к странице");
 	Тексты.Вставить("form.error.required", "Заполните поле");
 	Тексты.Вставить("form.error.number", "Нужно число");
 	Тексты.Вставить("form.error.date", "Нужна дата");

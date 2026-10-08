@@ -2217,6 +2217,34 @@ form[data-quiet][aria-busy="true"] { cursor: progress; }
 }
 .section__title .icon { color: var(--md-sys-color-primary); }
 .section__lead { color: var(--md-sys-color-on-surface-variant); margin: var(--space-2) 0 0; max-width: 70ch; }
+/* Шапка с действиями: кнопка «Добавить» стоит в одном месте на всех экранах — справа от
+   заголовка и лида, по верху. В разметке слот идёт ПОСЛЕ них, поэтому место справа даёт
+   сетка, а не порядок: на узком экране слот без перестановки встаёт под лидом, и порядок
+   чтения совпадает с порядком на глаз. Шапка без действий остаётся обычным блоком. */
+.section__head--actions {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	column-gap: var(--space-4);
+	align-items: start;
+}
+.section__head--actions > :not(.section__actions) { grid-column: 1; }
+.section__actions {
+	grid-column: 2;
+	grid-row: 1 / span 2;
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	align-items: center;
+	gap: var(--space-2);
+}
+.section__actions > form { margin: 0; }
+@media (max-width: 640px) {
+	/* Под лидом во всю ширину: справа от заголовка кнопка сжала бы его до пары слов. */
+	.section__head--actions { grid-template-columns: minmax(0, 1fr); }
+	.section__actions { grid-column: 1; grid-row: auto; margin-top: var(--space-3); }
+	.section__actions > * { flex: 1 1 100%; }
+	.section__actions .button { width: 100%; }
+}
 /* Ритм внутри секции настроек. Тело секции — тот самый контейнер, в котором лежит
    большинство полей приложения: РендерерНастроек.СекцияHTML всегда заворачивает Тело
    секции в .section__body, а поля туда кладут дома настроек. Собственных маргинов
