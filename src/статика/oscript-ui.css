@@ -2875,6 +2875,13 @@ div.entry__head:hover { --_state: 0%; }
 	color: var(--md-sys-color-on-surface);
 	box-shadow: var(--md-sys-elevation-level3);
 }
+/* Модальное окно — по центру экрана, где бы его ни напечатали. Окно в теле карточки или
+   секции — не первый ребёнок, и правило ритма контейнера (.card__body > * + *, у секции и
+   записи реестра то же) давало ему margin-top 16px при прочих нулях: центрирование верхнего
+   слоя пропадало, окно вставало у верхнего края поверх шапки (аудит M3, S2). :modal —
+   только окно в верхнем слое: окно, напечатанное открытым без скрипта, стоит в потоке, и
+   ритм контейнера ему нужен. */
+.modal:modal { margin: auto; }
 /* фон гасится скримом Material — тем же, что под шторкой и листом меню */
 .modal::backdrop { background: color-mix(in srgb, var(--md-sys-color-scrim) 32%, transparent); }
 .modal__box { padding: var(--space-5); }

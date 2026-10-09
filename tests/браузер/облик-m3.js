@@ -109,11 +109,44 @@ async function блокКоманды(b) {
   await ctx.close();
 }
 
+// Окно образца «Кнопка и окно», перенесённое в тело карточки после абзаца: так его печатает
+// приложение в секции или карточке, где правило ритма даёт не первому ребёнку margin-top.
+async function окноВКарточке(p, ид) {
+  await p.evaluate((ид) => {
+    const окно = document.getElementById(ид);
+    const карточка = document.createElement('div');
+    карточка.className = 'card';
+    карточка.innerHTML = '<div class="card__body"><p>Тело карточки перед окном.</p></div>';
+    document.querySelector('main').prepend(карточка);
+    карточка.firstChild.appendChild(окно);
+    окно.showModal();
+  }, ид);
+  await p.waitForTimeout(500);
+  return p.evaluate((ид) => {
+    const r = document.getElementById(ид).getBoundingClientRect();
+    return { верх: Math.round(r.top), низ: Math.round(innerHeight - r.bottom), лево: Math.round(r.left),
+      право: Math.round(innerWidth - r.right), ширина: Math.round(r.width), высота: Math.round(r.height) };
+  }, ид);
+}
+
+// S2: окно в теле карточки — по центру экрана, а не у верхнего края.
+async function окноПоЦентру(b) {
+  const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
+  const p = await ctx.newPage();
+  await p.goto(адрес('окно'), { waitUntil: 'networkidle' });
+  const з = await окноВКарточке(p, 'novyi-proekt-obrazec');
+  проверить(Math.abs(з.верх - з.низ) <= 2, `S2 1280: окно в карточке по центру по высоте (сверху ${з.верх}, снизу ${з.низ})`);
+  проверить(Math.abs(з.лево - з.право) <= 2, `S2 1280: окно по центру по ширине (${з.лево} / ${з.право})`);
+  await p.screenshot({ path: path.join(OUT, 'окно-в-карточке-1280.png') });
+  await ctx.close();
+}
+
 (async () => {
   const b = await браузер();
   try {
     await имяКарточки(b);
     await блокКоманды(b);
+    await окноПоЦентру(b);
   } finally {
     await b.close();
   }
