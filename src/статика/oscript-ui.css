@@ -2865,9 +2865,11 @@ div.entry__head:hover { --_state: 0%; }
    возвышения 3, скрим 32%. Появление — проявление с небольшим ростом, как Dialog у MUI
    (правила движения внизу листа). */
 
+/* Ширина — базового диалога Material (280–560 dp): 35rem на широком экране, а на узком —
+   экран без полей по 16 px. Широкое окно (шаги мастера, таблица) — 40rem своим видом. */
 .modal {
 	padding: 0;
-	max-width: min(40rem, calc(100vw - var(--space-6)));
+	max-width: min(35rem, calc(100vw - var(--space-6)));
 	width: 100%;
 	border: 0;
 	border-radius: var(--md-sys-shape-corner-extra-large);
@@ -2924,7 +2926,7 @@ div.entry__head:hover { --_state: 0%; }
 .modal__body > :first-child { margin-top: 0; }
 .modal__body > * + * { margin-top: var(--space-4); }
 
-.modal--wide { max-width: min(64rem, calc(100vw - var(--space-6))); }
+.modal--wide { max-width: min(40rem, calc(100vw - var(--space-6))); }
 .modal--danger .modal__title { color: var(--md-sys-color-error); }
 .modal--confirm .modal__box > .modal__lead { color: var(--md-sys-color-on-surface); font: var(--type-body-large); }
 .modal__echo { max-width: 420px; }
@@ -2950,12 +2952,18 @@ div.entry__head:hover { --_state: 0%; }
 .window-error[hidden] { display: none; }
 .window-error > .toast { pointer-events: auto; max-width: 40rem; margin: 0; box-shadow: var(--md-sys-elevation-level3); }
 
-/* До 640 px открытое окно — лист во весь экран, как полноэкранный диалог Material:
-   прокручивается само окно, а действия прилипают к его низу и всегда под пальцем.
+/* На телефоне (до 640 px) базовое окно остаётся базовым: по центру, шириной в экран без
+   полей по 16 px, действия под телом. Полноэкранный диалог Material — только для сложной
+   задачи: окно со словом ВоВесьЭкран (.modal--full) и окно с шагами мастера ([data-steps]).
+   Было: листом во весь экран вставало любое окно, и подтверждение из поля и двух кнопок
+   оставляло огромную пустоту с действиями внизу (аудит M3, S5).
+   Лист: прокручивается само окно, а действия прилипают к его низу и всегда под пальцем.
    Только у модального (:modal): окно, которое сервер напечатал открытым без скрипта,
-   стоит в потоке страницы и листом не становится. */
+   стоит в потоке страницы и листом не становится. Движок без :has() выбросит правила листа
+   целиком — и любое окно у него останется базовым: законченный вид, а не сломанный. */
 @media (max-width: 640px) {
-	.modal:modal {
+	.modal:modal { width: calc(100% - var(--space-6)); max-width: calc(100% - var(--space-6)); }
+	.modal--full:modal, .modal:modal:has([data-steps]) {
 		width: 100%;
 		max-width: 100%;
 		height: 100%;
@@ -2963,9 +2971,9 @@ div.entry__head:hover { --_state: 0%; }
 		margin: 0;
 		border-radius: 0;
 	}
-	.modal:modal .modal__box { display: flex; flex-direction: column; min-height: 100%; padding-bottom: 0; }
-	.modal:modal .modal__body { flex: 1 0 auto; }
-	.modal:modal .modal__actions {
+	.modal--full:modal .modal__box, .modal:modal:has([data-steps]) .modal__box { display: flex; flex-direction: column; min-height: 100%; padding-bottom: 0; }
+	.modal--full:modal .modal__body, .modal:modal:has([data-steps]) .modal__body { flex: 1 0 auto; }
+	.modal--full:modal .modal__actions, .modal:modal:has([data-steps]) .modal__actions {
 		position: sticky;
 		bottom: 0;
 		margin: var(--space-5) calc(-1 * var(--space-5)) 0;
@@ -2973,10 +2981,9 @@ div.entry__head:hover { --_state: 0%; }
 		background: var(--md-sys-color-surface-container-high);
 		border-top: 1px solid var(--md-sys-color-outline-variant);
 	}
-	.modal:modal .modal__actions > .button { flex: 1 1 auto; }
 	/* у прежнего окна формы последним идёт форма, а подвал — внутри неё */
-	.modal:modal .modal__box > form:last-child { flex: 1 0 auto; display: flex; flex-direction: column; }
-	.modal:modal .modal__box > form:last-child > .modal__actions { margin-top: auto; }
+	.modal--full:modal .modal__box > form:last-child, .modal:modal:has([data-steps]) .modal__box > form:last-child { flex: 1 0 auto; display: flex; flex-direction: column; }
+	.modal--full:modal .modal__box > form:last-child > .modal__actions, .modal:modal:has([data-steps]) .modal__box > form:last-child > .modal__actions { margin-top: auto; }
 }
 
 /* --- врезка: шаг ВНУТРИ формы, а не своя секция ---------------------------------

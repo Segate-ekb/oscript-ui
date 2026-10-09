@@ -258,15 +258,17 @@ async function снимки(b) {
       await p.click('a[data-opens="novyi-proekt"]');
       await p.waitForTimeout(400);
       if (ширина <= 640) {
-        const лист = await p.evaluate(() => {
+        // короткое окно на телефоне — базовое (dev.5, аудит M3 S5): по центру, в экран без
+        // полей по 16 px; листом во весь экран встаёт только окно ВоВесьЭкран и окно с шагами
+        const окно = await p.evaluate(() => {
           const d = document.getElementById('novyi-proekt');
           const к = d.getBoundingClientRect();
-          const д = d.querySelector('.modal__actions').getBoundingClientRect();
-          return { w: к.width, h: к.height, низ: д.bottom, вв: innerHeight, шв: innerWidth };
+          return { w: к.width, лево: к.left, право: innerWidth - к.right, верх: к.top, низ: innerHeight - к.bottom,
+            шв: innerWidth };
         });
-        проверить(Math.abs(лист.w - лист.шв) < 2 && Math.abs(лист.h - лист.вв) < 2,
-          `${имя}: окно — лист во весь экран (${лист.w}×${лист.h})`);
-        проверить(Math.abs(лист.низ - лист.вв) < 2, `${имя}: действия прилипли к низу (${лист.низ}/${лист.вв})`);
+        проверить(Math.abs(окно.w - (окно.шв - 32)) < 2 && Math.abs(окно.лево - окно.право) < 2,
+          `${имя}: короткое окно — базовое, в экран без полей по 16 px (${окно.w})`);
+        проверить(Math.abs(окно.верх - окно.низ) < 2, `${имя}: короткое окно по центру (${окно.верх}/${окно.низ})`);
       }
       await p.screenshot({ path: path.join(OUT, `окно-${имя}.png`) });
       await p.keyboard.press('Escape');

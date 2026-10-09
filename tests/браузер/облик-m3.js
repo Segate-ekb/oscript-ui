@@ -141,12 +141,61 @@ async function окноПоЦентру(b) {
   await ctx.close();
 }
 
+// Открывает окно страницы по идентификатору и меряет его относительно экрана.
+async function открытьИЗамерить(p, ид) {
+  await p.evaluate((ид) => document.getElementById(ид).showModal(), ид);
+  await p.waitForTimeout(500);
+  return p.evaluate((ид) => {
+    const d = document.getElementById(ид);
+    const r = d.getBoundingClientRect();
+    const д = d.querySelector('.modal__actions, .steps__nav');
+    const тело = d.querySelector('.modal__body');
+    return { ш: Math.round(r.width), в: Math.round(r.height), верх: Math.round(r.top), низ: Math.round(innerHeight - r.bottom),
+      лево: Math.round(r.left), право: Math.round(innerWidth - r.right), шв: innerWidth, вв: innerHeight,
+      действияНиз: д ? Math.round(innerHeight - д.getBoundingClientRect().bottom) : null,
+      действияПодТелом: д && тело ? д.getBoundingClientRect().top >= тело.getBoundingClientRect().bottom - 0.5 : null };
+  }, ид);
+}
+
+// S5: на 390 короткое окно — базовое, по центру и в экран без полей 16 px; окно ВоВесьЭкран и
+// окно с шагами — лист во весь экран; на 1280 базовое 560, широкое 640.
+async function окнаНаТелефоне(b) {
+  const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
+  const p = await ctx.newPage();
+  await p.goto(адрес('окно'), { waitUntil: 'networkidle' });
+  let з = await открытьИЗамерить(p, 'pereimenovat-telefon');
+  проверить(з.ш === з.шв - 32 && Math.abs(з.лево - з.право) <= 1, `S5 390: короткое окно — базовое, ширина ${з.ш} = экран − 32`);
+  проверить(Math.abs(з.верх - з.низ) <= 2 && з.в < з.вв / 2, `S5 390: короткое окно по центру, не лист (высота ${з.в})`);
+  проверить(з.действияПодТелом, 'S5 390: действия под телом');
+  await p.screenshot({ path: path.join(OUT, 'окно-короткое-390.png') });
+  await p.keyboard.press('Escape');
+  await p.waitForTimeout(400);
+  з = await открытьИЗамерить(p, 'istochnik-telefon');
+  проверить(з.ш === з.шв && з.в === з.вв, `S5 390: ВоВесьЭкран — лист во весь экран (${з.ш}×${з.в})`);
+  проверить(Math.abs(з.действияНиз) <= 1, `S5 390: у листа действия прилипли к низу (${з.действияНиз})`);
+  await p.screenshot({ path: path.join(OUT, 'окно-во-весь-экран-390.png') });
+  await p.keyboard.press('Escape');
+  await p.goto(адрес('шаги'), { waitUntil: 'networkidle' });
+  з = await открытьИЗамерить(p, 'master-v-okne');
+  проверить(з.ш === з.шв && з.в === з.вв, `S5 390: окно с шагами — лист во весь экран (${з.ш}×${з.в})`);
+  await p.setViewportSize({ width: 1280, height: 900 });
+  await p.waitForTimeout(300);
+  з = await p.evaluate(() => Math.round(document.getElementById('master-v-okne').getBoundingClientRect().width));
+  проверить(з === 640, `S5 1280: широкое окно — 640 (${з})`);
+  await p.keyboard.press('Escape');
+  await p.goto(адрес('окно'), { waitUntil: 'networkidle' });
+  з = await открытьИЗамерить(p, 'pereimenovat-telefon');
+  проверить(з.ш === 560, `S5 1280: базовое окно — 560 (${з.ш})`);
+  await ctx.close();
+}
+
 (async () => {
   const b = await браузер();
   try {
     await имяКарточки(b);
     await блокКоманды(b);
     await окноПоЦентру(b);
+    await окнаНаТелефоне(b);
   } finally {
     await b.close();
   }
