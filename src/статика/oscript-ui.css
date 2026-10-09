@@ -3824,3 +3824,118 @@ div.entry__head:hover { --_state: 0%; }
 @media (prefers-reduced-motion: reduce) {
 	.preview__theme { transition: none; }
 }
+
+/* --- таблица карточками и свойства (выпуск 0.13) ------------------------------------
+   Запись-карточка на узком экране: заглавная ячейка (слово Заглавная у колонки, иначе
+   первая) встаёт первой строкой и крупнее — по ней запись узнают в лицо, в каком бы месте
+   ряда она ни стояла на широком экране. Ячейка с меню строки уходит в правый верхний угол:
+   там шестерёнку ищут глазом, и действия не путаются со значениями. Лист действий меню
+   по-прежнему выезжает у нижнего края окна.
+
+   Сетка из двух колонок, а не порядок flex: заглавная и меню делят первую строку, прочие
+   ячейки идут под ними во всю ширину и в порядке разметки. Без меню вторая колонка пуста
+   и ширины не берёт. На широком экране оба класса ничего не меняют: там у таблицы шапка. */
+@media (max-width: 720px) {
+	.table-cards tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
+	.table-cards td { grid-column: 1 / -1; min-width: 0; }
+	.table-cards td.cell-title {
+		grid-row: 1;
+		grid-column: 1;
+		align-self: center;
+		font: var(--type-title-medium);
+		letter-spacing: var(--md-sys-typescale-title-medium-tracking);
+	}
+	/* Отрицательное поле ставит кнопку меню в угол карточки, а не в угол её полей —
+	   как действие в шапке карточки Material. */
+	.table-cards td.cell-menu {
+		grid-row: 1;
+		grid-column: 2;
+		padding: 0 0 0 var(--space-2);
+		margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-2)) 0 0;
+	}
+}
+
+/* Свойство со словами: значение, кнопки сразу за ним и примечание строкой ниже. Кнопка
+   у края списка, оторванная от значения, читалась бы действием над всем списком. */
+.props__value { display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--space-2); min-width: 0; }
+.props__text { min-width: 0; overflow-wrap: anywhere; }
+/* полоса заполнения — показание во всю строку: ужатая до содержимого, она стала бы точкой */
+.props__text:has(.meter) { flex: 1 1 12rem; }
+.props__note {
+	flex-basis: 100%;
+	color: var(--md-sys-color-on-surface-variant);
+	font: var(--type-body-small);
+	letter-spacing: var(--md-sys-typescale-body-small-tracking);
+}
+
+/* Кнопка копирования — кнопка-иконка Material: круг 32px, слой состояния на наведении.
+   Подпись «Копировать» — для скринридера и всплывающей подсказки (title). */
+.props__copy {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: none;
+	width: 32px;
+	height: 32px;
+	padding: 0;
+	border: 0;
+	border-radius: var(--md-sys-shape-corner-full);
+	background: transparent;
+	color: var(--md-sys-color-on-surface-variant);
+	cursor: pointer;
+	transition: background-color var(--motion-fast) var(--motion-ease);
+}
+.props__copy:hover { background: color-mix(in srgb, var(--md-sys-color-on-surface) var(--state-hover), transparent); }
+.props__copy svg { width: 18px; height: 18px; }
+
+/* Секрет без скрипта: галка «Показать» стоит в разметке ПЕРЕД значением, и правило
+   «:checked ~» снимает точки и открывает значение — работает и там, где :has ещё нет.
+   Сама галка спрятана, но фокус в неё приходит, и кольцо фокуса рисует её подпись.
+   Скрытое значение не читает и скринридер: display: none убирает его из дерева. */
+.props__reveal-box {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+	opacity: 0;
+}
+.props__mask { color: var(--md-sys-color-on-surface-variant); letter-spacing: .12em; }
+.props__value--secret .props__text { display: none; }
+.props__reveal-box:checked ~ .props__text { display: block; }
+.props__reveal-box:checked ~ .props__mask { display: none; }
+.props__reveal {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	min-height: 32px;
+	padding: 0 var(--space-2);
+	border-radius: var(--md-sys-shape-corner-full);
+	color: var(--md-sys-color-primary);
+	font: var(--type-label-large);
+	letter-spacing: var(--md-sys-typescale-label-large-tracking);
+	cursor: pointer;
+	user-select: none;
+	transition: background-color var(--motion-fast) var(--motion-ease);
+}
+.props__reveal:hover { background: color-mix(in srgb, var(--md-sys-color-primary) var(--state-hover), transparent); }
+.props__reveal-box:focus-visible ~ .props__reveal { outline: 3px solid var(--md-sys-color-secondary); outline-offset: 2px; }
+.props__reveal-hide { display: none; }
+.props__reveal-box:checked ~ .props__reveal .props__reveal-show { display: none; }
+.props__reveal-box:checked ~ .props__reveal .props__reveal-hide { display: inline; }
+
+/* Кнопка рядом со значением выше строки текста, и строка значения встаёт по её середине:
+   имя напротив опускается на ту же середину, иначе оно глядит выше значения. */
+@media (min-width: 641px) {
+	.props dt:has(+ dd > :is(.props__copy, .props__reveal)) { padding-top: 6px; }
+}
+
+/* До 640px двум колонкам тесно: имя встаёт над значением, пара отбита от соседней. */
+@media (max-width: 640px) {
+	.props { grid-template-columns: minmax(0, 1fr); row-gap: 0; }
+	.props dt { white-space: normal; }
+	.props dd + dt { margin-top: var(--space-3); }
+}
