@@ -612,7 +612,10 @@ h3 {
 
 /* ТЕКСТОВОЕ ПОЛЕ MATERIAL, ЗАЛИТОЕ (filled), но в рамке. Контейнер
    surface-container-highest, скругление small (8px) по всем углам и рамка 1px
-   outline-variant; подпись лежит ВНУТРИ контейнера. На фокусе рамка — 2px primary:
+   цветом outline — роль Material для «важной границы, такой как рамка текстового поля»:
+   контраст рамки с заливкой поля и с карточкой — не меньше 3:1 в обеих темах при любом
+   акценте (WCAG 1.4.11). Рамка outline-variant давала 1.2–1.8:1, и в светлой теме поле на
+   карточке почти пропадало (аудит M3, S3). Подпись лежит ВНУТРИ контейнера. На фокусе рамка — 2px primary:
    вторым пикселем служит кольцо внутрь (inset box-shadow), поэтому содержимое не
    сдвигается. Плоский низ и линия-индикатор залитого поля M3 сняты: рядом с карточками
    в 16px и пилюлями-плашками поле с прямыми нижними углами читалось «квадратно», а линия
@@ -665,7 +668,7 @@ h3 {
 	letter-spacing: var(--md-sys-typescale-body-large-tracking);
 	color: var(--md-sys-color-on-surface);
 	background-color: color-mix(in srgb, var(--md-sys-color-on-surface) var(--_state), var(--_bg));
-	border: 1px solid var(--md-sys-color-outline-variant);
+	border: 1px solid var(--md-sys-color-outline);
 	border-radius: var(--md-sys-shape-corner-small);
 	outline: none;
 	caret-color: var(--md-sys-color-primary);

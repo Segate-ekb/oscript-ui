@@ -433,7 +433,7 @@
 КонецПроцедуры
 
 // Скругления: крупные поверхности — large (16px), плашка и чип — пилюли, поле ввода — 8px
-// по всем углам в рамке outline-variant, в фокусе рамка 2px primary (второй пиксель — кольцо
+// по всем углам в рамке outline (dev.5, аудит M3 S3; была outline-variant), в фокусе рамка 2px primary (второй пиксель — кольцо
 // внутрь, без сдвига содержимого). Повод — превью 0.13: «в целом сильно квадратно».
 &Тест
 Процедура СкругленияПоверхностейИПолеВРамке() Экспорт
@@ -447,7 +447,7 @@
 	Ожидания.Добавить(".chip|border-radius|var(--md-sys-shape-corner-full)");
 	Ожидания.Добавить(".button|border-radius|var(--md-sys-shape-corner-full)");
 	Ожидания.Добавить(".field__control|border-radius|var(--md-sys-shape-corner-small)");
-	Ожидания.Добавить(".field__control|border|1px solid var(--md-sys-color-outline-variant)");
+	Ожидания.Добавить(".field__control|border|1px solid var(--md-sys-color-outline)");
 	Ожидания.Добавить(".field__control:focus|border-color|var(--_line)");
 	Ожидания.Добавить(".field__control:focus|box-shadow|inset 0 0 0 1px var(--_line)");
 	Ожидания.Добавить(".field__control|background-image|" + "");
@@ -582,6 +582,9 @@
 	Результат.Добавить(Пара("surface", "outline"));
 	Результат.Добавить(Пара("surface-container-low", "outline"));
 	Результат.Добавить(Пара("surface-container-highest", "on-surface-variant"));
+	// рамка поля: на заливке поля и на карточке обеих тем (dev.5, аудит M3 S3)
+	Результат.Добавить(Пара("surface-container-highest", "outline"));
+	Результат.Добавить(Пара("surface-container", "outline"));
 	Возврат Результат;
 
 КонецФункции
