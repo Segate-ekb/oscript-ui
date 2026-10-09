@@ -33,6 +33,10 @@
  *      пагинации, сортировка колонки) берётся в фоне и морфится, как ответ тихой формы,
  *      адрес — в историю вкладки (pushState), «Назад» по помеченной записи — тоже тихо;
  *      тихая GET-форма отбора уходит сама по изменению поля с задержкой.
+ *  14. дерево галок (выпуск 0.13, data-checktree-*): «частично» у веток по детям, страницы
+ *      ветки по «Показать ещё» и при раскрытии, поиск через сервер на месте веток, правки
+ *      плашками и форма, которая отдаёт только правки. Плашку правки скрипт берёт из
+ *      шаблона сервера.
  *
  * Глобальных имён скрипт не заводит, разметку не печатает — только атрибуты, рябь и текст
  * отказа под полем (field__error — тот же, что печатает сервер; выпуск 0.12).
@@ -2263,4 +2267,832 @@
 	   остальные кнопки копирования: список элементов ряби читается на каждом нажатии. */
 
 	RIPPLE += ', .props__copy, .props__reveal';
+
+	/* --- 14. дерево галок (выпуск 0.13, шаг 23) -------------------------------------- */
+
+	// Дерево галок без скрипта — флажки формы: «частично» печатает сервер, ветка показывает
+	// первые 50 детей, «Показать ещё» — ссылка на адрес ветки, «Найти» — кнопка отправки на
+	// адрес поиска, режим ветки — радиокнопки, и форма уходит обычной отправкой галок.
+	// Скрипт добавляет вот что:
+	//   — щелчок по галке ветки раздаёт её состояние детям, а ветки выше пересчитывают
+	//     «частично» по детям. Ветка, у которой дети загружены не все, «целиком» становится,
+	//     только если так её напечатал сервер или отметил целиком человек: чего не видно,
+	//     того скрипт не знает; новые дети такой ветки приезжают её состоянием;
+	//   — «Показать ещё» и раскрытие пустой ветки берут страницу детей запросом в фоне
+	//     (так же, как окно по адресу, раздел 7) и дописывают её в ветку: из ответа берётся
+	//     список data-checktree-page с ключом ветки и следующая строка data-checktree-more;
+	//     не вышло — обычный переход по ссылке;
+	//   — «Найти» и ввод в поле поиска берут Поиск?найти=<строка> и кладут ответ
+	//     (data-checktree-found) на место веток; пустое поле возвращает ветки; «Включить /
+	//     Снять найденные» отмечают совпадения на месте;
+	//   — у дерева data-checktree-edits-only правки (галки и режимы, которые человек поменял
+	//     против напечатанного сервером) копятся, видны плашками data-checktree-edits
+	//     (плашку скрипт клонирует из шаблона сервера) и уходят с формой вместо галок:
+	//     правки=1, включить=<ключ>, снять=<ключ>, режим=<ключ>:<режим>.
+	// Узел называет ключ: своё значение галки, иначе её имя — то же правило у сервера.
+
+	var CT_EDITS = 'oscriptUiEdits';        // свойство обёртки: Map «box:ключ» | «mode:ключ» → правка
+	var CT_MIXED = 'oscriptUiMixed';        // свойство галки: показана «частично»
+	var CT_TOUCHED = 'oscriptUiTouched';    // свойство галки: её состояние ставил скрипт
+	var CT_WHOLE = 'oscriptUiWhole';        // свойство галки ветки: человек отметил или снял её целиком
+	var CT_SEQ = 'oscriptUiFind';           // свойство обёртки: номер последнего запроса поиска
+	var CT_BUSY = 'oscriptUiLoading';       // свойство строки «Показать ещё»: её страница в пути
+	var CT_NATIVE = 'oscriptUiTreeNative';  // свойство формы: отправку поиска пустить к браузеру
+	var ctTimer = 0;
+
+	function ctKey(box) {
+		return box.value && box.value !== '1' ? box.value : box.name;
+	}
+
+	function ctOrigin(box) {
+		return box.getAttribute('data-checktree-state') || (box.defaultChecked ? 'on' : 'off');
+	}
+
+	function ctState(box) {
+		return box[CT_MIXED] ? 'mixed' : box.checked ? 'on' : 'off';
+	}
+
+	// «Частично» держит свойство indeterminate: по нему и лист рисует черту, и скринридер
+	// слышит «частично». Атрибут aria-checked сервера после этого только мешал бы.
+	function ctShow(box, state) {
+		box[CT_MIXED] = state === 'mixed';
+		box.indeterminate = state === 'mixed';
+		box.checked = state !== 'off';
+		box.removeAttribute('aria-checked');
+	}
+
+	function ctSet(box, state) {
+		box[CT_TOUCHED] = true;
+		ctShow(box, state);
+	}
+
+	function ctChild(el, cls) {
+		for (var c = el ? el.firstElementChild : null; c; c = c.nextElementSibling) {
+			if (c.classList.contains(cls)) {
+				return c;
+			}
+		}
+		return null;
+	}
+
+	function ctBoxOf(node) {
+		var row = ctChild(node, 'checktree__row');
+		return row ? row.querySelector('[data-checktree-box]') : null;
+	}
+
+	function ctList(node) {
+		return ctChild(ctChild(node, 'checktree__branch'), 'checktree__children');
+	}
+
+	function ctParent(node) {
+		var list = node ? node.parentElement : null;
+		if (!list || !list.classList.contains('checktree__children')) {
+			return null;
+		}
+		var up = list.parentElement ? list.parentElement.parentElement : null;
+		return up && up.classList.contains('checktree__node') ? up : null;
+	}
+
+	function ctUnloaded(node) {
+		var branch = ctChild(node, 'checktree__branch');
+		return !!(branch && branch.querySelector(':scope > [data-checktree-more]'));
+	}
+
+	function ctFindBy(root, name, key) {
+		var all = root.querySelectorAll('[' + name + ']');
+		for (var i = 0; i < all.length; i++) {
+			if (all[i].getAttribute(name) === key) {
+				return all[i];
+			}
+		}
+		return null;
+	}
+
+	function ctBoxes(set, key) {
+		var all = set.querySelectorAll('[data-checktree-box]');
+		var out = [];
+		for (var i = 0; i < all.length; i++) {
+			if (ctKey(all[i]) === key) {
+				out.push(all[i]);
+			}
+		}
+		return out;
+	}
+
+	// Ветка по детям: все включены — включена, все сняты — снята, иначе «частично».
+	function ctRecalc(node) {
+		var box = ctBoxOf(node);
+		var list = ctList(node);
+		if (!box || !list) {
+			return false;
+		}
+		var on = 0, off = 0, n = 0;
+		for (var li = list.firstElementChild; li; li = li.nextElementSibling) {
+			var kid = ctBoxOf(li);
+			if (kid) {
+				n++;
+				var s = ctState(kid);
+				on += s === 'on' ? 1 : 0;
+				off += s === 'off' ? 1 : 0;
+			}
+		}
+		if (!n) {
+			return false;
+		}
+		var next = on === n ? 'on' : off === n ? 'off' : 'mixed';
+		if (next !== 'mixed' && next !== ctOrigin(box) && next !== box[CT_WHOLE] && ctUnloaded(node)) {
+			next = 'mixed';
+		}
+		if (next === ctState(box)) {
+			return false;
+		}
+		ctSet(box, next);
+		return true;
+	}
+
+	function ctUp(node, out) {
+		for (var p = ctParent(node); p; p = ctParent(p)) {
+			if (ctRecalc(p)) {
+				out.push(ctBoxOf(p));
+			}
+		}
+	}
+
+	function ctCascade(node, state, out) {
+		var list = ctList(node);
+		var all = list ? list.querySelectorAll('[data-checktree-box]') : [];
+		for (var i = 0; i < all.length; i++) {
+			if (!all[i].disabled && ctState(all[i]) !== state) {
+				ctSet(all[i], state);
+				out.push(all[i]);
+			}
+		}
+	}
+
+	// Сменились галки changed: ветки над ними пересчитываются, двойники в обёртке (та же
+	// галка в ответе поиска и в дереве) встают так же, правки записываются.
+	function ctSettle(set, changed) {
+		var queue = changed.slice();
+		var touched = [];
+		var guard = 0;
+		while (queue.length && guard++ < 10000) {
+			var box = queue.shift();
+			if (touched.indexOf(box) < 0) {
+				touched.push(box);
+			}
+			var up = [];
+			ctUp(box.closest('.checktree__node'), up);
+			queue.push.apply(queue, up);
+			if (!set) {
+				continue;
+			}
+			var twins = ctBoxes(set, ctKey(box));
+			for (var i = 0; i < twins.length; i++) {
+				if (twins[i] !== box && ctState(twins[i]) !== ctState(box)) {
+					ctSet(twins[i], ctState(box));
+					queue.push(twins[i]);
+				}
+			}
+		}
+		if (set) {
+			ctRecord(set, touched);
+			ctPaint(set);
+		}
+	}
+
+	function ctEdits(set) {
+		if (!set[CT_EDITS]) {
+			set[CT_EDITS] = new Map();
+		}
+		return set[CT_EDITS];
+	}
+
+	function ctLabelOf(el) {
+		var row = el.closest('.checktree__row');
+		var label = row ? row.querySelector('.checktree__label') : null;
+		return label ? label.textContent : '';
+	}
+
+	function ctRecord(set, boxes) {
+		if (!set.hasAttribute('data-checktree-edits-only')) {
+			return;
+		}
+		var edits = ctEdits(set);
+		boxes.forEach(function (box) {
+			var key = ctKey(box);
+			var state = ctState(box);
+			if (state === 'mixed' || state === ctOrigin(box)) {
+				edits.delete('box:' + key);
+			} else {
+				edits.set('box:' + key, { kind: state, key: key, label: ctLabelOf(box) || key });
+			}
+		});
+	}
+
+	/* щелчок по галке */
+
+	doc.addEventListener('change', function (e) {
+		var box = e.target;
+		if (!box || !box.hasAttribute || !box.hasAttribute('data-checktree-box')) {
+			return;
+		}
+		// «частично» щелчком становится «включено», как у трёхпозиционного флажка ARIA
+		var state = box[CT_MIXED] || box.checked ? 'on' : 'off';
+		ctSet(box, state);
+		box[CT_WHOLE] = state;
+		var changed = [box];
+		ctCascade(box.closest('.checktree__node'), state, changed);
+		ctSettle(box.closest('[data-checktree-set]'), changed);
+	});
+
+	/* режим ветки */
+
+	function ctModeOf(group) {
+		var checked = group.querySelector('input:checked');
+		return checked ? checked.value : '';
+	}
+
+	function ctModeOrigin(group) {
+		var all = group.querySelectorAll('input');
+		for (var i = 0; i < all.length; i++) {
+			if (all[i].defaultChecked) {
+				return all[i].value;
+			}
+		}
+		return '';
+	}
+
+	// Дети ветки в режиме «все» или «никакие» решены режимом: их не правят ни указатель
+	// (лист), ни клавиатура (inert). Режим «выбранные» — второй сегмент.
+	function ctModeLock(group) {
+		var list = ctList(group.closest('.checktree__node'));
+		var all = group.querySelectorAll('input');
+		if (list && all.length > 1) {
+			list.inert = ctModeOf(group) !== all[1].value;
+		}
+	}
+
+	function ctPickMode(group, value) {
+		var all = group.querySelectorAll('input');
+		for (var i = 0; i < all.length; i++) {
+			all[i].checked = all[i].value === value;
+		}
+		ctModeLock(group);
+	}
+
+	function ctRecordMode(set, group) {
+		if (!set.hasAttribute('data-checktree-edits-only')) {
+			return;
+		}
+		var key = group.getAttribute('data-checktree-modes');
+		var value = ctModeOf(group);
+		var edits = ctEdits(set);
+		if (value === ctModeOrigin(group)) {
+			edits.delete('mode:' + key);
+			return;
+		}
+		var checked = group.querySelector('input:checked');
+		var text = checked ? checked.parentNode.querySelector('.segments__text') : null;
+		edits.set('mode:' + key, { kind: 'mode', key: key, value: value, label: ctLabelOf(group) || key,
+			mode: text ? text.textContent : value });
+	}
+
+	doc.addEventListener('change', function (e) {
+		var radio = e.target;
+		var group = radio && radio.closest ? radio.closest('[data-checktree-modes]') : null;
+		if (!group || radio.type !== 'radio') {
+			return;
+		}
+		ctModeLock(group);
+		var set = group.closest('[data-checktree-set]');
+		if (!set) {
+			return;
+		}
+		var key = group.getAttribute('data-checktree-modes');
+		var all = set.querySelectorAll('[data-checktree-modes]');
+		for (var i = 0; i < all.length; i++) {
+			if (all[i] !== group && all[i].getAttribute('data-checktree-modes') === key) {
+				ctPickMode(all[i], radio.value);
+			}
+		}
+		ctRecordMode(set, group);
+		ctPaint(set);
+	});
+
+	/* плашки правок */
+
+	// Правка ребёнка не нужна плашкой, если её покрыла правка ветки выше того же рода:
+	// «+ Альфа» уже говорит, что включены и все её участники.
+	function ctCovered(set, edits, ed) {
+		var boxes = ctBoxes(set, ed.key);
+		for (var i = 0; i < boxes.length; i++) {
+			for (var p = ctParent(boxes[i].closest('.checktree__node')); p; p = ctParent(p)) {
+				var pb = ctBoxOf(p);
+				var pe = pb ? edits.get('box:' + ctKey(pb)) : null;
+				if (pe && pe.kind === ed.kind) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	function ctText(pattern, a, b) {
+		return pattern.replace('%1', function () { return a; }).replace('%2', function () { return b || ''; });
+	}
+
+	function ctPaint(set) {
+		var row = set.querySelector('[data-checktree-edits]');
+		var tpl = row ? row.querySelector('template[data-checktree-chip]') : null;
+		var list = row ? row.querySelector('.checktree__edits-list') : null;
+		if (!tpl || !list || !tpl.content) {
+			return;
+		}
+		var edits = ctEdits(set);
+		while (list.firstChild) {
+			list.removeChild(list.firstChild);
+		}
+		edits.forEach(function (ed, id) {
+			if (ed.kind !== 'mode' && ctCovered(set, edits, ed)) {
+				return;
+			}
+			var text = ctText(tpl.getAttribute('data-checktree-text-' + ed.kind) || '%1', ed.label, ed.mode);
+			var chip = tpl.content.firstElementChild.cloneNode(true);
+			chip.classList.add('checktree__edit--' + ed.kind);
+			chip.querySelector('.chips-in__text').textContent = text;
+			var undo = chip.querySelector('[data-checktree-undo]');
+			undo.setAttribute('aria-label', ctText(undo.getAttribute('aria-label') || '%1', text));
+			undo.setAttribute('data-checktree-undo', id);
+			list.appendChild(chip);
+		});
+		row.hidden = !list.firstElementChild;
+	}
+
+	// Снять правку — вернуть узлу то, что напечатал сервер. Правка ветки уносит с собой
+	// и правки её детей того же рода: они были её частью.
+	function ctUndo(set, ed) {
+		var edits = ctEdits(set);
+		if (ed.kind === 'mode') {
+			var groups = set.querySelectorAll('[data-checktree-modes]');
+			for (var i = 0; i < groups.length; i++) {
+				if (groups[i].getAttribute('data-checktree-modes') === ed.key) {
+					ctPickMode(groups[i], ctModeOrigin(groups[i]));
+				}
+			}
+			edits.delete('mode:' + ed.key);
+			return;
+		}
+		var changed = [];
+		var revert = function (key) {
+			ctBoxes(set, key).forEach(function (box) {
+				ctSet(box, ctOrigin(box));
+				box[CT_WHOLE] = '';
+				changed.push(box);
+			});
+			edits.delete('box:' + key);
+		};
+		ctBoxes(set, ed.key).forEach(function (box) {
+			var list = ctList(box.closest('.checktree__node'));
+			var kids = list ? list.querySelectorAll('[data-checktree-box]') : [];
+			for (var k = 0; k < kids.length; k++) {
+				var ke = edits.get('box:' + ctKey(kids[k]));
+				if (ke && ke.kind === ed.kind) {
+					revert(ke.key);
+				}
+			}
+		});
+		revert(ed.key);
+		ctSettle(set, changed);
+	}
+
+	doc.addEventListener('click', function (e) {
+		var undo = e.target.closest ? e.target.closest('[data-checktree-undo]') : null;
+		var set = undo ? undo.closest('[data-checktree-set]') : null;
+		var ed = set ? ctEdits(set).get(undo.getAttribute('data-checktree-undo')) : null;
+		if (!ed) {
+			return;
+		}
+		var list = undo.closest('.checktree__edits-list');
+		var at = Array.prototype.indexOf.call(list.children, undo.closest('.checktree__edit'));
+		ctUndo(set, ed);
+		ctPaint(set);
+		// фокус — на соседнюю плашку, а без них — на сам узел: кнопка, которую нажали, ушла
+		var rest = list.querySelectorAll('[data-checktree-undo]');
+		var next = rest[Math.min(at, rest.length - 1)];
+		if (!next) {
+			next = ctBoxes(set, ed.key).filter(function (b) { return b.offsetParent; })[0]
+				|| set.querySelector('[data-checktree-modes] input:checked, [data-checktree-box]');
+		}
+		if (next) {
+			next.focus();
+		}
+	});
+
+	/* страница ветки */
+
+	function ctLoad(link, navigate) {
+		var more = link.closest('[data-checktree-more]');
+		var key = more.getAttribute('data-checktree-more');
+		var host = more.parentElement;
+		var list = host ? ctChild(host, 'checktree__children') || host.querySelector(':scope > [data-checktree]') : null;
+		if (!list || list.getAttribute('data-checktree-page') !== key || more[CT_BUSY]) {
+			return;
+		}
+		more[CT_BUSY] = true;
+		link.setAttribute('aria-busy', 'true');
+		var focused = doc.activeElement === link;
+		fetch(link.href, { credentials: 'same-origin', headers: { 'Accept': 'text/html' } })
+			.then(function (response) {
+				var type = response.headers.get('Content-Type') || '';
+				if (!response.ok || !/text\/html/i.test(type)) {
+					throw new Error('страница ветки не пришла');
+				}
+				return response.text();
+			})
+			.then(function (html) {
+				var next = new DOMParser().parseFromString(html, 'text/html');
+				var page = ctFindBy(next, 'data-checktree-page', key);
+				if (!page) {
+					throw new Error('в ответе нет ветки');
+				}
+				var have = {};
+				for (var li = list.firstElementChild; li; li = li.nextElementSibling) {
+					var own = ctBoxOf(li);
+					if (own) {
+						have[ctKey(own)] = true;
+					}
+				}
+				var added = [];
+				for (var item = page.firstElementChild; item; item = item.nextElementSibling) {
+					var box = ctBoxOf(item);
+					if (item.classList.contains('checktree__node') && !(box && have[ctKey(box)])) {
+						added.push(list.appendChild(doc.importNode(item, true)));
+					}
+				}
+				var fresh = ctFindBy(next, 'data-checktree-more', key);
+				if (fresh) {
+					more.parentNode.replaceChild(doc.importNode(fresh, true), more);
+				} else {
+					more.parentNode.removeChild(more);
+				}
+				ctAdopt(list, added);
+				var first = added.length ? added[0].querySelector('[data-checktree-box], input') : null;
+				if (focused && first) {
+					first.focus();
+				}
+				doc.dispatchEvent(new CustomEvent('oscript-ui:update', { detail: { url: link.href } }));
+			})
+			.catch(function () {
+				more[CT_BUSY] = false;
+				link.removeAttribute('aria-busy');
+				if (navigate) {
+					location.assign(link.href);
+				}
+			});
+	}
+
+	// Новые узлы ветки: ветка, которую человек отметил или снял целиком, раздаёт себя и им,
+	// а накопленные правки ложатся на свои галки и режимы.
+	function ctAdopt(list, added) {
+		var set = list.closest('[data-checktree-set]');
+		var node = list.closest('.checktree__node');
+		var parent = node ? ctBoxOf(node) : null;
+		var whole = parent && parent[CT_WHOLE] && ctState(parent) === parent[CT_WHOLE] ? parent[CT_WHOLE] : '';
+		var edits = set ? ctEdits(set) : new Map();
+		var changed = [];
+		added.forEach(function (li) {
+			ctInit(li);
+			var boxes = li.querySelectorAll('[data-checktree-box]');
+			for (var i = 0; i < boxes.length; i++) {
+				var ed = edits.get('box:' + ctKey(boxes[i]));
+				var want = whole || (ed ? ed.kind : '');
+				if (want && !boxes[i].disabled && ctState(boxes[i]) !== want) {
+					ctSet(boxes[i], want);
+					changed.push(boxes[i]);
+				}
+			}
+			var groups = li.querySelectorAll('[data-checktree-modes]');
+			for (var g = 0; g < groups.length; g++) {
+				var me = edits.get('mode:' + groups[g].getAttribute('data-checktree-modes'));
+				if (me) {
+					ctPickMode(groups[g], me.value);
+				}
+			}
+		});
+		if (changed.length) {
+			ctSettle(set, changed);
+		}
+	}
+
+	doc.addEventListener('click', function (e) {
+		if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) {
+			return;
+		}
+		var link = e.target.closest ? e.target.closest('[data-checktree-more] a[href]') : null;
+		if (!link || !window.fetch || !window.DOMParser || !sameOrigin(link.href)) {
+			return; // без запроса в фоне ссылка ведёт на страницу ветки — обычный переход
+		}
+		e.preventDefault();
+		ctLoad(link, true);
+	});
+
+	// Ветка, чьи дети не напечатаны, берёт первую страницу, раскрываясь.
+	function ctLazy(branch) {
+		var list = ctChild(branch, 'checktree__children');
+		var more = branch.querySelector(':scope > [data-checktree-more]');
+		var link = more ? more.querySelector('a[href]') : null;
+		if (list && !list.firstElementChild && link && window.fetch && window.DOMParser && sameOrigin(link.href)) {
+			ctLoad(link, false);
+		}
+	}
+
+	doc.addEventListener('toggle', function (e) {
+		var branch = e.target;
+		if (branch && branch.classList && branch.classList.contains('checktree__branch') && branch.open) {
+			ctLazy(branch);
+		}
+	}, true);
+
+	/* поиск */
+
+	function ctSearchOf(set) {
+		var box = set.querySelector(':scope > [data-checktree-search]');
+		return box ? { input: box.querySelector('input'), button: box.querySelector('button') } : null;
+	}
+
+	function ctShowFound(set, found) {
+		var old = set.querySelector(':scope > [data-checktree-found]');
+		if (old) {
+			set.replaceChild(found, old);
+		} else {
+			var search = set.querySelector(':scope > [data-checktree-search]');
+			set.insertBefore(found, search ? search.nextSibling : set.firstChild);
+		}
+		var tree = set.querySelector(':scope > [data-checktree]');
+		var more = set.querySelector(':scope > [data-checktree-more]');
+		if (tree) {
+			tree.hidden = true;
+		}
+		if (more) {
+			more.hidden = true;
+		}
+		ctInit(found);
+		// совпадение показывает то же, что его двойник в дереве, а без двойника — правку
+		var edits = ctEdits(set);
+		var boxes = found.querySelectorAll('[data-checktree-box]');
+		for (var i = 0; i < boxes.length; i++) {
+			var key = ctKey(boxes[i]);
+			var twin = ctBoxes(set, key).filter(function (b) { return !found.contains(b); })[0];
+			var ed = edits.get('box:' + key);
+			var want = twin ? ctState(twin) : ed ? ed.kind : '';
+			if (want && ctState(boxes[i]) !== want) {
+				ctSet(boxes[i], want);
+			}
+		}
+		var groups = found.querySelectorAll('[data-checktree-modes]');
+		for (var g = 0; g < groups.length; g++) {
+			var me = edits.get('mode:' + groups[g].getAttribute('data-checktree-modes'));
+			if (me) {
+				ctPickMode(groups[g], me.value);
+			}
+		}
+		doc.dispatchEvent(new CustomEvent('oscript-ui:update', { detail: { url: location.href } }));
+	}
+
+	function ctUnfind(set) {
+		var found = set.querySelector(':scope > [data-checktree-found]');
+		var tree = set.querySelector(':scope > [data-checktree]');
+		if (!tree) {
+			return false; // ответ поиска напечатал сервер, веток на странице нет
+		}
+		if (found) {
+			set.removeChild(found);
+		}
+		tree.hidden = false;
+		var more = set.querySelector(':scope > [data-checktree-more]');
+		if (more) {
+			more.hidden = false;
+		}
+		return true;
+	}
+
+	function ctNative(button) {
+		var form = button.form;
+		if (form && form.requestSubmit) {
+			form[CT_NATIVE] = true;
+			form.requestSubmit(button);
+		}
+	}
+
+	// explicit — человек сам попросил искать (Enter, «Найти»): тогда неудача уводит
+	// в обычную отправку на адрес поиска, а ввод с паузой молча ждёт следующего.
+	function ctSearch(set, explicit) {
+		var parts = ctSearchOf(set);
+		if (!parts || !parts.input || !parts.button) {
+			return;
+		}
+		clearTimeout(ctTimer);
+		var q = parts.input.value.trim();
+		var seq = set[CT_SEQ] = (set[CT_SEQ] || 0) + 1;
+		if (!q) {
+			set.removeAttribute('aria-busy');
+			if (!ctUnfind(set) && explicit) {
+				ctNative(parts.button);
+			}
+			return;
+		}
+		var url = new URL(parts.button.getAttribute('formaction') || location.href, location.href);
+		if (!sameOrigin(url.href)) {
+			return;
+		}
+		url.searchParams.set(parts.input.name || 'найти', q);
+		set.setAttribute('aria-busy', 'true');
+		fetch(url.href, { credentials: 'same-origin', headers: { 'Accept': 'text/html' } })
+			.then(function (response) {
+				var type = response.headers.get('Content-Type') || '';
+				if (!response.ok || !/text\/html/i.test(type)) {
+					throw new Error('ответ поиска не пришёл');
+				}
+				return response.text();
+			})
+			.then(function (html) {
+				if (seq !== set[CT_SEQ]) {
+					return; // ответ устарел: человек уже набрал другое
+				}
+				var found = new DOMParser().parseFromString(html, 'text/html').querySelector('[data-checktree-found]');
+				if (!found) {
+					throw new Error('в ответе нет найденного');
+				}
+				ctShowFound(set, doc.importNode(found, true));
+			})
+			.catch(function () {
+				if (seq === set[CT_SEQ] && explicit) {
+					ctNative(parts.button);
+				}
+			})
+			.finally(function () {
+				if (seq === set[CT_SEQ]) {
+					set.removeAttribute('aria-busy');
+				}
+			});
+	}
+
+	function ctFoundAll(set, found, button) {
+		var buttons = found.querySelectorAll('.checktree__found-actions button');
+		var state = button === buttons[0] ? 'on' : 'off';
+		var boxes = found.querySelectorAll('[data-checktree-box]');
+		var changed = [];
+		for (var i = 0; i < boxes.length; i++) {
+			if (!boxes[i].disabled && ctState(boxes[i]) !== state) {
+				ctSet(boxes[i], state);
+				changed.push(boxes[i]);
+			}
+		}
+		ctSettle(set, changed);
+	}
+
+	// Перехват на window в фазе погружения — раньше подтверждения и тихой отправки (они
+	// слушают document): со скриптом «Найти» и «Включить / Снять найденные» форму
+	// не отправляют. Отправку, которую пустил к браузеру скрипт кита, не трогаем.
+	window.addEventListener('submit', function (e) {
+		var form = e.target;
+		if (!form || form[NATIVE]) {
+			return;
+		}
+		if (form[CT_NATIVE]) {
+			form[CT_NATIVE] = false;
+			return;
+		}
+		var button = e.submitter;
+		if (!button || !button.closest || !window.fetch || !window.DOMParser) {
+			return;
+		}
+		var search = button.closest('[data-checktree-search]');
+		var found = button.closest('[data-checktree-found]');
+		var set = search || found ? button.closest('[data-checktree-set]') : null;
+		if (!set) {
+			return;
+		}
+		e.preventDefault();
+		e.stopPropagation();
+		if (search) {
+			ctSearch(set, true);
+		} else {
+			ctFoundAll(set, found, button);
+		}
+	}, true);
+
+	function ctSearchSet(target) {
+		var box = target && target.tagName === 'INPUT' && target.closest
+			? target.closest('[data-checktree-search]') : null;
+		return box ? box.closest('[data-checktree-set]') : null;
+	}
+
+	doc.addEventListener('input', function (e) {
+		var set = ctSearchSet(e.target);
+		if (!set) {
+			return;
+		}
+		clearTimeout(ctTimer);
+		if (!e.target.value.trim()) {
+			ctSearch(set, false);
+			return;
+		}
+		ctTimer = setTimeout(function () { ctSearch(set, false); }, 400);
+	});
+
+	doc.addEventListener('keydown', function (e) {
+		var set = e.key === 'Enter' && !e.isComposing ? ctSearchSet(e.target) : null;
+		if (set) {
+			e.preventDefault();
+			ctSearch(set, true);
+		}
+	}, true);
+
+	/* отправка правок */
+
+	// Форма дерева data-checktree-edits-only отдаёт вместо галок и режимов правки: событие
+	// formdata приходит и к обычной отправке, и к тихой (FormData в разделе 6), поэтому
+	// разметку трогать не нужно — меняется только то, что уходит.
+	doc.addEventListener('formdata', function (e) {
+		var form = e.target;
+		var data = e.formData;
+		if (!form || !form.querySelectorAll || !data) {
+			return;
+		}
+		var sets = form.querySelectorAll('[data-checktree-set][data-checktree-edits-only]');
+		for (var s = 0; s < sets.length; s++) {
+			var all = sets[s].querySelectorAll('[data-checktree-box], [data-checktree-modes] input');
+			var names = {};
+			for (var i = 0; i < all.length; i++) {
+				if (all[i].name) {
+					names[all[i].name] = true;
+				}
+			}
+			Object.keys(names).forEach(function (name) { data.delete(name); });
+			data.set('правки', '1');
+			ctEdits(sets[s]).forEach(function (ed) {
+				if (ed.kind === 'on') {
+					data.append('включить', ed.key);
+				} else if (ed.kind === 'off') {
+					data.append('снять', ed.key);
+				} else {
+					data.append('режим', ed.key + ':' + ed.value);
+				}
+			});
+		}
+	}, true);
+
+	// Сброс формы (и удачная тихая отправка, раздел 6) возвращает галкам то, что напечатал
+	// сервер, — правки уходят вместе с ним. Ждём конца задачи: тихая отправка сбрасывает
+	// форму до морфинга, а свежие состояния сервер приносит морфингом.
+	doc.addEventListener('reset', function (e) {
+		var form = e.target;
+		if (!form || !form.querySelectorAll) {
+			return;
+		}
+		setTimeout(function () {
+			var boxes = form.querySelectorAll('[data-checktree-box]');
+			for (var i = 0; i < boxes.length; i++) {
+				boxes[i][CT_TOUCHED] = false;
+				boxes[i][CT_WHOLE] = '';
+				ctShow(boxes[i], ctOrigin(boxes[i]));
+			}
+			var sets = form.querySelectorAll('[data-checktree-set]');
+			for (var s = 0; s < sets.length; s++) {
+				ctEdits(sets[s]).clear();
+			}
+			ctInit(form);
+		}, 0);
+	}, true);
+
+	function ctInit(scope) {
+		var root = scope || doc;
+		var mixed = root.querySelectorAll('[data-checktree-box][aria-checked="mixed"]');
+		for (var i = 0; i < mixed.length; i++) {
+			if (!mixed[i][CT_TOUCHED]) {
+				ctShow(mixed[i], 'mixed');
+			}
+			mixed[i].removeAttribute('aria-checked');
+		}
+		var groups = root.querySelectorAll('[data-checktree-modes]');
+		for (var g = 0; g < groups.length; g++) {
+			ctModeLock(groups[g]);
+		}
+		var open = root.querySelectorAll('details.checktree__branch[open]');
+		for (var b = 0; b < open.length; b++) {
+			ctLazy(open[b]);
+		}
+		var sets = root.querySelectorAll('[data-checktree-set]');
+		for (var s = 0; s < sets.length; s++) {
+			ctPaint(sets[s]);
+		}
+	}
+
+	// Морфинг возвращает разметке серверный вид: «частично» снова приходит атрибутом,
+	// замки режимов снимаются — их ставим заново; правки живут в обёртке и переживают его.
+	doc.addEventListener('oscript-ui:update', function () {
+		ctInit(doc);
+	});
+	ctInit(doc);
 })();
