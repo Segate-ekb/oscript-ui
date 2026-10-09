@@ -429,6 +429,9 @@
 	}
 
 	function send(form, submitter, p, last) {
+		if (form.hasAttribute('data-theme-toggle')) {
+			return sendTheme(form, p, last);
+		}
 		return fetch(p.url, p.init).then(function (response) {
 			var type = response.headers.get('Content-Type') || '';
 			if (!/text\/html/i.test(type) || !sameOrigin(response.url)) {
@@ -443,6 +446,37 @@
 		}).catch(function () {
 			fallback(form, submitter, p, null);
 		});
+	}
+
+	// Форма темы. Тема уже перевёрнута на месте (flipTheme), куку ставит ответ сервера —
+	// больше от ответа ничего не нужно, и страницу он не трогает: сервер приложения отвечает
+	// перенаправлением «туда, откуда пришли», а не узнав откуда (Referer срезан политикой
+	// перехода), — на главную, и прежний путь ответа уводил человека со страницы. Из ответа
+	// берётся только сам переключатель — его значок и подсказка, которые выбирает сервер,
+	// — и только когда переключателей в ответе столько же, сколько на странице. Сбой сети
+	// тоже ничего не делает: тема на экране сменилась, а без куки следующая страница придёт
+	// в прежней — это лучше, чем перезагрузка посреди работы.
+	function sendTheme(form, p, last) {
+		return fetch(p.url, p.init).then(function (response) {
+			var type = response.headers.get('Content-Type') || '';
+			if (!response.ok || !/text\/html/i.test(type) || !sameOrigin(response.url)) {
+				return null;
+			}
+			return response.text().then(function (html) {
+				if (!last()) {
+					return;
+				}
+				var next = new DOMParser().parseFromString(html, 'text/html');
+				var mine = doc.querySelectorAll('form[data-theme-toggle]');
+				var theirs = next.querySelectorAll('form[data-theme-toggle]');
+				if (mine.length !== theirs.length) {
+					return;
+				}
+				for (var i = 0; i < mine.length; i++) {
+					morphNode(mine[i], theirs[i]);
+				}
+			});
+		}).catch(function () {});
 	}
 
 	function fallback(form, submitter, p, response) {
