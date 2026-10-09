@@ -146,10 +146,10 @@
 		+ "<legend class=""field__label"">Акцент</legend><div class=""swatches"" data-swatches-row hidden>"),
 		"корень: " + HTML).ЭтоИстина();
 	Ожидаем.Что(СтрНайти(HTML, "<label class=""swatches__item"" title=""Синий""><input type=""radio"""
-		+ " class=""swatches__radio"" name=""accent"" value=""#1a73e8"" form="""" style=""--swatch: #1a73e8"" checked>"
+		+ " class=""swatches__radio"" name=""accent"" value=""#1a73e8"" form="""" style=""--_swatch: #1a73e8"" checked>"
 		+ "<span class=""visually-hidden"">Синий</span></label>") > 0, "образец: " + HTML).ЭтоИстина();
 	Ожидаем.Что(СтрЧислоВхождений(HTML, " checked"), "отмечен один").Равно(1);
-	Ожидаем.Что(СтрНайти(HTML, "value=""#188038"" form="""" style=""--swatch: #188038"">") > 0, "второй образец")
+	Ожидаем.Что(СтрНайти(HTML, "value=""#188038"" form="""" style=""--_swatch: #188038"">") > 0, "второй образец")
 		.ЭтоИстина();
 	Ожидаем.Что(СтрНайти(HTML, "<input class=""field__control swatches__code"" type=""text"" name=""accent"""
 		+ " value=""#1A73E8"" pattern=""#[0-9A-Fa-f]{6}"" maxlength=""7"" placeholder=""По умолчанию"""
@@ -184,7 +184,7 @@
 	HTML = Синий().Значение("#123456").Рендер();
 
 	Ожидаем.Что(СтрНайти(HTML, " checked"), "образцы не отмечены").Равно(0);
-	Ожидаем.Что(СтрНайти(HTML, "<span class=""swatches__dot"" style=""--swatch: #123456""></span>") > 0,
+	Ожидаем.Что(СтрНайти(HTML, "<span class=""swatches__dot"" style=""--_swatch: #123456""></span>") > 0,
 		"кружок своего цвета: " + HTML).ЭтоИстина();
 	Ожидаем.Что(СтрНайти(HTML, "data-swatches-name>Свой</span>") > 0, "имя — «Свой»").ЭтоИстина();
 

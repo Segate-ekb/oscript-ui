@@ -785,6 +785,205 @@ textarea.field__control { min-height: calc(var(--space-8) * 2); resize: vertical
    способа отрисовки (легенда становится обычным flex-элементом и уезжает из рамки). */
 fieldset > * + * { margin-top: var(--space-2); }
 
+/* --- поля список и цвет (выпуск 0.12, шаги 14–15) ------------------------------------
+   СПИСОК. Без скрипта .chips-in — просто обёртка, и поле выглядит обычным текстовым:
+   подпись лежит поверх ввода, как у любого поля (позиционирована от .field), плашки
+   спрятаны атрибутом hidden. Скрипт ставит data-chips-live, и рамкой поля становится
+   .chips-in: та же заливка и линия снизу, что у контрола, подпись наверху, плашки встают
+   перед строкой ввода (order), ввод берёт остаток строки. В разметке ввод идёт ПЕРВЫМ:
+   подпись <label> связана с ним вложением, а крестики-кнопки лежат вне подписи.
+   Подпись здесь не прямой ребёнок .field, поэтому её состояния (фокус, отказ,
+   блокировка) повторены для вложенной. */
+.field--chips:focus-within .field__label { color: var(--md-sys-color-primary); }
+.field--chips.field--error .field__label { color: var(--md-sys-color-error); }
+.field--chips:has(.chips-in__input[disabled]) .field__label {
+	color: color-mix(in srgb, var(--md-sys-color-on-surface) var(--state-disabled-content), transparent);
+}
+.chips-in__list[hidden] { display: none; }
+.field--chips[data-chips-live] .chips-in {
+	--_bg: var(--md-sys-color-surface-container-highest);
+	--_state: 0%;
+	--_line: var(--md-sys-color-primary);
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space-1) var(--space-2);
+	min-height: 56px;
+	padding: 26px 12px 6px 16px;
+	background-color: color-mix(in srgb, var(--md-sys-color-on-surface) var(--_state), var(--_bg));
+	background-image: linear-gradient(var(--_line), var(--_line));
+	background-position: 50% 100%;
+	background-size: 0% 2px;
+	background-repeat: no-repeat;
+	border-bottom: 1px solid var(--md-sys-color-on-surface-variant);
+	border-radius: var(--md-sys-shape-corner-extra-small) var(--md-sys-shape-corner-extra-small) 0 0;
+	cursor: text;
+	transition: background-color var(--motion-fast) var(--motion-ease),
+	            background-size var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-emphasized-decelerate),
+	            border-color var(--motion-fast) var(--motion-ease);
+}
+.field--chips[data-chips-live] .chips-in:hover { --_state: var(--state-hover); border-bottom-color: var(--md-sys-color-on-surface); }
+.field--chips[data-chips-live] .chips-in:focus-within { background-size: 100% 2px; }
+.field--chips.field--error[data-chips-live] .chips-in {
+	--_line: var(--md-sys-color-error);
+	border-bottom-color: var(--md-sys-color-error);
+}
+.field--chips[data-chips-live] .chips-in__list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-1);
+	order: -1;
+	min-width: 0;
+	max-width: 100%;
+}
+.field--chips[data-chips-live] .chips-in__list:empty { display: none; }
+.field--chips[data-chips-live] .chips-in__entry { display: flex; flex: 1 1 8rem; min-width: 6rem; }
+.field--chips[data-chips-live] .chips-in__input {
+	min-height: 28px;
+	padding: 0;
+	background: none;
+	border: 0;
+	border-radius: 0;
+}
+/* Плашка значения — входной чип Material, уменьшенный под рамку поля: высота 28px,
+   скругление small, подпись label-large, крестик 24px со своим слоем состояния. Заливка
+   secondary-container отличает значение от строки ввода в любой теме. */
+.chips-in__chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	min-height: 28px;
+	max-width: 100%;
+	padding: 0 2px 0 var(--space-3);
+	border-radius: var(--md-sys-shape-corner-small);
+	font: var(--type-label-large);
+	letter-spacing: var(--md-sys-typescale-label-large-tracking);
+	color: var(--md-sys-color-on-secondary-container);
+	background: var(--md-sys-color-secondary-container);
+	cursor: default;
+}
+.chips-in__text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chips-in__remove {
+	--_state: 0%;
+	display: inline-grid;
+	place-items: center;
+	flex: none;
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	color: inherit;
+	background: color-mix(in srgb, currentColor var(--_state), transparent);
+	cursor: pointer;
+	transition: background-color var(--motion-fast) var(--motion-ease);
+}
+.chips-in__remove:hover { --_state: var(--state-hover); }
+.chips-in__remove:active { --_state: var(--state-pressed); }
+.chips-in__remove .icon { width: 18px; height: 18px; }
+.chips-in__remove[disabled] { display: none; }
+
+/* ЦВЕТ. Группа <fieldset>: подпись — <legend> обычным текстом над рядом (плавающей
+   подписи у группы нет), ряд образцов — радиокнопки-кружки, «свой» — кружок со скрытым
+   поверх него системным выбором цвета, под рядом — код и имя выбранного. Без скрипта ряд
+   спрятан, и остаётся поле кода. Цвет кружка — пользовательское свойство --_swatch из
+   разметки (только проверенный код #rrggbb). Отмеченный кружок обведён двойным кольцом:
+   зазор цветом поверхности и кольцо on-surface — видно и на светлом, и на тёмном
+   образце. Свой цвет отмечен, когда кружок «свой» показывает код, а ни одна
+   радиокнопка не отмечена. */
+.field--color { display: block; min-width: 0; margin: 0; padding: 0; border: 0; }
+.field.field--color > .field__label {
+	position: static;
+	max-width: none;
+	margin-bottom: var(--space-2);
+	padding: 0;
+	white-space: normal;
+	transform: none;
+	font: var(--type-body-medium);
+	letter-spacing: var(--md-sys-typescale-body-medium-tracking);
+}
+.swatches { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.swatches[hidden] { display: none; }
+.swatches__item {
+	position: relative;
+	display: inline-grid;
+	place-items: center;
+	width: 44px;
+	height: 44px;
+	border-radius: 50%;
+	cursor: pointer;
+}
+.swatches__radio, .swatches__dot {
+	/* цвет образца: разметка перекрывает его своим style, у кружка без цвета — заливка */
+	--_swatch: var(--md-sys-color-surface-container-highest);
+	-webkit-appearance: none;
+	appearance: none;
+	display: block;
+	width: 32px;
+	height: 32px;
+	margin: 0;
+	border-radius: 50%;
+	background: var(--_swatch);
+	box-shadow: inset 0 0 0 1px var(--md-sys-color-outline-variant);
+	cursor: pointer;
+	transition: box-shadow var(--motion-fast) var(--motion-ease);
+}
+.swatches__radio:checked,
+.field--color:not(:has(.swatches__radio:checked)) .swatches__dot[style] {
+	box-shadow: 0 0 0 2px var(--md-sys-color-surface), 0 0 0 4px var(--md-sys-color-on-surface);
+}
+/* «По умолчанию» — пустой кружок, перечёркнутый наискось: своего цвета у него нет. */
+.swatches__item--default .swatches__radio {
+	background: linear-gradient(to top right, transparent calc(50% - 1px),
+			var(--md-sys-color-outline) 0 calc(50% + 1px), transparent 0),
+		var(--md-sys-color-surface-container-highest);
+}
+/* «Свой» без своего цвета — кружок с плюсом из двух отрезков цветом on-surface-variant. */
+.swatches__item--own .swatches__dot:not([style]) {
+	background: linear-gradient(var(--md-sys-color-on-surface-variant), var(--md-sys-color-on-surface-variant))
+			center / 14px 2px no-repeat,
+		linear-gradient(var(--md-sys-color-on-surface-variant), var(--md-sys-color-on-surface-variant))
+			center / 2px 14px no-repeat,
+		var(--md-sys-color-surface-container-highest);
+}
+/* Системный выбор цвета лежит поверх кружка невидимым: нажатие открывает палитру движка,
+   а обводку фокуса за невидимое поле рисует кружок. */
+.swatches__picker {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	opacity: 0;
+	cursor: pointer;
+}
+.swatches__item--own:has(.swatches__picker:focus-visible) .swatches__dot {
+	outline: 3px solid var(--md-sys-color-secondary);
+	outline-offset: 2px;
+}
+.swatches__item:has(:disabled) { cursor: not-allowed; }
+.swatches__item:has(:disabled) > * {
+	cursor: not-allowed;
+	filter: grayscale(1);
+	opacity: .38;
+}
+.swatches__current { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.field--color .swatches__code {
+	flex: 0 1 10rem;
+	width: 10rem;
+	min-width: 8rem;
+	padding-top: 16px;
+	padding-bottom: 16px;
+	font-family: var(--md-ref-typeface-mono);
+}
+.swatches__name {
+	font: var(--type-body-medium);
+	letter-spacing: var(--md-sys-typescale-body-medium-tracking);
+	color: var(--md-sys-color-on-surface-variant);
+}
+
 /* --- компонент: тумблер (поле из двух состояний) ---
    Без JS: всё держится на :checked у настоящего <input type="checkbox">. Флажок НЕ
    скрыт через display:none — иначе он выпал бы из порядка фокуса и тумблер перестал
