@@ -343,6 +343,25 @@ async function рубрики(b) {
   await ctx.close();
 }
 
+// Пробел dev.4 п. 5: три сегмента с подписями в два слова на 390 — подписи целиком (перенос
+// во вторую строку), без многоточия и без выхода за экран.
+async function сегментыНаТелефоне(b) {
+  const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
+  const p = await ctx.newPage();
+  await p.goto(адрес('сегменты'), { waitUntil: 'networkidle' });
+  const з = await образец(p, 'Три подписи').locator('.docs-sample__preview .segments').evaluate((г) => ({
+    обрезано: [...г.querySelectorAll('.segments__text')].filter((т) => т.scrollWidth > т.clientWidth + 1).map((т) => т.textContent),
+    строк: Math.max(...[...г.querySelectorAll('.segments__text')].map((т) =>
+      Math.round(т.getBoundingClientRect().height / parseFloat(getComputedStyle(т).lineHeight)))),
+    право: Math.round(г.getBoundingClientRect().right), экран: innerWidth,
+  }));
+  проверить(з.обрезано.length === 0, `сегменты 390: подписи целиком (обрезаны: ${з.обрезано.join(', ') || 'нет'})`);
+  проверить(з.строк <= 2, `сегменты 390: не больше двух строк, слово не рвётся (${з.строк})`);
+  проверить(з.право <= з.экран, `сегменты 390: группа в пределах экрана (${з.право})`);
+  await образец(p, 'Три подписи').screenshot({ path: path.join(OUT, 'сегменты-390.png') });
+  await ctx.close();
+}
+
 (async () => {
   const b = await браузер();
   try {
@@ -354,6 +373,7 @@ async function рубрики(b) {
     await ссылкиВТексте(b);
     await целиКасания(b);
     await рубрики(b);
+    await сегментыНаТелефоне(b);
   } finally {
     await b.close();
   }

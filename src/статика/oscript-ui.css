@@ -3748,6 +3748,16 @@ div.entry__head:hover { --_state: 0%; }
 	letter-spacing: var(--md-sys-typescale-label-medium-tracking);
 }
 .segments--small .segments__input:checked + .segments__label .segments__check { margin-right: var(--space-1); }
+/* На телефоне подпись сегмента не обрезается многоточием, а переносится во вторую строку:
+   три сегмента с подписями в два-три слова на 390 резали каждую до «Свет…» (пробел хаба
+   dev.4, п. 5). Пилюля растёт в высоту, скругление full остаётся круглым.
+   Группа встаёт во всю ширину равными колонками: при колонках по содержимому выбранный
+   сегмент с галкой оставался самым узким и рвал слово посередине. */
+@media (max-width: 600px) {
+	.segments { display: grid; grid-auto-columns: minmax(0, 1fr); width: 100%; }
+	.segments__label { padding: var(--space-1) var(--space-2); }
+	.segments__text { white-space: normal; text-overflow: clip; overflow-wrap: break-word; text-align: center; }
+}
 
 /* Наборы полей под сегментами. Панель номер N видна, пока отмечен сегмент номер N: лист
    сопоставляет их по номеру, правила перечислены до восьми сегментов (столько же
