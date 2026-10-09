@@ -50,18 +50,22 @@ async function шаг6и7(b) {
   await p.goto(ОБРАЗЕЦ, { waitUntil: 'networkidle' });
   await пометить(p);
 
-  // шаг 6: открывашка, имя окна, Esc и возврат фокуса
-  const открывашка = p.locator('button[command="show-modal"][commandfor="novyi-proekt"]');
+  // шаг 6: открывашка, имя окна, Esc и возврат фокуса. Открывашка — ссылка на ?окно=новый
+  // с data-opens (dev.3): скрипт открывает окно страницы на месте, без перехода
+  const открывашка = p.locator('a[data-opens="novyi-proekt"]');
+  проверить(decodeURIComponent(await открывашка.getAttribute('href')) === '/образец-окон?окно=новый',
+    '6: открывашка — ссылка на страницу с окном');
   await открывашка.click();
   let окно = await открытоеОкно(p);
   проверить(окно && окно.id === 'novyi-proekt' && окно.модальное, '6: кнопка открыла окно модальным');
+  проверить(await безПерезагрузки(p) && !decodeURIComponent(p.url()).includes('окно='), '6: окно открыто без перехода');
   проверить(окно && окно.имя === 'Новый проект', '6: окно названо заголовком (aria-labelledby)');
   const порядок = await p.evaluate(() => [...document.querySelector('#novyi-proekt .modal__box').children]
     .map((э) => э.className.split(' ')[0]).filter(Boolean).join(','));
   проверить(порядок === 'modal__head,modal__lead,modal__body,modal__actions', '6: слоты по порядку: ' + порядок);
   await p.keyboard.press('Escape');
   проверить(!(await открытоеОкно(p)), '6: Esc закрыл окно');
-  проверить(await p.evaluate(() => document.activeElement.getAttribute('commandfor') === 'novyi-proekt'),
+  проверить(await p.evaluate(() => document.activeElement.getAttribute('data-opens') === 'novyi-proekt'),
     '6: фокус вернулся на открывашку');
 
   // шаг 7: 400 — окно открыто, поле отбито, введённое на месте
@@ -88,7 +92,7 @@ async function шаг6и7(b) {
   проверить(фокус.tr && фокус.текст.startsWith('Дельта'), '7: новая запись в фокусе: ' + фокус.текст.slice(0, 20));
   проверить(await безПерезагрузки(p), '7: без перезагрузки (303)');
   проверить(decodeURIComponent(p.url()).includes('добавлено=Дельта'), '7: адрес вкладки — адрес ответа');
-  await p.click('button[command="show-modal"][commandfor="novyi-proekt"]');
+  await p.click('a[data-opens="novyi-proekt"]');
   проверить(await p.inputValue('#novyi-proekt-name') === '', '7: удачная форма сброшена');
   await ctx.close();
 }
@@ -180,11 +184,15 @@ async function безСкрипта(b) {
   let p = await ctx.newPage();
   await p.goto(ОБРАЗЕЦ, { waitUntil: 'networkidle' });
 
-  // окно открывает движок, форма уходит обычным POST
-  await p.click('button[command="show-modal"][commandfor="novyi-proekt"]');
-  проверить(await p.evaluate(() => document.getElementById('novyi-proekt').open), 'без JS: команда движка открыла окно');
-  await p.fill('#novyi-proekt-name', 'Я');
-  await p.click('#novyi-proekt .modal__actions button[type=submit]');
+  // ссылка окна ведёт на страницу, где сервер печатает окно открытым; форма уходит обычным POST
+  await p.click('a[data-opens="novyi-proekt"]');
+  await p.waitForLoadState('networkidle');
+  проверить(decodeURIComponent(p.url()).includes('окно=новый')
+    && await p.evaluate(() => document.getElementById('novyi-proekt').open), 'без JS: ссылка окна ведёт на страницу с окном открытым');
+  // headless без скрипта после навигации в той же вкладке не рисует кадров — щелчок без
+  // проверки «элемент устоялся»
+  await p.fill('#novyi-proekt-name', 'Я', { force: true });
+  await p.click('#novyi-proekt .modal__actions button[type=submit]', { force: true });
   await p.waitForLoadState('networkidle');
   проверить(await p.evaluate(() => document.getElementById('novyi-proekt').hasAttribute('open')
     && !!document.querySelector('#novyi-proekt [aria-invalid="true"]')), 'без JS: 400 — страница с окном открытым');
@@ -227,6 +235,11 @@ async function страницаОкно(b) {
   await p.click('button[command="show-modal"][commandfor="novyi-proekt-obrazec"]');
   проверить((await открытоеОкно(p) || {}).id === 'novyi-proekt-obrazec', 'страница «Окно»: образец открывается');
   await p.keyboard.press('Escape');
+  await пометить(p);
+  await p.click('a[data-opens="novyi-proekt-ssylkoi"]');
+  проверить((await открытоеОкно(p) || {}).id === 'novyi-proekt-ssylkoi' && await безПерезагрузки(p),
+    'страница «Окно»: ссылка окна открывает его на месте');
+  await p.keyboard.press('Escape');
   проверить(await p.locator('[data-window-shell]').count() === 1, 'страница «Окно»: оболочка для содержимого строкой');
   await p.locator('a[data-window-link]').first().click();
   await p.waitForSelector('dialog[data-window-shell][open]');
@@ -242,7 +255,7 @@ async function снимки(b) {
       await p.goto(ОБРАЗЕЦ, { waitUntil: 'networkidle' });
       await p.evaluate((т) => { document.documentElement.dataset.theme = т; }, тема);
       const имя = `${ширина}-${тема}`;
-      await p.click('button[command="show-modal"][commandfor="novyi-proekt"]');
+      await p.click('a[data-opens="novyi-proekt"]');
       await p.waitForTimeout(400);
       if (ширина <= 640) {
         const лист = await p.evaluate(() => {
