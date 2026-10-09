@@ -4039,6 +4039,16 @@ fieldset > legend + .segments__origin + .segments { display: grid; width: fit-co
 	overflow-wrap: anywhere;
 }
 
+/* Отказ сервера под строкой состояния (слово Ошибка, 0.13 дев-сборка 6) — как отказ под
+   полем: мелко, цветом error; рамку слот не перекрашивает — отказ касается файла, а не места. */
+.imgslot__error {
+	margin: var(--space-1) 0 0;
+	font: var(--type-body-small);
+	letter-spacing: var(--md-sys-typescale-body-small-tracking);
+	color: var(--md-sys-color-error);
+	overflow-wrap: anywhere;
+}
+
 .imgslot__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .imgslot__pick { display: inline-flex; position: relative; min-width: 0; }
 .imgslot .imgslot__face { display: none; }

@@ -118,10 +118,44 @@ async function источникСегментов(b) {
   }
 }
 
+// Отказ слота картинки: файл не картинки уходит тихо, сервер отвечает 422 со слотом с отказом,
+// и отказ встаёт под строкой состояния цветом ошибки; поле помечено негодным. Страница не
+// перезагружается.
+async function отказСлота(b) {
+  const файл = path.join(require('os').tmpdir(), 'отчёт-проба.txt');
+  fs.writeFileSync(файл, 'не картинка');
+  const { ctx, p } = await страница(b, 'образец-картинки', 1280);
+  await p.evaluate(() => { window.__та_же = true; });
+  const ответы = [];
+  p.on('response', (r) => { if (r.request().method() === 'POST') ответы.push(r.status()); });
+  await p.setInputFiles('#slot-logo .imgslot__file', файл);
+  await p.waitForSelector('#slot-logo .imgslot__error', { timeout: 8000 }).catch(() => {});
+  const з = await p.evaluate(() => {
+    const о = document.querySelector('#slot-logo .imgslot__error');
+    const поле = document.querySelector('#slot-logo .imgslot__file');
+    const с = document.querySelector('#slot-logo .imgslot__state');
+    return {
+      текст: о ? о.textContent : '', цвет: о ? getComputedStyle(о).color : '',
+      ошибка: getComputedStyle(document.documentElement).getPropertyValue('--md-sys-color-error').trim(),
+      недействительно: поле.getAttribute('aria-invalid'), описание: поле.getAttribute('aria-describedby'),
+      подСостоянием: о && с ? о.getBoundingClientRect().top >= с.getBoundingClientRect().bottom - 0.5 : false,
+      таЖе: window.__та_же === true,
+    };
+  });
+  проверить(ответы.includes(422), `слот: сервер ответил отказом 422 (${ответы.join(', ')})`);
+  проверить(/отчёт-проба\.txt.*не картинка/.test(з.текст), `слот: отказ под слотом словами («${з.текст}»)`);
+  проверить(з.подСостоянием, 'слот: отказ под строкой состояния');
+  проверить(з.недействительно === 'true' && /-error/.test(з.описание || ''), `слот: поле негодно и описано отказом (${з.описание})`);
+  проверить(з.таЖе, 'слот: отказ лёг на страницу без перезагрузки');
+  await p.locator('#slot-logo').screenshot({ path: path.join(OUT, 'отказ-слота-1280.png') });
+  await ctx.close();
+}
+
 (async () => {
   const b = await браузер();
   await колонкаЧисел(b);
   await источникСегментов(b);
+  await отказСлота(b);
   await b.close();
   if (беды.length) {
     console.log(`\n${беды.length} бед`);
