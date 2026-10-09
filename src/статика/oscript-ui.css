@@ -3647,6 +3647,13 @@ div.entry__head:hover { --_state: 0%; }
 .field-help:has(> .field--check) { flex-direction: row; align-items: flex-start; }
 .field-help > .field--check { flex: 0 1 auto; }
 .field-help:has(> .field--check) > .help { position: static; margin: -2px 0 0 var(--space-1); }
+/* Справка у списка и цвета (выпуск 0.12): строка ввода списка не прямой ребёнок поля,
+   поэтому место под значок оставляют её рамка (со скриптом) и сам ввод (без него) —
+   иначе значок лёг бы на плашки и текст. У цвета рамки нет: значок стоит в строке
+   подписи, над рядом образцов, которые иначе дотянулись бы до него. */
+.field-help > .field--chips:not([data-chips-live]) .field__control { padding-right: 48px; }
+.field-help > .field--chips[data-chips-live] .chips-in { padding-right: 48px; }
+.field-help:has(> .field--color) > .help { top: -2px; right: 0; }
 
 /* --- проверка до отправки и тост (выпуск 0.12, шаги 18 и 19) ----------------------------
    Отказ до отправки скрипт пишет в тот же field__error и ставит тот же field--error, что
