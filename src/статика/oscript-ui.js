@@ -552,6 +552,7 @@
 		var toastsBefore = toastSnapshot(); // проверка до отправки и тост (выпуск 0.12)
 		morphChildren(doc.body, next.body);
 		syncAttributes(doc.body, next.body);
+		settleWindows(next); // окна ответа (0.13, дев-сборка 5)
 
 		if (moved) {
 			history.pushState({ oscriptUi: true }, '', url.href + here.hash);
@@ -567,6 +568,50 @@
 		if (closing) {
 			focusMarked();
 		}
+	}
+
+	// Окна после ответа. Морфинг держит открытость окна за браузером (KEEP): сервер о ней не
+	// знает. Но ответ, который сам печатает окно открытым («ключ выпущен — скопируйте его
+	// сейчас»), говорит об окнах прямо, и без этого шага он не ложился на страницу: новое окно
+	// оставалось закрытым, а старое — открытым, или открытая оболочка окна по адресу
+	// оставалась пустой (пробел хаба dev.4, п. 3). Поэтому:
+	//   — открытое окно, которого в ответе нет, и пустая после морфинга оболочка закрываются;
+	//   — открытое окно, которое ответ печатает закрытым, закрывается, когда ответ открывает
+	//     другое окно: окно поверх окна кит не держит;
+	//   — окно, которое ответ печатает открытым, открывается модальным (lift).
+	function settleWindows(next) {
+		var fresh = [];
+		var printed = next.querySelectorAll('dialog.modal[open][id]');
+		for (var i = 0; i < printed.length; i++) {
+			var mine = doc.getElementById(printed[i].id);
+			if (mine && mine.tagName === 'DIALOG') {
+				fresh.push(mine);
+			}
+		}
+		var open = doc.querySelectorAll('dialog.modal[open]');
+		for (var j = 0; j < open.length; j++) {
+			var d = open[j];
+			if (fresh.indexOf(d) >= 0) {
+				continue;
+			}
+			var gone;
+			if (d.matches(SHELL)) {
+				gone = !d.querySelector('.modal__box');
+			} else {
+				var twin = d.id ? next.getElementById(d.id) : null;
+				gone = !twin || fresh.length > 0;
+			}
+			if (gone) {
+				d.close();
+			}
+		}
+		for (var k = 0; k < fresh.length; k++) {
+			if (!fresh[k].open && fresh[k].showModal) {
+				prepareConfirm(fresh[k]);
+				fresh[k].showModal();
+			}
+		}
+		lift();
 	}
 
 	// Окно формы — то, в котором стоит кнопка отправки (подтверждение отправляет форму вне
@@ -793,7 +838,7 @@
 	//     показывает тост ошибки, напечатанный сервером рядом с оболочкой (data-window-error);
 	//   — подтверждение (data-confirm у формы): отправка формы открывает окно подтверждения,
 	//     а уходит форма его кнопкой; эхо-поле держит эту кнопку недоступной до совпадения.
-	// Закрытие окна по успеху тихой отправки — в разделе 6 (land).
+	// Закрытие окна по успеху тихой отправки и окна ответа — в разделе 6 (land, settleWindows).
 
 	var COMMANDS = !!(window.HTMLButtonElement && 'command' in HTMLButtonElement.prototype);
 	var SHELL = '[data-window-shell]';

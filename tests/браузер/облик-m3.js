@@ -386,6 +386,40 @@ async function тумблерСоСправкой(b) {
   }
 }
 
+// Пробел dev.4 п. 3: ответ тихой отправки 2xx без перенаправления, который сам печатает
+// другое окно открытым («ключ выпущен»), ложится на страницу: окно формы закрывается, окно
+// ответа открывается модальным. Ответ подменён перехватом: страница образца окон с открытым
+// окном «Проект создан» — так отвечает приложение, которое показывает результат окном.
+async function окноОтвета(b) {
+  const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
+  const p = await ctx.newPage();
+  const адресОбразца = адрес('образец-окон');
+  const страница = await (await ctx.request.get(адресОбразца)).text();
+  const ответ = страница.replace('</main>', '<dialog class="modal" id="gotovo" open aria-labelledby="gotovo-title">'
+    + '<div class="modal__box"><div class="modal__head"><h2 class="modal__title" id="gotovo-title">Проект создан</h2></div>'
+    + '<div class="modal__body"><p>Ключ проекта: <code>k-42</code></p></div></div></dialog></main>');
+  await p.route((u) => u.href.startsWith(адресОбразца), (r) => (r.request().method() === 'POST'
+    ? r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: ответ }) : r.fallback()));
+  await p.goto(адресОбразца, { waitUntil: 'networkidle' });
+  await p.evaluate(() => { window.__метка = 1; });
+  await p.click('a[data-opens="novyi-proekt"]');
+  await p.fill('#novyi-proekt input[name="name"]', 'Гамма');
+  await p.locator('#novyi-proekt button[type="submit"]').first().click();
+  await p.waitForSelector('#gotovo', { state: 'attached' });
+  await p.waitForTimeout(400);
+  const з = await p.evaluate(() => ({
+    форма: document.getElementById('novyi-proekt').open,
+    готово: document.getElementById('gotovo').open,
+    модальное: document.getElementById('gotovo').matches(':modal'),
+    безПерезагрузки: window.__метка === 1,
+  }));
+  проверить(з.безПерезагрузки, 'окно ответа: страница не перезагружалась');
+  проверить(!з.форма, 'окно ответа: окно формы закрылось');
+  проверить(з.готово && з.модальное, 'окно ответа: окно, напечатанное ответом открытым, поднято модальным');
+  await p.screenshot({ path: path.join(OUT, 'окно-ответа-1280.png') });
+  await ctx.close();
+}
+
 (async () => {
   const b = await браузер();
   try {
@@ -399,6 +433,7 @@ async function тумблерСоСправкой(b) {
     await рубрики(b);
     await сегментыНаТелефоне(b);
     await тумблерСоСправкой(b);
+    await окноОтвета(b);
   } finally {
     await b.close();
   }
