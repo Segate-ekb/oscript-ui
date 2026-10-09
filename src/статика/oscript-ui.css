@@ -3,8 +3,8 @@
  * тени уровнями возвышения, наведение и нажатие слоями состояний — всё токенами
  * --md-sys-*, которые печатает ТокеныТемы.
  *
- * ДВИЖЕНИЕ — ПО ОБРАЗЦУ MUI. Слой состояний, плавающая подпись поля, растущая полоса
- * фокуса, раскрытие меню и окна, выезд шторки, скольжение индикатора вкладок — CSS.
+ * ДВИЖЕНИЕ — ПО ОБРАЗЦУ MUI. Слой состояний, плавающая подпись поля, рамка фокуса
+ * поля, раскрытие меню и окна, выезд шторки, скольжение индикатора вкладок — CSS.
  * Рябь от точки нажатия, пустота поля и тень шапки при прокрутке — скрипт кита
  * (oscript-ui.js). Без скрипта всё работает и выглядит законченным: подпись поля просто
  * стоит наверху, а ряби нет.
@@ -492,11 +492,12 @@ h3 {
 
 /* Карточка Material, приподнятая (elevated): поверхность --surface-card (surface-container-low,
    в тёмной теме на тон выше), кольцо 1px outline-variant поверх тени уровня 1 — контур
-   виден и там, где тень на тёмном фоне пропадает; скругление medium. */
+   виден и там, где тень на тёмном фоне пропадает; скругление large (16px) — у самой крупной
+   поверхности экрана самый мягкий угол. */
 .card {
 	background: var(--surface-card);
 	color: var(--md-sys-color-on-surface);
-	border-radius: var(--md-sys-shape-corner-medium);
+	border-radius: var(--md-sys-shape-corner-large);
 	box-shadow: var(--elevation-ring-level1);
 	padding: var(--space-5);
 	margin-bottom: var(--space-4);
@@ -609,11 +610,13 @@ h3 {
    отбора и с подписью источника. Задавая gap, не забудь про display: flex — без
    flex-контекста gap инертен, и правило выглядит рабочим, ничего не делая. */
 
-/* ТЕКСТОВОЕ ПОЛЕ MATERIAL, ЗАЛИТОЕ (filled). Контейнер surface-container-highest
-   со скруглёнными верхними углами и линией-индикатором снизу; подпись лежит ВНУТРИ
-   контейнера. На фокусе индикатор растёт от середины до краёв цветом primary — это
-   градиент фоном самого контрола (background-size 0 → 100%), отдельного элемента под
-   линию разметке не нужно.
+/* ТЕКСТОВОЕ ПОЛЕ MATERIAL, ЗАЛИТОЕ (filled), но в рамке. Контейнер
+   surface-container-highest, скругление small (8px) по всем углам и рамка 1px
+   outline-variant; подпись лежит ВНУТРИ контейнера. На фокусе рамка — 2px primary:
+   вторым пикселем служит кольцо внутрь (inset box-shadow), поэтому содержимое не
+   сдвигается. Плоский низ и линия-индикатор залитого поля M3 сняты: рядом с карточками
+   в 16px и пилюлями-плашками поле с прямыми нижними углами читалось «квадратно», а линия
+   без рамки на тёмной теме терялась.
    Подпись плавает: у пустого поля без фокуса она стоит на месте значения во весь кегль,
    у заполненного или в фокусе — уменьшается и поднимается к верхнему краю. Пустоту
    отмечает скрипт кита атрибутом data-empty; без скрипта атрибута нет, и подпись
@@ -625,7 +628,7 @@ h3 {
 .field__label {
 	position: absolute;
 	top: 11px;
-	left: 16px;
+	left: 17px; /* рамка 1px и отступ 16px контрола: подпись стоит ровно над значением */
 	z-index: 1;
 	max-width: calc(100% - 32px);
 	overflow: hidden;
@@ -657,29 +660,28 @@ h3 {
 	--_line: var(--md-sys-color-primary);
 	width: 100%;
 	min-height: 44px;
-	padding: 18px 16px 3px;
+	padding: 17px 16px 3px;
 	font: var(--type-body-large);
 	letter-spacing: var(--md-sys-typescale-body-large-tracking);
 	color: var(--md-sys-color-on-surface);
 	background-color: color-mix(in srgb, var(--md-sys-color-on-surface) var(--_state), var(--_bg));
-	background-image: linear-gradient(var(--_line), var(--_line));
-	background-position: 50% 100%;
-	background-size: 0% 2px;
-	background-repeat: no-repeat;
-	border: 0;
-	border-bottom: 1px solid var(--md-sys-color-on-surface-variant);
-	border-radius: var(--md-sys-shape-corner-extra-small) var(--md-sys-shape-corner-extra-small) 0 0;
+	border: 1px solid var(--md-sys-color-outline-variant);
+	border-radius: var(--md-sys-shape-corner-small);
 	outline: none;
 	caret-color: var(--md-sys-color-primary);
 	transition: background-color var(--motion-fast) var(--motion-ease),
-	            background-size var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-emphasized-decelerate),
+	            box-shadow var(--motion-fast) var(--motion-ease),
 	            border-color var(--motion-fast) var(--motion-ease);
 }
-.field__control:hover:not([disabled]) { --_state: var(--state-hover); border-bottom-color: var(--md-sys-color-on-surface); }
-.field__control:focus, .field__control:focus-visible { background-size: 100% 2px; outline: none; }
+.field__control:hover:not([disabled]) { --_state: var(--state-hover); border-color: var(--md-sys-color-on-surface-variant); }
+.field__control:focus, .field__control:focus-visible {
+	border-color: var(--_line);
+	box-shadow: inset 0 0 0 1px var(--_line);
+	outline: none;
+}
 /* Поле без подписи: значению наверху делать нечего, оно садится посередине. :has() обёрнут
    в :is(): движок без :has() выбросил бы и всё остальное правило. */
-.field:is(:not(:has(> .field__label))) > .field__control { padding-top: 11px; padding-bottom: 10px; }
+.field:is(:not(:has(> .field__label))) > .field__control { padding-top: 10px; padding-bottom: 10px; }
 /* Выпадающий список — свой шеврон справа: системная стрелка снята, и место под ней тоже. */
 select.field__control { -webkit-appearance: none; appearance: none; padding-right: 48px; cursor: pointer; }
 .field:has(> select.field__control)::after {
@@ -697,7 +699,7 @@ select.field__control { -webkit-appearance: none; appearance: none; padding-righ
 .field__control[disabled] {
 	--_bg: color-mix(in srgb, var(--md-sys-color-on-surface) 4%, transparent);
 	color: color-mix(in srgb, var(--md-sys-color-on-surface) var(--state-disabled-content), transparent);
-	border-bottom-color: color-mix(in srgb, var(--md-sys-color-on-surface) var(--state-disabled-content), transparent);
+	border-color: color-mix(in srgb, var(--md-sys-color-on-surface) var(--state-disabled-container), transparent);
 	cursor: not-allowed;
 }
 .field:has(> .field__control[disabled]) > .field__label {
@@ -740,7 +742,7 @@ select.field__control { -webkit-appearance: none; appearance: none; padding-righ
 	letter-spacing: var(--md-sys-typescale-body-small-tracking);
 	color: var(--md-sys-color-error);
 }
-.field--error .field__control { --_line: var(--md-sys-color-error); border-bottom-color: var(--md-sys-color-error); caret-color: var(--md-sys-color-error); }
+.field--error .field__control { --_line: var(--md-sys-color-error); border-color: var(--md-sys-color-error); caret-color: var(--md-sys-color-error); }
 .field--error > .field__label,
 .field--error:focus-within > .field__label { color: var(--md-sys-color-error); }
 /* Флажок — сетка в две колонки: галка слева, подпись справа, пояснение и отказ — под
@@ -838,24 +840,20 @@ fieldset > * + * { margin-top: var(--space-2); }
 	align-items: center;
 	gap: var(--space-1) var(--space-2);
 	min-height: 44px;
-	padding: 18px 12px 3px 16px;
+	padding: 17px 12px 3px 16px;
 	background-color: color-mix(in srgb, var(--md-sys-color-on-surface) var(--_state), var(--_bg));
-	background-image: linear-gradient(var(--_line), var(--_line));
-	background-position: 50% 100%;
-	background-size: 0% 2px;
-	background-repeat: no-repeat;
-	border-bottom: 1px solid var(--md-sys-color-on-surface-variant);
-	border-radius: var(--md-sys-shape-corner-extra-small) var(--md-sys-shape-corner-extra-small) 0 0;
+	border: 1px solid var(--md-sys-color-outline-variant);
+	border-radius: var(--md-sys-shape-corner-small);
 	cursor: text;
 	transition: background-color var(--motion-fast) var(--motion-ease),
-	            background-size var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-emphasized-decelerate),
+	            box-shadow var(--motion-fast) var(--motion-ease),
 	            border-color var(--motion-fast) var(--motion-ease);
 }
-.field--chips[data-chips-live] .chips-in:hover { --_state: var(--state-hover); border-bottom-color: var(--md-sys-color-on-surface); }
-.field--chips[data-chips-live] .chips-in:focus-within { background-size: 100% 2px; }
+.field--chips[data-chips-live] .chips-in:hover { --_state: var(--state-hover); border-color: var(--md-sys-color-on-surface-variant); }
+.field--chips[data-chips-live] .chips-in:focus-within { border-color: var(--_line); box-shadow: inset 0 0 0 1px var(--_line); }
 .field--chips.field--error[data-chips-live] .chips-in {
 	--_line: var(--md-sys-color-error);
-	border-bottom-color: var(--md-sys-color-error);
+	border-color: var(--md-sys-color-error);
 }
 .field--chips[data-chips-live] .chips-in__list {
 	display: flex;
@@ -1003,7 +1001,7 @@ fieldset > * + * { margin-top: var(--space-2); }
 	flex: 0 1 10rem;
 	width: 10rem;
 	min-width: 8rem;
-	padding-top: 11px;
+	padding-top: 10px;
 	padding-bottom: 10px;
 	font-family: var(--md-ref-typeface-mono);
 }
@@ -1297,7 +1295,7 @@ tbody tr.row-accent.table__record:hover + .table__expand { background: color-mix
 /* --- компонент: плашка --- */
 
 /* Плашка — малый чип Material: высота 22px (плотнее 24 спецификации, чтобы плашка в строке
-   текста не раздвигала её), скругление small, подпись label-medium.
+   текста не раздвигала её), пилюля, подпись label-medium.
    Нейтральная — контейнер surface-container-highest, статусные — тональные контейнеры
    своих ролей: цвет узнаётся заливкой, а текст на ней остаётся читаемым. */
 .tag {
@@ -1309,7 +1307,7 @@ tbody tr.row-accent.table__record:hover + .table__expand { background: color-mix
 	gap: var(--space-1);
 	min-height: 22px;
 	padding: 0 var(--space-2);
-	border-radius: var(--md-sys-shape-corner-small);
+	border-radius: var(--md-sys-shape-corner-full);
 	font: var(--type-label-medium);
 	letter-spacing: var(--md-sys-typescale-label-medium-tracking);
 	background-color: color-mix(in srgb, currentColor var(--_state), var(--_bg));
@@ -1933,7 +1931,7 @@ span.checktree__item { cursor: default; }
 
 /* Нативная пипетка рисует сплошную заливку во всю площадь ввода: у поля кита
    с его паддингом она выглядела бы серой рамкой вокруг цветного пятна. */
-input[type="color"].field__control { padding: 18px 12px 3px; height: 44px; cursor: pointer; }
+input[type="color"].field__control { padding: 17px 12px 3px; height: 44px; cursor: pointer; }
 
 /* Подпись только для скринридера: видимая часть меню — символ «⋯», и без текстовой
    пары кнопка безымянна (та же беда, что у кнопки-иконки в ките). */
@@ -2186,7 +2184,7 @@ form[data-quiet][aria-busy="true"] { cursor: progress; }
 	flex-direction: column;
 	height: 100%;
 	background: var(--surface-card);
-	border-radius: var(--md-sys-shape-corner-medium);
+	border-radius: var(--md-sys-shape-corner-large);
 	box-shadow: var(--elevation-ring-level1);
 	padding: var(--space-3) var(--space-4);
 	transition: box-shadow var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-standard);
@@ -2291,7 +2289,7 @@ form[data-quiet][aria-busy="true"] { cursor: progress; }
 	position: relative;
 	background: var(--surface-card);
 	border: 0;
-	border-radius: var(--md-sys-shape-corner-medium);
+	border-radius: var(--md-sys-shape-corner-large);
 	box-shadow: var(--elevation-ring-level1);
 	padding: var(--space-4) var(--space-5);
 	min-width: 140px;
@@ -2417,7 +2415,7 @@ form[data-quiet][aria-busy="true"] { cursor: progress; }
 .chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
 /* Чип фильтра Material: высота 28px (плотнее 32 спецификации — ряд чипов над списком не
-   должен быть выше строки списка), скругление small, обводка outline-variant;
+   должен быть выше строки списка), пилюля, обводка outline-variant;
    выбранный — заливка secondary-container без обводки и галочка перед подписью. */
 .chip {
 	--_bg: transparent;
@@ -2429,7 +2427,7 @@ form[data-quiet][aria-busy="true"] { cursor: progress; }
 	min-height: 28px;
 	padding: 0 var(--space-4);
 	border: 1px solid var(--md-sys-color-outline-variant);
-	border-radius: var(--md-sys-shape-corner-small);
+	border-radius: var(--md-sys-shape-corner-full);
 	background-color: color-mix(in srgb, currentColor var(--_state), var(--_bg));
 	color: var(--md-sys-color-on-surface-variant);
 	font: var(--type-label-large);
@@ -2461,7 +2459,7 @@ form[data-quiet][aria-busy="true"] { cursor: progress; }
 /* Свёрнутая группа списка: раскрытие без JS. */
 .fold {
 	background: var(--surface-card);
-	border-radius: var(--md-sys-shape-corner-medium);
+	border-radius: var(--md-sys-shape-corner-large);
 	box-shadow: var(--elevation-ring-level1);
 	padding: var(--space-3) var(--space-4);
 	margin-top: var(--space-4);
@@ -2546,7 +2544,7 @@ form[data-quiet][aria-busy="true"] { cursor: progress; }
    outline-variant без тени — в тёмной теме секция иначе сливалась с фоном. */
 .section {
 	background: var(--surface-card);
-	border-radius: var(--md-sys-shape-corner-medium);
+	border-radius: var(--md-sys-shape-corner-large);
 	box-shadow: var(--elevation-ring);
 	padding: var(--space-5);
 	margin-bottom: var(--space-4);
