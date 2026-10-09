@@ -18,6 +18,9 @@
  *      сервер напечатал открытым, — модальным, окно по адресу (data-window-link) в одной
  *      на страницу оболочке и подтверждение отправки формы (data-confirm).
  *   8. шаги (data-steps) — одна панель длинной формы за раз, «Дальше» проверяет поля шага.
+ *   9. поле-список (data-chips) — значения плашками, Enter и запятая добавляют плашку,
+ *      строка через запятую уходит скрытым полем; поле цвета (data-swatches) — ряд
+ *      образцов в согласии с полем кода. Новую плашку скрипт берёт из шаблона сервера.
  *
  * Глобальных имён скрипт не заводит, разметку не печатает — только атрибуты и рябь.
  * Обновив страницу на месте, он сообщает об этом событием «oscript-ui:update» на document:
@@ -1159,4 +1162,285 @@
 	// шаги оживают заново.
 	doc.addEventListener('oscript-ui:update', function () { stepsInit(); });
 	stepsInit();
+
+	/* --- 9. поля список и цвет (выпуск 0.12, шаги 14–15) ------------------------------ */
+
+	// Поле-список без скрипта — текстовое поле со строкой через запятую. Скрипт показывает
+	// плашки, которые напечатал сервер, отдаёт имя поля скрытому полю data-chips-value
+	// и при каждой правке пишет в него ту же строку; в строке ввода остаётся только новое.
+	// Новую плашку он клонирует из шаблона data-chips-chip — разметку печатает сервер.
+	var chipsRequired = new WeakMap();
+
+	function chipsParts(root) {
+		return {
+			input: root.querySelector('.chips-in__input'),
+			list: root.querySelector('.chips-in__list'),
+			value: root.querySelector('[data-chips-value]'),
+			chip: root.querySelector('template[data-chips-chip]')
+		};
+	}
+
+	function chipsValues(parts) {
+		return Array.prototype.map.call(parts.list.querySelectorAll('.chips-in__text'), function (text) {
+			return text.textContent;
+		});
+	}
+
+	// Обязательный список держит required у строки ввода, только пока плашек нет: скрытое
+	// поле браузер не проверяет, а пустая строка при плашках — не пустое поле.
+	function chipsSync(root, parts) {
+		var values = chipsValues(parts);
+		parts.value.value = values.join(', ');
+		if (chipsRequired.get(root)) {
+			parts.input.required = values.length === 0;
+		}
+	}
+
+	// Значения делятся по запятым, края срезаются, пустые и повторы отбрасываются — то же
+	// правило, что у сервера при печати и разборе.
+	function chipsAdd(root, parts, text) {
+		var values = chipsValues(parts);
+		text.split(',').forEach(function (part) {
+			var value = part.trim();
+			if (!value || values.indexOf(value) >= 0) {
+				return;
+			}
+			values.push(value);
+			var chip = parts.chip.content.firstElementChild.cloneNode(true);
+			chip.querySelector('.chips-in__text').textContent = value;
+			var remove = chip.querySelector('[data-chips-remove]');
+			remove.setAttribute('aria-label', (remove.getAttribute('aria-label') || '').replace('%1', value));
+			parts.list.appendChild(chip);
+		});
+		chipsSync(root, parts);
+	}
+
+	function chipsLive(target) {
+		var root = target && target.closest ? target.closest('[data-chips-live]') : null;
+		return root ? { root: root, parts: chipsParts(root) } : null;
+	}
+
+	function chipsFixed(parts) {
+		return parts.input.disabled || parts.input.readOnly;
+	}
+
+	function chipsInit(scope) {
+		var roots = (scope || doc).querySelectorAll('[data-chips]');
+		for (var i = 0; i < roots.length; i++) {
+			var root = roots[i];
+			var parts = chipsParts(root);
+			// заблокированное поле — витрина значения: ему хватает строки без плашек
+			if (root.hasAttribute('data-chips-live') || !parts.input || !parts.list || !parts.value
+				|| !parts.chip || parts.input.disabled) {
+				continue;
+			}
+			chipsRequired.set(root, parts.input.required);
+			parts.value.name = parts.input.name;
+			parts.value.disabled = false;
+			parts.input.removeAttribute('name');
+			parts.input.value = '';
+			parts.list.hidden = false;
+			root.setAttribute('data-chips-live', '');
+			chipsSync(root, parts);
+		}
+	}
+
+	// Перехват в фазе захвата: Enter с набранным добавляет плашку раньше, чем его увидят
+	// отправка формы и «Дальше» шагов. Пустой Enter работает как обычно — отправляет форму.
+	doc.addEventListener('keydown', function (e) {
+		var live = e.target && e.target.classList && e.target.classList.contains('chips-in__input')
+			? chipsLive(e.target) : null;
+		if (!live || e.isComposing || chipsFixed(live.parts)) {
+			return;
+		}
+		var input = live.parts.input;
+		if (e.key === 'Enter' && input.value.trim() !== '') {
+			e.preventDefault();
+			chipsAdd(live.root, live.parts, input.value);
+			input.value = '';
+		} else if (e.key === 'Backspace' && input.value === '') {
+			var last = live.parts.list.lastElementChild;
+			if (last) {
+				e.preventDefault();
+				last.remove();
+				chipsSync(live.root, live.parts);
+			}
+		}
+	}, true);
+
+	// Запятая — тоже конец значения: набранное и вставленное до последней запятой уходит
+	// в плашки, хвост остаётся в строке.
+	doc.addEventListener('input', function (e) {
+		var live = e.target && e.target.classList && e.target.classList.contains('chips-in__input')
+			? chipsLive(e.target) : null;
+		if (!live || e.isComposing || chipsFixed(live.parts)) {
+			return;
+		}
+		var input = live.parts.input;
+		var cut = input.value.lastIndexOf(',');
+		if (cut >= 0) {
+			chipsAdd(live.root, live.parts, input.value.slice(0, cut));
+			input.value = input.value.slice(cut + 1).replace(/^\s+/, '');
+		}
+	});
+
+	// Ушёл из строки — набранное становится плашкой: щелчок по кнопке отправки иначе
+	// унёс бы форму без последнего значения.
+	doc.addEventListener('focusout', function (e) {
+		var live = e.target && e.target.classList && e.target.classList.contains('chips-in__input')
+			? chipsLive(e.target) : null;
+		if (live && !chipsFixed(live.parts) && live.parts.input.value.trim() !== '') {
+			chipsAdd(live.root, live.parts, live.parts.input.value);
+			live.parts.input.value = '';
+		}
+	});
+
+	doc.addEventListener('click', function (e) {
+		var remove = e.target.closest ? e.target.closest('[data-chips-remove]') : null;
+		var live = chipsLive(remove || e.target);
+		if (!live) {
+			return;
+		}
+		if (remove && !remove.disabled) {
+			remove.closest('.chips-in__chip').remove();
+			chipsSync(live.root, live.parts);
+			live.parts.input.focus();
+		} else if (!remove && e.target.closest('.chips-in') && !e.target.closest('.chips-in__entry')) {
+			// щелчок по рамке мимо плашек — в строку ввода, как у любого поля
+			live.parts.input.focus();
+		}
+	});
+
+	// Сброс формы возвращает строке ввода значение сервера: из него же заново плашки.
+	doc.addEventListener('reset', function (e) {
+		var form = e.target;
+		setTimeout(function () {
+			var roots = form.querySelectorAll ? form.querySelectorAll('[data-chips-live]') : [];
+			for (var i = 0; i < roots.length; i++) {
+				var parts = chipsParts(roots[i]);
+				parts.list.textContent = '';
+				chipsAdd(roots[i], parts, parts.input.value);
+				parts.input.value = '';
+			}
+		}, 0);
+	});
+
+	// Поле цвета без скрипта — код текстом с pattern. Скрипт показывает ряд образцов и держит
+	// его в согласии с кодом: кружок пишет свой код в поле, набранный код отмечает свой
+	// кружок, системный выбор цвета — «свой». Радиокнопки и выбор цвета отвязаны от формы
+	// (form=""), поэтому значение по-прежнему несёт одно поле кода.
+	var SWATCH_CODE = /^#[0-9a-f]{6}$/;
+
+	function swatchParts(root) {
+		return {
+			row: root.querySelector('[data-swatches-row]'),
+			code: root.querySelector('.swatches__code'),
+			name: root.querySelector('[data-swatches-name]'),
+			own: root.querySelector('[data-swatches-own]'),
+			dot: root.querySelector('.swatches__item--own .swatches__dot'),
+			radios: root.querySelectorAll('.swatches__radio')
+		};
+	}
+
+	function swatchTitle(control) {
+		var label = control.closest('label');
+		return label ? label.title : '';
+	}
+
+	function swatchShow(root) {
+		var parts = swatchParts(root);
+		if (!parts.code) {
+			return;
+		}
+		var code = parts.code.value.trim().toLowerCase();
+		var found = null;
+		for (var i = 0; i < parts.radios.length; i++) {
+			parts.radios[i].checked = !found && parts.radios[i].value === code;
+			found = parts.radios[i].checked ? parts.radios[i] : found;
+		}
+		var own = !found && SWATCH_CODE.test(code);
+		if (parts.dot) {
+			if (own) {
+				parts.dot.style.setProperty('--_swatch', code);
+			} else {
+				parts.dot.removeAttribute('style');
+			}
+		}
+		if (parts.own && own) {
+			parts.own.value = code;
+		}
+		if (parts.name) {
+			parts.name.textContent = found ? swatchTitle(found)
+				: (code ? swatchTitle(parts.own || parts.code) : parts.code.placeholder);
+		}
+	}
+
+	// Код меняется так, как его поменял бы человек: событием ввода — его слышат подсветка
+	// несохранённого и прочие слушатели формы.
+	function swatchWrite(root, value) {
+		var code = swatchParts(root).code;
+		if (!code || code.disabled || code.readOnly) {
+			return;
+		}
+		code.value = value;
+		code.dispatchEvent(new Event('input', { bubbles: true }));
+		code.dispatchEvent(new Event('change', { bubbles: true }));
+	}
+
+	// Радиокнопки без формы-владельца группируются по имени на всей странице: два поля цвета
+	// с одним именем (в двух формах) делили бы один выбор. Своё имя группы каждому полю
+	// даёт скрипт; отметку он всё равно выводит из кода, поэтому перепутанная при разборе
+	// страницы отметка значения не имеет.
+	var swatchGroups = 0;
+
+	function swatchesInit(scope) {
+		var roots = (scope || doc).querySelectorAll('[data-swatches]');
+		for (var i = 0; i < roots.length; i++) {
+			var parts = swatchParts(roots[i]);
+			if (parts.row && parts.code && parts.row.hidden) {
+				swatchGroups += 1;
+				for (var j = 0; j < parts.radios.length; j++) {
+					parts.radios[j].name = 'oscript-ui-swatches-' + swatchGroups;
+				}
+				parts.row.hidden = false;
+				swatchShow(roots[i]);
+			}
+		}
+	}
+
+	doc.addEventListener('change', function (e) {
+		var target = e.target;
+		var root = target && target.closest ? target.closest('[data-swatches]') : null;
+		if (root && target.classList.contains('swatches__radio') && target.checked) {
+			swatchWrite(root, target.value);
+		}
+	});
+
+	doc.addEventListener('input', function (e) {
+		var target = e.target;
+		var root = target && target.closest ? target.closest('[data-swatches]') : null;
+		if (!root) {
+			return;
+		}
+		if (target.hasAttribute('data-swatches-own')) {
+			swatchWrite(root, target.value);
+		} else if (target.classList.contains('swatches__code')) {
+			swatchShow(root);
+		}
+	});
+
+	doc.addEventListener('reset', function (e) {
+		var form = e.target;
+		setTimeout(function () {
+			var roots = form.querySelectorAll ? form.querySelectorAll('[data-swatches]') : [];
+			for (var i = 0; i < roots.length; i++) {
+				swatchShow(roots[i]);
+			}
+		}, 0);
+	});
+
+	// Морфинг ответа возвращает полям серверный вид: они оживают заново.
+	doc.addEventListener('oscript-ui:update', function () { chipsInit(); swatchesInit(); });
+	chipsInit();
+	swatchesInit();
 })();
