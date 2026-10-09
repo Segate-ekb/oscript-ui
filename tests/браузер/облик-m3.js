@@ -189,6 +189,45 @@ async function окнаНаТелефоне(b) {
   await ctx.close();
 }
 
+// Образец документации кладётся страницей приложения: его разметка — единственное содержимое
+// main.wrap, без рамки образца, — так меряется то, что увидит человек в приложении.
+async function образецСтраницей(p, страница, подпись) {
+  await p.goto(адрес(страница), { waitUntil: 'networkidle' });
+  await p.evaluate((подпись) => {
+    const fig = [...document.querySelectorAll('figure.docs-sample')]
+      .find((f) => f.querySelector('.docs-sample__title').textContent.startsWith(подпись));
+    const main = document.querySelector('main');
+    main.className = 'wrap';
+    main.innerHTML = fig.querySelector('.docs-sample__preview').innerHTML;
+  }, подпись);
+}
+
+// S6: на 390 вложенная карточка объекта и таблица внутри карточки — без тени и кольца, а их
+// содержимому достаётся не меньше 326 px (было около 270); на 1280 вложенная карточка — с кольцом.
+async function карточкаВКарточке(b) {
+  const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
+  const p = await ctx.newPage();
+  await образецСтраницей(p, 'карточка', 'Проекты в карточке');
+  const з = await p.evaluate(() => {
+    const к = document.querySelector('.card .objcard');
+    const ст = getComputedStyle(к);
+    const таблица = document.querySelector('.card .table-scroll');
+    const содержимое = к.getBoundingClientRect().width - parseFloat(ст.paddingLeft) - parseFloat(ст.paddingRight);
+    return { содержимое: Math.round(содержимое), тень: ст.boxShadow, фон: ст.backgroundColor,
+      таблица: Math.round(таблица.clientWidth), рамка: getComputedStyle(таблица).borderTopWidth,
+      вбок: document.documentElement.scrollWidth > innerWidth };
+  });
+  проверить(з.содержимое >= 326, `S6 390: содержимое вложенной карточки ${з.содержимое} ≥ 326`);
+  проверить(з.тень === 'none' && з.фон === 'rgba(0, 0, 0, 0)', `S6 390: вложенная карточка без тени, кольца и заливки (${з.тень})`);
+  проверить(з.таблица >= 326 && з.рамка === '0px', `S6 390: таблица в карточке без обводки, ширина ${з.таблица}`);
+  проверить(!з.вбок, 'S6 390: страница без прокрутки вбок');
+  await p.screenshot({ path: path.join(OUT, 'карточка-в-карточке-390.png'), fullPage: true });
+  await p.setViewportSize({ width: 1280, height: 900 });
+  const широко = await p.evaluate(() => getComputedStyle(document.querySelector('.card .objcard')).boxShadow);
+  проверить(широко !== 'none', 'S6 1280: на широком экране вложенная карточка объекта — с кольцом');
+  await ctx.close();
+}
+
 (async () => {
   const b = await браузер();
   try {
@@ -196,6 +235,7 @@ async function окнаНаТелефоне(b) {
     await блокКоманды(b);
     await окноПоЦентру(b);
     await окнаНаТелефоне(b);
+    await карточкаВКарточке(b);
   } finally {
     await b.close();
   }

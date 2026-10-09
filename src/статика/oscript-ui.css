@@ -2855,6 +2855,34 @@ div.entry__head:hover { --_state: 0%; }
 	.entry__buttons > form > .button { width: 100%; }
 }
 
+/* --- телефон: карточка в карточке -------------------------------------------------
+   На compact (до 600 px) вложенные поверхности не вкладываются: Material на узком экране
+   держит одну панель и поля 16 px. Было: поле страницы 20 + поле секции 20 + кольцо и
+   поле вложенной карточки или таблицы 16 — содержимому оставалось около 270 px из 390, и
+   в светлой теме тени лежали одна в другой (аудит M3, S6).
+   Теперь: боковое поле страницы и поле карточки и секции — 16 px (compact margin M3), а
+   карточка, секция и карточка объекта ВНУТРИ карточки или секции становятся частью
+   родителя — без тени, кольца, своей заливки и боковых полей; соседей разделяет черта
+   outline-variant, как пункты списка. Таблица внутри — без своей обводки. Содержимое
+   вложенного блока получает всю ширину родителя: на 390 — 326 px.
+   На широком экране всё как было: вложенная карточка там — карточка. */
+@media (max-width: 600px) {
+	.wrap { padding-left: var(--space-4); padding-right: var(--space-4); }
+	.card, .section { padding: var(--space-4); }
+	.card .card, .card .section, .card .objcard,
+	.section .card, .section .section, .section .objcard {
+		background: transparent;
+		box-shadow: none;
+		border-radius: 0;
+		padding: var(--space-3) 0 0;
+		margin-bottom: 0;
+		border-top: 1px solid var(--md-sys-color-outline-variant);
+	}
+	.card .objcard:hover, .section .objcard:hover { box-shadow: none; }
+	.card .grid, .section .grid { gap: var(--space-3); }
+	.card .table-scroll, .section .table-scroll { border: 0; border-radius: 0; }
+}
+
 /* --- модальное окно формы -------------------------------------------------------
    Открытый <dialog> уходит в верхний слой браузера: он не в потоке, поэтому ничего
    на странице не двигает, и его не обрезает предок с overflow. Открытие, закрытие
