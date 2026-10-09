@@ -30,6 +30,7 @@
 	Тексты.Вставить("chrome.menu.close", "Закрыть меню");
 	Тексты.Вставить("chrome.menu.rail.title", "Части документации");
 	Тексты.Вставить("chrome.menu.section.deeds", "Дела");
+	Тексты.Вставить("chrome.menu.section.settings", "Настройки");
 	Тексты.Вставить("chrome.menu.section.nav", "Документация");
 	Тексты.Вставить("chrome.menu.section.screen", "Страницы раздела");
 	Тексты.Вставить("chrome.menu.count", "ждёт внимания: %1");

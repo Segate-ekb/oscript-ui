@@ -45,6 +45,7 @@
 	Тексты.Вставить("chrome.menu.close", "Закрыть меню");
 	Тексты.Вставить("chrome.menu.rail.title", "Основные разделы");
 	Тексты.Вставить("chrome.menu.section.deeds", "Мои дела");
+	Тексты.Вставить("chrome.menu.section.settings", "Мои настройки");
 	Тексты.Вставить("chrome.menu.section.nav", "Ромашка");
 	Тексты.Вставить("chrome.menu.section.screen", "Разделы экрана");
 	Тексты.Вставить("chrome.menu.count", "ждёт внимания: %1");
