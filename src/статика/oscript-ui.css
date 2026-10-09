@@ -705,6 +705,30 @@ select.field__control { -webkit-appearance: none; appearance: none; padding-righ
 	letter-spacing: var(--md-sys-typescale-body-small-tracking);
 	color: var(--md-sys-color-on-surface-variant);
 }
+/* Источник значения — справка о значении, а не о поле: мелкая приглушённая надпись справа
+   в строке подсказки. Строка с источником — flex: подсказка слева, источник прижат вправо
+   и переносится внутри себя (ключ конфига бывает длиннее строки); на телефоне он уходит
+   под подсказку медиа-блоком ниже. */
+.field__hint--origin {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	column-gap: var(--space-3);
+}
+.field__origin {
+	margin-left: auto;
+	min-width: 0;
+	text-align: end;
+	overflow-wrap: anywhere;
+	font: var(--type-label-small);
+	letter-spacing: var(--md-sys-typescale-label-small-tracking);
+	/* цвет вспомогательного текста, а не outline: мелкому кеглю нужен полный контраст */
+	color: var(--md-sys-color-on-surface-variant);
+}
+@media (max-width: 640px) {
+	.field__hint--origin { flex-direction: column; align-items: flex-start; }
+	.field__origin { margin-left: 0; text-align: start; }
+}
 .field__error {
 	padding: 0 var(--space-4);
 	font: var(--type-body-small);
