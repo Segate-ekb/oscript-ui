@@ -490,6 +490,7 @@
 		if (tokens && fresh && tokens.textContent !== fresh.textContent) {
 			tokens.textContent = fresh.textContent;
 		}
+		var toastsBefore = toastSnapshot(); // проверка до отправки и тост (выпуск 0.12)
 		morphChildren(doc.body, next.body);
 		syncAttributes(doc.body, next.body);
 
@@ -500,7 +501,7 @@
 		}
 		markAll();
 		paintTop();
-		toastLift(); // проверка до отправки и тост (выпуск 0.12): тосты ответа — в очередь
+		toastLift(toastsBefore); // проверка до отправки и тост (выпуск 0.12): новые тосты — в очередь
 		doc.dispatchEvent(new CustomEvent('oscript-ui:update', { detail: { url: url.href } }));
 		if (closing) {
 			focusMarked();
@@ -1417,7 +1418,9 @@
 	// После тихой отправки тост ответа ложится морфингом на своё место — скрипт поднимает
 	// его оттуда вниз экрана (data-toast-live: wait — ждёт очереди, show — виден, gone —
 	// гаснет) и показывает тосты по одному, каждый TOAST_TIME; пока на тосте мышь или фокус,
-	// время стоит. Крестик закрывает раньше (раздел 5). Тост с ролью alert скрипт не трогает:
+	// время стоит. Новый — тот, которого на странице до ответа не было: тост, что стоял в
+	// потоке и пришёл в ответе тем же (образец на странице, постоянное предупреждение), и
+	// смена темы, и любая другая тихая отправка оставляют на месте. Крестик закрывает раньше (раздел 5). Тост с ролью alert скрипт не трогает:
 	// он остаётся на месте, пока его не закроют или не уберёт следующий ответ сервера.
 	// Поднятый тост живёт в конце <body>, и морфинг его не трогает (toastOwned).
 
@@ -1431,10 +1434,26 @@
 		return !!(node && node.nodeType === 1 && node.hasAttribute('data-toast-live'));
 	}
 
-	function toastLift() {
+	// Тосты в потоке страницы — тем, как их напечатал сервер: тост без id, и узнать
+	// прежний после морфинга можно только по разметке.
+	function toastSnapshot() {
+		var seen = {};
+		var list = doc.body.querySelectorAll('.toast:not([data-toast-live])');
+		for (var i = 0; i < list.length; i++) {
+			seen[list[i].outerHTML] = (seen[list[i].outerHTML] || 0) + 1;
+		}
+		return seen;
+	}
+
+	function toastLift(before) {
 		var list = doc.body.querySelectorAll('.toast:not([data-toast-live])');
 		for (var i = 0; i < list.length; i++) {
 			var toast = list[i];
+			var key = toast.outerHTML;
+			if (before && before[key]) {
+				before[key]--;
+				continue;
+			}
 			if (toast.getAttribute('role') === 'alert'
 				|| toast.closest('dialog, [hidden], [data-window-error]')) {
 				continue;

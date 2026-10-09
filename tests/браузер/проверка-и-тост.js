@@ -200,6 +200,27 @@ async function шаг19(b) {
   await ctx.close();
 }
 
+// Новый тост — только тот, которого до ответа на странице не было: смена темы (тоже тихая
+// отправка) на странице «Тост» не уносит её образцы вниз экрана.
+async function тостыСтраницы(b) {
+  const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
+  const p = await ctx.newPage();
+  await p.goto(B + '/' + encodeURIComponent('тост'), { waitUntil: 'networkidle' });
+  await пометить(p);
+  const было = await p.evaluate(() => document.querySelectorAll('.toast').length);
+  const тема = await p.evaluate(() => document.documentElement.getAttribute('data-theme'));
+  await p.click('form[data-theme-toggle] button');
+  await p.waitForFunction((т) => document.documentElement.getAttribute('data-theme') !== т, тема);
+  await p.waitForTimeout(1500);
+  const стало = await p.evaluate(() => ({
+    всего: document.querySelectorAll('.toast').length,
+    поднято: document.querySelectorAll('[data-toast-live]').length,
+  }));
+  проверить(await безПерезагрузки(p) && стало.всего === было && стало.поднято === 0,
+    `19: смена темы не поднимает тосты, что уже стояли на странице (${было} → ${стало.всего}, поднято ${стало.поднято})`);
+  await ctx.close();
+}
+
 async function безСкрипта(b) {
   const ctx = await b.newContext({ viewport: { width: 1280, height: 900 }, javaScriptEnabled: false });
   const p = await ctx.newPage();
@@ -275,6 +296,7 @@ async function снимки(b) {
   const b = await браузер();
   await шаг18(b);
   await шаг19(b);
+  await тостыСтраницы(b);
   await безСкрипта(b);
   await снимки(b);
   await b.close();
