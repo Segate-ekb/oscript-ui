@@ -146,7 +146,7 @@ code, pre, kbd, samp { font-family: var(--md-ref-typeface-mono); }
 	position: relative;
 	display: inline-flex;
 	align-items: center;
-	min-height: 40px;
+	min-height: 36px;
 	padding: 0 var(--space-3);
 	border-radius: var(--md-sys-shape-corner-full);
 	color: var(--md-sys-color-on-surface-variant);
@@ -523,23 +523,24 @@ h3 {
 
    ОХВАТ ПРАВИЛА ПРОВЕРЕН ЧИСЛАМИ.
    Правило кладёт margin-top ВСЕМ не-первым детям тела карточки, поэтому вопрос «не
-   поехала ли вёрстка» законный. Шаг сетки — 4dp Material: 4/8/12/16/24/32
-   (ТокеныТемы.ШагСетки, плотность 1), то есть --space-4 = 16px при кегле body-large 16px.
+   поехала ли вёрстка» законный. Шаг сетки — 4dp Material: 4/8/12/16/20/32
+   (ТокеныТемы.ШагСетки, плотность 1; пятая ступень плотнее спецификации), то есть
+   --space-4 = 16px при кегле body-large 15px.
    Считаем по факту, помня две вещи: правило трогает только ВЕРХНИЙ маргин, а маргины
    соседей СХЛОПЫВАЮТСЯ (зазор = max, а не сумма):
      * поля и тумблеры (собственных маргинов у них нет): 0 -> 16px — собственно
        починенный дефект;
-     * <p> + <p> без класса: остаётся 16px. Правило переопределяет margin-top второго
-       абзаца, но margin-bottom первого — браузерный 1em = 16px — остаётся, и схлопывание
-       даёт max(16, 16) = 16px. Не «стало плотнее», а «не изменилось»;
+     * <p> + <p> без класса: 16px. Правило переопределяет margin-top второго абзаца,
+       а margin-bottom первого — браузерный 1em = 15px — схлопывается с ним:
+       max(15, 16) = 16px;
      * pre.code (margin-bottom space-3 = 12px) перед <p>: max(12, 16) = 16px;
      * первый и последний ребёнок: внешние маргины сняты, чтобы не удваивать padding
-       карточки (space-5 = 24px).
+       карточки (space-5 = 20px).
    ЗАЗОР ПОД ЗАГОЛОВКОМ СТАНОВИТСЯ ШИРЕ — и это единственное место, где правило не
    только нормализует. У заголовков собственный нижний маргин МЕНЬШЕ 16px, а верхний
    больше, так что правило подтягивает их сверху и раздвигает снизу:
-     * h3 (margin: space-5 0 space-2 = 24/8) — реальный непосредственный ребёнок
-       .card__body (заголовки блоков страницы): сверху 24 -> 16,
+     * h3 (margin: space-5 0 space-2 = 20/8) — реальный непосредственный ребёнок
+       .card__body (заголовки блоков страницы): сверху 20 -> 16,
        снизу max(8, 16) = 16 (+8). Заголовок становится равноудалён от соседей
        сверху и снизу — практически это ровнее, а не поломка;
      * h1 (margin-bottom space-3 = 12) и h2 (space-6 0 space-3 = 32/12) — так же:
@@ -621,7 +622,7 @@ h3 {
 .field { position: relative; display: flex; flex-direction: column; gap: var(--space-1); }
 .field__label {
 	position: absolute;
-	top: 16px;
+	top: 11px;
 	left: 16px;
 	z-index: 1;
 	max-width: calc(100% - 32px);
@@ -632,15 +633,17 @@ h3 {
 	letter-spacing: var(--md-sys-typescale-body-large-tracking);
 	color: var(--md-sys-color-on-surface-variant);
 	pointer-events: none;
-	transform: translateY(-10px) scale(.75);
+	/* Поле плотное, 44 px: подпись наверху — 12 px (4/5 от 15) в трёх пикселях от верхнего
+	   края, значение под ней. Опущенная подпись стоит по середине поля, на месте значения. */
+	transform: translateY(-8px) scale(.8);
 	transform-origin: left top;
 	transition: transform var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard),
 	            color var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard),
 	            max-width var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
 }
-/* Подпись наверху — уменьшенная на 3/4, поэтому ей и места в строке на 4/3 больше. */
+/* Подпись наверху — уменьшенная до 4/5, поэтому ей и места в строке на 5/4 больше. */
 .field:not([data-empty]) > .field__label,
-.field:focus-within > .field__label { max-width: calc((100% - 32px) * 4 / 3); }
+.field:focus-within > .field__label { max-width: calc((100% - 32px) * 5 / 4); }
 .field[data-empty]:not(:focus-within) > .field__label { transform: none; }
 .field:focus-within > .field__label { color: var(--md-sys-color-primary); }
 /* Плейсхолдер прячется, только пока на его месте стоит опущенная подпись: у поля без
@@ -651,8 +654,8 @@ h3 {
 	--_state: 0%;
 	--_line: var(--md-sys-color-primary);
 	width: 100%;
-	min-height: 56px;
-	padding: 24px 16px 8px;
+	min-height: 44px;
+	padding: 18px 16px 3px;
 	font: var(--type-body-large);
 	letter-spacing: var(--md-sys-typescale-body-large-tracking);
 	color: var(--md-sys-color-on-surface);
@@ -674,13 +677,13 @@ h3 {
 .field__control:focus, .field__control:focus-visible { background-size: 100% 2px; outline: none; }
 /* Поле без подписи: значению наверху делать нечего, оно садится посередине. :has() обёрнут
    в :is(): движок без :has() выбросил бы и всё остальное правило. */
-.field:is(:not(:has(> .field__label))) > .field__control { padding-top: 16px; padding-bottom: 16px; }
+.field:is(:not(:has(> .field__label))) > .field__control { padding-top: 11px; padding-bottom: 10px; }
 /* Выпадающий список — свой шеврон справа: системная стрелка снята, и место под ней тоже. */
 select.field__control { -webkit-appearance: none; appearance: none; padding-right: 48px; cursor: pointer; }
 .field:has(> select.field__control)::after {
 	content: "";
 	position: absolute;
-	top: 24px;
+	top: 17px;
 	right: 20px;
 	width: 7px;
 	height: 7px;
@@ -799,7 +802,7 @@ select.field__control { -webkit-appearance: none; appearance: none; padding-righ
 	border-color: transparent;
 	background-color: color-mix(in srgb, var(--md-sys-color-on-surface) var(--state-disabled-content), transparent);
 }
-textarea.field__control { min-height: calc(var(--space-8) * 2); resize: vertical; }
+textarea.field__control { min-height: calc(var(--space-8) * 1.5); resize: vertical; }
 
 /* Группа полей <fieldset><legend> — тоже КОНТЕЙНЕР полей, а значит владелец интервала:
    без этого правила три флажка подряд внутри группы слипаются в ноль пикселей.
@@ -832,8 +835,8 @@ fieldset > * + * { margin-top: var(--space-2); }
 	flex-wrap: wrap;
 	align-items: center;
 	gap: var(--space-1) var(--space-2);
-	min-height: 56px;
-	padding: 26px 12px 6px 16px;
+	min-height: 44px;
+	padding: 18px 12px 3px 16px;
 	background-color: color-mix(in srgb, var(--md-sys-color-on-surface) var(--_state), var(--_bg));
 	background-image: linear-gradient(var(--_line), var(--_line));
 	background-position: 50% 100%;
@@ -863,7 +866,7 @@ fieldset > * + * { margin-top: var(--space-2); }
 .field--chips[data-chips-live] .chips-in__list:empty { display: none; }
 .field--chips[data-chips-live] .chips-in__entry { display: flex; flex: 1 1 8rem; min-width: 6rem; }
 .field--chips[data-chips-live] .chips-in__input {
-	min-height: 28px;
+	min-height: 22px;
 	padding: 0;
 	background: none;
 	border: 0;
@@ -998,8 +1001,8 @@ fieldset > * + * { margin-top: var(--space-2); }
 	flex: 0 1 10rem;
 	width: 10rem;
 	min-width: 8rem;
-	padding-top: 16px;
-	padding-bottom: 16px;
+	padding-top: 11px;
+	padding-bottom: 10px;
 	font-family: var(--md-ref-typeface-mono);
 }
 .swatches__name {
@@ -1181,7 +1184,9 @@ pre.code {
 
 /* Таблица данных — по образцу MUI: лист цвета surface-container-low в обводке
    outline-variant, шапка — title-small приглушённым цветом, строки body-medium через
-   разделитель, наведение — слой состояния на всю строку. */
+   разделитель, наведение — слой состояния на всю строку. Ряд плотный, как dense у MUI:
+   ячейка 10/12px по вертикали и горизонтали, строка body-medium — ряд около 40px, шапка
+   той же высоты. Отступы — от ступеней шага, чтобы плотность оформления их тоже двигала. */
 .table-scroll {
 	overflow-x: auto;
 	border: 1px solid var(--md-sys-color-outline-variant);
@@ -1196,13 +1201,13 @@ table, .table {
 }
 th, td {
 	text-align: left;
-	padding: var(--space-3) var(--space-4);
+	padding: calc(var(--space-3) - 2px) var(--space-3);
 	border-bottom: 1px solid var(--md-sys-color-outline-variant);
 	font: var(--type-body-medium);
 	letter-spacing: var(--md-sys-typescale-body-medium-tracking);
 }
 th {
-	height: 56px;
+	height: 40px;
 	font: var(--type-title-small);
 	letter-spacing: var(--md-sys-typescale-title-small-tracking);
 	color: var(--md-sys-color-on-surface-variant);
@@ -1211,7 +1216,7 @@ th {
 tr:last-child td { border-bottom: none; }
 tbody tr { transition: background-color var(--motion-fast) var(--motion-ease); }
 tbody tr:hover { background: color-mix(in srgb, var(--md-sys-color-on-surface) var(--state-hover), transparent); }
-caption { text-align: left; padding: var(--space-3) var(--space-4); color: var(--md-sys-color-on-surface-variant); }
+caption { text-align: left; padding: calc(var(--space-3) - 2px) var(--space-3); color: var(--md-sys-color-on-surface-variant); }
 .note-empty { color: var(--md-sys-color-on-surface-variant); font-style: italic; }
 
 /* Строка-разворот: печатается следующим за записью <tr> во всю ширину таблицы.
@@ -1289,7 +1294,8 @@ tbody tr.row-accent.table__record:hover + .table__expand { background: color-mix
 
 /* --- компонент: плашка --- */
 
-/* Плашка — малый чип Material: высота 24px, скругление small, подпись label-medium.
+/* Плашка — малый чип Material: высота 22px (плотнее 24 спецификации, чтобы плашка в строке
+   текста не раздвигала её), скругление small, подпись label-medium.
    Нейтральная — контейнер surface-container-highest, статусные — тональные контейнеры
    своих ролей: цвет узнаётся заливкой, а текст на ней остаётся читаемым. */
 .tag {
@@ -1299,7 +1305,7 @@ tbody tr.row-accent.table__record:hover + .table__expand { background: color-mix
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-1);
-	min-height: 24px;
+	min-height: 22px;
 	padding: 0 var(--space-2);
 	border-radius: var(--md-sys-shape-corner-small);
 	font: var(--type-label-medium);
@@ -1488,7 +1494,7 @@ span.checktree__item { cursor: default; }
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2);
-	min-height: 40px;
+	min-height: 36px;
 	padding: 0 var(--space-4);
 	border-radius: var(--md-sys-shape-corner-full);
 	color: var(--md-sys-color-on-surface-variant);
@@ -1504,7 +1510,9 @@ span.checktree__item { cursor: default; }
 	--_bg: var(--md-sys-color-secondary-container);
 	color: var(--md-sys-color-on-secondary-container);
 }
-.tree--column .tree__link { display: flex; min-height: 48px; }
+/* Колонка разделов дома — плотная, 36px, как ход в шапке: пальцевую высоту ей даёт медиа-блок
+   дома настроек на узком экране, а на широком под курсором хватает и этой. */
+.tree--column .tree__link { display: flex; min-height: 36px; }
 .tree--column .tree__list--1 { margin-left: var(--space-4); }
 /* Рубрика — подпись над первым разделом своей группы: label-medium прописными,
    приглушённо и с отступом сверху, чтобы группа читалась отдельно. В ряду шапки рубрик
@@ -1564,7 +1572,9 @@ span.checktree__item { cursor: default; }
    вид совпадал с первичным. Поэтому у каждого варианта есть собственное правило:
    класса без правила и правила без класса в этом листе не бывает.
 
-   Кнопки — общие кнопки Material 3: пилюля высотой 40px, подпись label-large.
+   Кнопки — общие кнопки Material 3: пилюля, подпись label-large. Высота плотная — 36px,
+   а не 40 спецификации (малая — 28, значок — круг 36): в строке с полем 44px и в ряду
+   действий карточки кнопка не должна быть самым высоким, что там стоит.
    Вариант задаёт пару «заливка и содержимое» (--_bg, --_fg), а слой состояния считается
    поверх неё одним правилом: залитая (основная, опасная) на наведении ещё и приподнимается
    на уровень 1, как у MUI. Варианты кита ложатся на виды Material так:
@@ -1579,7 +1589,7 @@ span.checktree__item { cursor: default; }
 	align-items: center;
 	justify-content: center;
 	gap: var(--space-2);
-	min-height: 40px;
+	min-height: 36px;
 	padding: 0 var(--space-5);
 	font: var(--type-label-large);
 	letter-spacing: var(--md-sys-typescale-label-large-tracking);
@@ -1634,7 +1644,7 @@ span.checktree__item { cursor: default; }
 }
 .button--link:is([disabled], [aria-disabled="true"]) { --_bg: transparent; }
 .button--sm {
-	min-height: 32px;
+	min-height: 28px;
 	padding: 0 var(--space-4);
 	font: var(--type-label-medium);
 	letter-spacing: var(--md-sys-typescale-label-medium-tracking);
@@ -1671,9 +1681,9 @@ span.checktree__item { cursor: default; }
    вместе с подписью, перерастает текст и меняет высоту кнопки. */
 .button__pic { width: 1em; height: 1em; flex: none; vertical-align: -0.125em; }
 
-.button--icon { width: 40px; min-height: 40px; padding: 0; }
+.button--icon { width: 36px; min-height: 36px; padding: 0; }
 .button--icon .icon { width: 24px; height: 24px; }
-.button--icon.button--sm { width: 36px; min-height: 36px; }
+.button--icon.button--sm { width: 32px; min-height: 32px; }
 .button--icon.button--sm .icon { width: 20px; height: 20px; }
 /* :where() держит специфичность этого правила на уровне варианта: пункт меню, который
    перебивает варианты, перебивает и его. */
@@ -1921,7 +1931,7 @@ span.checktree__item { cursor: default; }
 
 /* Нативная пипетка рисует сплошную заливку во всю площадь ввода: у поля кита
    с его паддингом она выглядела бы серой рамкой вокруг цветного пятна. */
-input[type="color"].field__control { padding: 24px 12px 6px; height: 56px; cursor: pointer; }
+input[type="color"].field__control { padding: 18px 12px 3px; height: 44px; cursor: pointer; }
 
 /* Подпись только для скринридера: видимая часть меню — символ «⋯», и без текстовой
    пары кнопка безымянна (та же беда, что у кнопки-иконки в ките). */
@@ -2176,7 +2186,7 @@ form[data-quiet][aria-busy="true"] { cursor: progress; }
 	background: var(--md-sys-color-surface-container-low);
 	border-radius: var(--md-sys-shape-corner-medium);
 	box-shadow: var(--md-sys-elevation-level1);
-	padding: var(--space-4) var(--space-5);
+	padding: var(--space-3) var(--space-4);
 	transition: box-shadow var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-standard);
 }
 .objcard:hover { box-shadow: var(--md-sys-elevation-level2); }
@@ -2388,13 +2398,13 @@ form[data-quiet][aria-busy="true"] { cursor: progress; }
    отступа поля, а не по нижней границе его контрола — визуально на 16 px ниже.
    Починка не здесь, а у .field: интервалы больше не живут на самих полях, и низ
    маргин-бокса поля совпал с низом ввода.
-   С полем Material правило стало flex-start: контейнер поля — 56px, кнопка — 40px, и низом
+   С полем Material правило стало flex-start: контейнер поля — 44px, кнопка — 36px, и низом
    к низу она садилась ниже середины поля, а с пояснением под полем — и вовсе к пояснению.
    По верху и со сдвигом на половину разницы высот кнопка стоит ровно по центру контрола,
    что бы ни печаталось под ним. baseline по-прежнему не годится: равняло бы по ТЕКСТУ. */
 .filters { display: flex; align-items: flex-start; gap: var(--space-2); margin: var(--space-4) 0; }
 .filters > .field { flex: 1; min-width: 0; }
-.filters > .button { margin-top: var(--space-2); }
+.filters > .button { margin-top: var(--space-1); }
 /* На телефоне поля отбора встают каждое во всю строку, а кнопка — под ними: в одну строку
    три поля и кнопка сжимались до нечитаемого. */
 @media (max-width: 640px) {
@@ -2404,7 +2414,8 @@ form[data-quiet][aria-busy="true"] { cursor: progress; }
 }
 .chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
-/* Чип фильтра Material: высота 32px, скругление small, обводка outline-variant;
+/* Чип фильтра Material: высота 28px (плотнее 32 спецификации — ряд чипов над списком не
+   должен быть выше строки списка), скругление small, обводка outline-variant;
    выбранный — заливка secondary-container без обводки и галочка перед подписью. */
 .chip {
 	--_bg: transparent;
@@ -2413,7 +2424,7 @@ form[data-quiet][aria-busy="true"] { cursor: progress; }
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2);
-	min-height: 32px;
+	min-height: 28px;
 	padding: 0 var(--space-4);
 	border: 1px solid var(--md-sys-color-outline-variant);
 	border-radius: var(--md-sys-shape-corner-small);
@@ -2606,7 +2617,7 @@ form[data-quiet][aria-busy="true"] { cursor: progress; }
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2);
-	min-height: 40px;
+	min-height: 36px;
 	padding: 0 var(--space-4) 0 var(--space-5);
 	border: 1px solid var(--md-sys-color-outline);
 	border-radius: var(--md-sys-shape-corner-full);
@@ -3716,13 +3727,13 @@ div.entry__head:hover { --_state: 0%; }
    под него. У выпадающего списка значок левее шеврона. У флажка значок идёт сразу за
    подписью. */
 .field-help { position: relative; display: flex; flex-direction: column; min-width: 0; }
-.field-help > .help { position: absolute; z-index: 1; top: 16px; right: var(--space-3); margin: 0; }
+.field-help > .help { position: absolute; z-index: 1; top: 10px; right: var(--space-3); margin: 0; }
 .field-help > .field > .field__control { padding-right: 48px; }
 .field-help > .field > select.field__control { padding-right: 76px; }
 .field-help:has(> .field > select.field__control) > .help { right: 44px; }
 .field-help > .field > .field__label { max-width: calc(100% - 72px); }
 .field-help > .field:not([data-empty]) > .field__label,
-.field-help > .field:focus-within > .field__label { max-width: calc((100% - 72px) * 4 / 3); }
+.field-help > .field:focus-within > .field__label { max-width: calc((100% - 72px) * 5 / 4); }
 .field-help:has(> .field--check) { flex-direction: row; align-items: flex-start; }
 .field-help > .field--check { flex: 0 1 auto; }
 .field-help:has(> .field--check) > .help { position: static; margin: -2px 0 0 var(--space-1); }
