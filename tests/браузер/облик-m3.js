@@ -259,6 +259,70 @@ async function ссылкиВТексте(b) {
   await ctx.close();
 }
 
+// Область касания элемента: точки в 23 px от центра по четырём сторонам попадают в него
+// (или в его потомка). Видимый размер — коробка элемента.
+async function областьКасания(локатор) {
+  return локатор.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    const попал = (x, y) => { const t = document.elementFromPoint(x, y); return !!t && (t === el || el.contains(t)); };
+    let край = 0;
+    for (let d = 1; d <= 30; d++) {
+      if (попал(cx - d, cy) && попал(cx + d, cy) && попал(cx, cy - d) && попал(cx, cy + d)) край = d; else break;
+    }
+    return { видно: Math.round(Math.min(r.width, r.height)), касание: край * 2 };
+  });
+}
+
+// S8: на касании (pointer: coarse) у кнопки-значка, малой кнопки-значка, крестика плашки
+// списка, кружка акцента, «?» подсказки и ссылки в ячейке таблицы область касания не меньше
+// 48, а видимый размер прежний; мышью (pointer: fine) — область кнопки-значка прежняя.
+async function целиКасания(b) {
+  const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const p = await ctx.newPage();
+  проверить(await p.evaluate(() => matchMedia('(pointer: coarse)').matches), 'S8: эмуляция касания — pointer: coarse');
+  await p.goto(адрес('кнопка'), { waitUntil: 'networkidle' });
+  for (const [что, селектор] of [['кнопка-значок', '.docs-sample__preview .button--icon:not(.button--sm)'],
+    ['малая кнопка-значок', '.docs-sample__preview .button--icon.button--sm']]) {
+    const л = p.locator(селектор).first();
+    await л.scrollIntoViewIfNeeded();
+    const з = await областьКасания(л);
+    проверить(з.касание >= 46, `S8 касание: ${что} — видно ${з.видно}, область ${з.касание + 2}`);
+  }
+  await p.goto(адрес('поле'), { waitUntil: 'networkidle' });
+  const цели = [
+    ['крестик плашки списка', 'main .chips-in__remove:not([disabled])'],
+    ['кружок акцента', 'main .swatches__item'],
+    ['«?» подсказки', 'main .help'],
+  ];
+  for (const [что, селектор] of цели) {
+    const л = p.locator(селектор).first();
+    if (!(await л.count())) { проверить(false, `S8: на странице «Поле» есть ${что} (${селектор})`); continue; }
+    await л.scrollIntoViewIfNeeded();
+    const з = await областьКасания(л);
+    проверить(з.касание >= 46, `S8 касание: ${что} — видно ${з.видно}, область ${з.касание + 2}`);
+  }
+  const ячейка = await p.evaluate(() => {
+    const т = document.createElement('table');
+    т.innerHTML = '<tbody><tr><td><a href="#x">ключ</a></td><td>12 марта</td></tr></tbody>';
+    document.querySelector('main').prepend(т);
+    window.scrollTo(0, 0);
+    return Math.round(т.querySelector('a').getBoundingClientRect().height);
+  });
+  проверить(ячейка >= 48, `S8 касание: ссылка в ячейке таблицы — высота ${ячейка}`);
+  await ctx.close();
+
+  const мышь = await b.newContext({ viewport: { width: 1280, height: 900 } });
+  const м = await мышь.newPage();
+  await м.goto(адрес('кнопка'), { waitUntil: 'networkidle' });
+  const л = м.locator('.docs-sample__preview .button--icon.button--sm').first();
+  await л.scrollIntoViewIfNeeded();
+  const з = await областьКасания(л);
+  проверить(з.касание <= з.видно, `S8 мышь: область малой кнопки-значка — её видимый размер (${з.касание + 2} при ${з.видно})`);
+  await мышь.close();
+}
+
 (async () => {
   const b = await браузер();
   try {
@@ -268,6 +332,7 @@ async function ссылкиВТексте(b) {
     await окнаНаТелефоне(b);
     await карточкаВКарточке(b);
     await ссылкиВТексте(b);
+    await целиКасания(b);
   } finally {
     await b.close();
   }
