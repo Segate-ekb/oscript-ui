@@ -1393,6 +1393,61 @@ a.tag:hover { --_state: var(--state-hover); text-decoration: none; }
 }
 .checktree__box[disabled] + .checktree__label { color: var(--md-sys-color-on-surface-variant); }
 
+/* --- дерево галок (выпуск 0.13): тысяча пунктов --- */
+
+/* Обёртка дерева с полями 0.13: поиск над деревом, дерево (или ответ поиска), ряд правок
+   под ним — над кнопками формы. «Показать ещё» — ссылка-кнопка и счёт показанного в конце
+   ветки. Ветка с режимами вместо галки несёт малые сегменты «все / выбранные / никакие»;
+   при «все» и «никакие» её дети показаны тем, что решил режим: галки отмеченными или
+   пустыми, приглушённо, и указатель их не правит (клавиатуру уводит скрипт — inert). */
+.checktree-set { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.checktree__search { display: flex; align-items: center; gap: var(--space-2); }
+.checktree__search > .field { flex: 1 1 auto; min-width: 0; }
+.checktree__page { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); }
+.checktree__count { color: var(--md-sys-color-on-surface-variant); }
+.checktree-set[aria-busy="true"] .checktree__search .button,
+.checktree__page .button[aria-busy="true"] { cursor: progress; opacity: .6; }
+span.checktree__item { cursor: default; }
+.checktree__modes { margin-left: auto; }
+.checktree__node:has(> .checktree__row > .checktree__modes > :first-child > :checked) > .checktree__branch > .checktree__children,
+.checktree__node:has(> .checktree__row > .checktree__modes > :last-child > :checked) > .checktree__branch > .checktree__children {
+	pointer-events: none;
+}
+.checktree__node:has(> .checktree__row > .checktree__modes > :first-child > :checked) > .checktree__branch > .checktree__children .checktree__box {
+	--_mark: var(--md-sys-color-surface);
+	border-color: transparent;
+	background: linear-gradient(45deg, transparent calc(50% - 1px), var(--_mark) 0 calc(50% + 1px), transparent 0)
+			1px 5px / 5px 5px no-repeat,
+		linear-gradient(-45deg, transparent calc(50% - 1px), var(--_mark) 0 calc(50% + 1px), transparent 0)
+			4px 1px / 9px 9px no-repeat,
+		color-mix(in srgb, var(--md-sys-color-on-surface) var(--state-disabled-content), transparent);
+}
+.checktree__node:has(> .checktree__row > .checktree__modes > :last-child > :checked) > .checktree__branch > .checktree__children .checktree__box {
+	border-color: color-mix(in srgb, var(--md-sys-color-on-surface) var(--state-disabled-content), transparent);
+	background: transparent;
+}
+.checktree__node:has(> .checktree__row > .checktree__modes > :first-child > :checked) > .checktree__branch > .checktree__children .checktree__label,
+.checktree__node:has(> .checktree__row > .checktree__modes > :last-child > :checked) > .checktree__branch > .checktree__children .checktree__label {
+	color: var(--md-sys-color-on-surface-variant);
+}
+.checktree__found { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.checktree__found-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.checktree__found-count { margin: 0; font: var(--type-body-medium); color: var(--md-sys-color-on-surface-variant); }
+.checktree__found-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+/* совпадения — плоский список: места под шеврон ветки им не нужно */
+.checktree--found > .checktree__node > .checktree__row { padding-left: 0; }
+.checktree__edits { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); }
+.checktree__edits[hidden] { display: none; }
+.checktree__edits-label { font: var(--type-label-medium); color: var(--md-sys-color-on-surface-variant); }
+.checktree__edits-list { display: flex; flex-wrap: wrap; gap: var(--space-1); min-width: 0; }
+.checktree__edit { max-width: 100%; }
+.checktree__edit--on { color: var(--md-sys-color-on-success-container); background: var(--md-sys-color-success-container); }
+.checktree__edit--off { color: var(--md-sys-color-on-error-container); background: var(--md-sys-color-error-container); }
+@media (max-width: 640px) {
+	.checktree__modes { margin-left: 0; }
+	.checktree__found-head { flex-direction: column; align-items: flex-start; }
+}
+
 /* --- компонент: дерево разделов --- */
 
 .tree { min-width: 0; }
