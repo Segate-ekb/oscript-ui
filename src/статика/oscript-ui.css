@@ -2421,6 +2421,34 @@ form[data-quiet][aria-busy="true"] { cursor: progress; }
 @media (max-width: 600px) { .grid--3 { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 520px) { .grid--4 { grid-template-columns: minmax(0, 1fr); } }
 .grid--tight { gap: var(--space-2); }
+/* Полные ряды (.grid--full-rows, слово ПолныеРяды): на каждой ширине ячейки неполного
+   последнего ряда не показываются. Число карточек лист не знает, поэтому ячейка находит себя
+   сама: nth-child — её место в ряду, nth-last-child — сколько ячеек после неё. Первая ячейка
+   ряда, за которой меньше, чем колонок, — начало хвоста; вторая и третья — по тому же счёту.
+   Первый ряд не прячется никогда (счёт с 4n+5, 3n+4, 2n+3): три карточки в четырёх колонках
+   остаются тремя, а не пустой сеткой. Восемь карточек в четырёх колонках дают 4 + 4, в трёх — 3 + 3 (две прячутся), в двух —
+   четыре ряда, в одной — все восемь. Каждое правило действует только на своём отрезке ширин:
+   на узком экране правило широкого спрятало бы не тот хвост. Отрезки — те же точки
+   перелома, что у потолка колонок выше. */
+@media (min-width: 1001px) {
+	.grid--4.grid--full-rows > .grid__cell:nth-child(4n+5):nth-last-child(-n+3),
+	.grid--4.grid--full-rows > .grid__cell:nth-child(4n+6):nth-last-child(-n+2),
+	.grid--4.grid--full-rows > .grid__cell:nth-child(4n+7):nth-last-child(1) { display: none; }
+}
+@media (min-width: 761px) and (max-width: 1000px) {
+	.grid--4.grid--full-rows > .grid__cell:nth-child(3n+4):nth-last-child(-n+2),
+	.grid--4.grid--full-rows > .grid__cell:nth-child(3n+5):nth-last-child(1) { display: none; }
+}
+@media (min-width: 521px) and (max-width: 760px) {
+	.grid--4.grid--full-rows > .grid__cell:nth-child(2n+3):nth-last-child(1) { display: none; }
+}
+@media (min-width: 901px) {
+	.grid--3.grid--full-rows > .grid__cell:nth-child(3n+4):nth-last-child(-n+2),
+	.grid--3.grid--full-rows > .grid__cell:nth-child(3n+5):nth-last-child(1) { display: none; }
+}
+@media (min-width: 601px) and (max-width: 900px) {
+	.grid--3.grid--full-rows > .grid__cell:nth-child(2n+3):nth-last-child(1) { display: none; }
+}
 
 /* --- страницы: формы, отборы, свёртки --- */
 
