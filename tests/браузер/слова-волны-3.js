@@ -167,12 +167,36 @@ async function кнопкаБезОтправки(b) {
   await ctx.close();
 }
 
+// Палитра акцента кита: поле печатает шесть кружков с именами из словаря, выбранный — зелёный;
+// щелчок по кружку пишет его код в поле и имя рядом.
+async function палитраАкцента(b) {
+  const { ctx, p } = await страница(b, 'поле', 1280);
+  const обр = образец(p, 'Акцент из палитры кита');
+  const з = await обр.evaluate((f) => ({
+    имена: [...f.querySelectorAll('.swatches__item:not(.swatches__item--default):not(.swatches__item--own)')]
+      .map((l) => l.getAttribute('title')),
+    видно: !f.querySelector('[data-swatches-row]').hidden,
+    имя: f.querySelector('[data-swatches-name]').textContent,
+  }));
+  проверить(з.имена.join(',') === 'Лаванда,Синий,Зелёный,Янтарный,Красный,Серый', `палитра: шесть кружков с именами (${з.имена.join(',')})`);
+  проверить(з.видно, 'палитра: со скриптом ряд виден');
+  проверить(з.имя === 'Зелёный', `палитра: выбран зелёный (${з.имя})`);
+  await обр.locator('.swatches__item[title="Красный"]').click();
+  const после = await обр.evaluate((f) => ({
+    код: f.querySelector('.swatches__code').value, имя: f.querySelector('[data-swatches-name]').textContent,
+  }));
+  проверить(после.код === '#e5484d' && после.имя === 'Красный', `палитра: щелчок по красному пишет код и имя (${после.код} ${после.имя})`);
+  await обр.locator('.docs-sample__view, .docs-sample__body').first().screenshot({ path: path.join(OUT, 'палитра-акцента-1280.png') }).catch(() => обр.screenshot({ path: path.join(OUT, 'палитра-акцента-1280.png') }));
+  await ctx.close();
+}
+
 (async () => {
   const b = await браузер();
   await колонкаЧисел(b);
   await источникСегментов(b);
   await отказСлота(b);
   await кнопкаБезОтправки(b);
+  await палитраАкцента(b);
   await b.close();
   if (беды.length) {
     console.log(`\n${беды.length} бед`);
