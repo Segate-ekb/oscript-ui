@@ -1985,14 +1985,27 @@ form[data-quiet][aria-busy="true"] { cursor: progress; }
    механизм, которым дефект вернётся. */
 /* Строка кода стоит на высоте кнопки копирования (32px) за счёт полей, а не интерлиньяжа:
    у многострочного сниппета интерлиньяж 32px развёл бы строки вдвое. */
+/* Код сжимается, а не кнопка: min-width 0 снимает с флекс-элемента ширину самого длинного
+   слова, а overflow-wrap: anywhere рвёт строку без пробелов (адрес, путь) у края блока.
+   Было: на 390 «opm install localhost:3412/пул/пакет» держал ширину целиком, и кнопка
+   «Копировать» уезжала за край блока (аудит M3, S7). */
 .cmd code {
+	flex: 1 1 auto;
+	min-width: 0;
 	padding: 6px 0;
 	font-size: var(--md-sys-typescale-body-medium-size);
 	line-height: var(--md-sys-typescale-body-medium-line-height);
 	white-space: pre-wrap;
+	overflow-wrap: anywhere;
 	tab-size: 4;
 }
+/* На телефоне кнопка встаёт под код, когда рядом с ним не помещается: ряд переносится по
+   полной ширине кода (основа auto), и короткая команда остаётся в одну строку с кнопкой. */
+@media (max-width: 600px) {
+	.cmd { flex-wrap: wrap; }
+}
 .cmd .copy, .from-config__env .copy {
+	flex: none;
 	margin-left: auto;
 	display: inline-flex;
 	align-items: center;

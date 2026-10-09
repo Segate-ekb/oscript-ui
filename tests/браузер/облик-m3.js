@@ -82,10 +82,38 @@ async function имяКарточки(b) {
   }
 }
 
+// S7: блок с длинной командой на 390 — кнопка «Копировать» целиком внутри блока и экрана,
+// блок не прокручивается вбок; на 1280 короткая команда стоит с кнопкой в одну строку.
+async function блокКоманды(b) {
+  const ctx = await b.newContext({ viewport: { width: 390, height: 900 } });
+  const p = await ctx.newPage();
+  await p.goto(адрес('блок-команды'), { waitUntil: 'networkidle' });
+  const з = await образец(p, 'Длинный адрес').locator('.docs-sample__preview .cmd').evaluate((c) => {
+    const к = c.querySelector('.copy').getBoundingClientRect();
+    const б = c.getBoundingClientRect();
+    const код = c.querySelector('code').getBoundingClientRect();
+    return { внутри: к.left >= б.left - 0.5 && к.right <= б.right + 0.5, экран: к.right <= innerWidth,
+      вбок: c.scrollWidth > c.clientWidth + 1, подКодом: к.top >= код.bottom - 0.5 };
+  });
+  проверить(з.внутри && з.экран, 'S7 390: «Копировать» целиком внутри блока и экрана');
+  проверить(!з.вбок, 'S7 390: блок команды не прокручивается вбок');
+  проверить(з.подКодом, 'S7 390: длинная команда — кнопка под кодом');
+  await образец(p, 'Длинный адрес').screenshot({ path: path.join(OUT, 'блок-команды-390.png') });
+  await p.setViewportSize({ width: 1280, height: 900 });
+  const широкий = await образец(p, 'Длинный адрес').locator('.docs-sample__preview .cmd').evaluate((c) => {
+    const к = c.querySelector('.copy').getBoundingClientRect();
+    const код = c.querySelector('code').getBoundingClientRect();
+    return к.top < код.bottom && к.left >= код.right - 0.5;
+  });
+  проверить(широкий, 'S7 1280: кнопка справа от кода, в одной строке с ним');
+  await ctx.close();
+}
+
 (async () => {
   const b = await браузер();
   try {
     await имяКарточки(b);
+    await блокКоманды(b);
   } finally {
     await b.close();
   }
