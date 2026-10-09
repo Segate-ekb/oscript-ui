@@ -151,11 +151,28 @@ async function отказСлота(b) {
   await ctx.close();
 }
 
+// Кнопка без отправки: щелчок по кнопке образца в форме не шлёт форму и не уводит со страницы.
+async function кнопкаБезОтправки(b) {
+  const { ctx, p } = await страница(b, 'кнопка', 1280);
+  const обр = образец(p, 'кнопка образца не отправляет форму');
+  const до = p.url();
+  const запросы = [];
+  p.on('request', (r) => { if (r.method() === 'POST') запросы.push(r.url()); });
+  const кнопка = обр.locator('.preview button').first();
+  проверить(await кнопка.getAttribute('type') === 'button', 'без отправки: type="button"');
+  await кнопка.click();
+  await p.waitForTimeout(600);
+  проверить(запросы.length === 0, `без отправки: форма не ушла (${запросы.length})`);
+  проверить(p.url() === до, 'без отправки: страница та же');
+  await ctx.close();
+}
+
 (async () => {
   const b = await браузер();
   await колонкаЧисел(b);
   await источникСегментов(b);
   await отказСлота(b);
+  await кнопкаБезОтправки(b);
   await b.close();
   if (беды.length) {
     console.log(`\n${беды.length} бед`);
