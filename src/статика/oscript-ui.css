@@ -3235,3 +3235,216 @@ div.entry__head:hover { --_state: 0%; }
 	/* вкладки стоят у левого края, а не растянуты линиями мастера */
 	.steps--tabs > .steps__bar > .steps__item { flex: 0 1 auto; }
 }
+
+/* --- сегменты и подсказка (выпуск 0.12) ---------------------------------------------
+   Сегменты — сегментированные кнопки Material 3: пилюля с рамкой outline, сегменты через
+   линию, выбранный залит secondary-container и несёт галку. Под капотом радиокнопки
+   одного имени: выбор держит :checked, скрипта нет. Радиокнопка не спрятана display:none —
+   иначе выпала бы из порядка фокуса и стрелок; она прозрачна и растянута по сегменту. */
+.segments {
+	display: inline-grid;
+	grid-auto-flow: column;
+	/* сегмент шириной в свою подпись. Равные колонки резали бы на телефоне самую длинную
+	   подпись — а у выбранного она ещё и с галкой; здесь же не хватит места — короткие
+	   сегменты останутся целыми, многоточие получит длинный */
+	grid-auto-columns: minmax(0, auto);
+	max-width: 100%;
+	vertical-align: middle;
+	border: 1px solid var(--md-sys-color-outline);
+	border-radius: var(--md-sys-shape-corner-full);
+}
+.segments__item { position: relative; display: flex; min-width: 0; cursor: pointer; }
+.segments__item + .segments__item { border-left: 1px solid var(--md-sys-color-outline); }
+.segments__item:has(:focus-visible) { z-index: 1; }
+.segments__input {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	margin: 0;
+	opacity: 0;
+	cursor: pointer;
+}
+.segments__label {
+	--_bg: transparent;
+	--_fg: var(--md-sys-color-on-surface);
+	--_state: 0%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	min-width: 0;
+	min-height: 40px;
+	padding: 0 var(--space-3);
+	font: var(--type-label-large);
+	letter-spacing: var(--md-sys-typescale-label-large-tracking);
+	color: var(--_fg);
+	background-color: color-mix(in srgb, var(--_fg) var(--_state), var(--_bg));
+	transition: background-color var(--motion-fast) var(--motion-ease),
+	            color var(--motion-fast) var(--motion-ease);
+}
+.segments__item:first-child > .segments__label { border-radius: var(--md-sys-shape-corner-full) 0 0 var(--md-sys-shape-corner-full); }
+.segments__item:last-child > .segments__label { border-radius: 0 var(--md-sys-shape-corner-full) var(--md-sys-shape-corner-full) 0; }
+.segments__item:only-child > .segments__label { border-radius: var(--md-sys-shape-corner-full); }
+.segments__text { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* Галка выбранного въезжает слева и сдвигает подпись, как в Material; у невыбранного места
+   под неё нет — подпись стоит посередине. */
+.segments__check {
+	display: inline-flex;
+	flex: none;
+	width: 0;
+	overflow: hidden;
+	transition: width var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard),
+	            margin var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+}
+.segments__check .icon { flex: none; width: 18px; height: 18px; }
+.segments__item:hover > .segments__label { --_state: var(--state-hover); }
+.segments__item:active > .segments__label { --_state: var(--state-pressed); }
+.segments__input:checked + .segments__label {
+	--_bg: var(--md-sys-color-secondary-container);
+	--_fg: var(--md-sys-color-on-secondary-container);
+}
+.segments__input:checked + .segments__label .segments__check { width: 18px; margin-right: var(--space-2); }
+.segments__input:focus-visible + .segments__label { outline: 3px solid var(--md-sys-color-secondary); outline-offset: 2px; }
+.segments__input[disabled] { cursor: not-allowed; }
+.segments__input[disabled] + .segments__label { opacity: .38; }
+/* Малые — для строки списка и записи реестра: та же пилюля, ниже и плотнее. */
+.segments--small .segments__label {
+	min-height: 32px;
+	padding: 0 var(--space-2);
+	font: var(--type-label-medium);
+	letter-spacing: var(--md-sys-typescale-label-medium-tracking);
+}
+.segments--small .segments__input:checked + .segments__label .segments__check { margin-right: var(--space-1); }
+
+/* Наборы полей под сегментами. Панель номер N видна, пока отмечен сегмент номер N: лист
+   сопоставляет их по номеру, правила перечислены до восьми сегментов (столько же
+   проверяет Сегменты.НаборовНаЛисте). Движок без :has() показывает все наборы сразу —
+   поля не теряются, лишние отбрасывает сервер. Пустая панель места не занимает. */
+.segments-set { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-4); }
+.segments-set > .segments__panel { align-self: stretch; display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.segments-set > .segments__panel:empty { display: none; }
+@supports selector(:has(*)) {
+	.segments-set > .segments__panel { display: none; }
+	.segments-set:has(> .segments > :nth-child(1) > :checked) > .segments__panel:nth-child(2):not(:empty),
+	.segments-set:has(> .segments > :nth-child(2) > :checked) > .segments__panel:nth-child(3):not(:empty),
+	.segments-set:has(> .segments > :nth-child(3) > :checked) > .segments__panel:nth-child(4):not(:empty),
+	.segments-set:has(> .segments > :nth-child(4) > :checked) > .segments__panel:nth-child(5):not(:empty),
+	.segments-set:has(> .segments > :nth-child(5) > :checked) > .segments__panel:nth-child(6):not(:empty),
+	.segments-set:has(> .segments > :nth-child(6) > :checked) > .segments__panel:nth-child(7):not(:empty),
+	.segments-set:has(> .segments > :nth-child(7) > :checked) > .segments__panel:nth-child(8):not(:empty),
+	.segments-set:has(> .segments > :nth-child(8) > :checked) > .segments__panel:nth-child(9):not(:empty) { display: flex; }
+}
+
+/* Подсказка — значок «?» и поповер при нём (rich tooltip Material): контейнер
+   surface-container, второй уровень возвышения, текст body-medium. Открывает и закрывает
+   поповер движок (popovertarget, Esc, щелчок мимо), скрипта нет. Значок 24px, а зона
+   нажатия — 48px: псевдоэлемент выходит за него на 12px с каждой стороны. */
+.help {
+	--_state: 0%;
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: none;
+	width: 24px;
+	height: 24px;
+	margin: 0 0 0 var(--space-1);
+	padding: 0;
+	vertical-align: middle;
+	border: 0;
+	border-radius: var(--md-sys-shape-corner-full);
+	color: var(--md-sys-color-on-surface-variant);
+	background-color: color-mix(in srgb, var(--md-sys-color-on-surface-variant) var(--_state), transparent);
+	cursor: pointer;
+	transition: background-color var(--motion-fast) var(--motion-ease),
+	            color var(--motion-fast) var(--motion-ease);
+}
+.help::before { content: ""; position: absolute; inset: -12px; }
+.help:hover { --_state: var(--state-hover); color: var(--md-sys-color-on-surface); }
+.help:active { --_state: var(--state-pressed); }
+.help:focus-visible { outline: 3px solid var(--md-sys-color-secondary); outline-offset: 2px; }
+.help__mark {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 18px;
+	height: 18px;
+	border: 2px solid currentColor;
+	border-radius: var(--md-sys-shape-corner-full);
+	font: var(--type-label-medium);
+	font-weight: 700;
+	line-height: 1;
+}
+.help__pop {
+	max-width: min(312px, calc(100vw - 2 * var(--space-4)));
+	padding: var(--space-3) var(--space-4);
+	border: 0;
+	border-radius: var(--md-sys-shape-corner-medium);
+	background: var(--md-sys-color-surface-container);
+	color: var(--md-sys-color-on-surface-variant);
+	box-shadow: var(--md-sys-elevation-level2);
+	font: var(--type-body-medium);
+	letter-spacing: var(--md-sys-typescale-body-medium-tracking);
+	font-weight: normal;
+	text-align: start;
+	text-transform: none;
+	white-space: normal;
+	overflow-wrap: anywhere;
+}
+/* Поповер проявляется — дискретно снимаются только верхний слой и display, после
+   движения; движок, который так не умеет, открывает его сразу. */
+@supports selector(:popover-open) {
+	.help__pop {
+		opacity: 0;
+		transition: opacity var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard),
+		            overlay var(--md-sys-motion-duration-short4) allow-discrete,
+		            display var(--md-sys-motion-duration-short4) allow-discrete;
+	}
+	.help__pop:popover-open { opacity: 1; }
+	@starting-style {
+		.help__pop:popover-open { opacity: 0; }
+	}
+}
+/* Место поповера — под значком, который его открыл: кнопка из popovertarget и есть его
+   неявный якорь (см. панель меню). Не хватит места справа или снизу — браузер отзеркалит
+   его сам. Движок без привязки к якорю ставит поповер по центру экрана (стиль UA), и
+   ширина в экран с полями 16px не пускает его за край и там. */
+@supports (top: anchor(bottom)) {
+	.help__pop {
+		inset: auto;
+		position-anchor: auto;
+		top: anchor(bottom);
+		left: anchor(left);
+		margin: var(--space-1) 0 0;
+		position-try-fallbacks: flip-inline, flip-block, flip-block flip-inline;
+	}
+	/* У поля значок стоит у правого края — поповер растёт от него влево, над полем. */
+	.field-help > .help__pop { left: auto; right: anchor(right); }
+	/* На телефоне поповер шириной в экран с полями 16px — под значком или над ним: так
+	   он не уходит за край, где бы значок ни стоял. */
+	@media (max-width: 640px) {
+		.help__pop, .field-help > .help__pop {
+			left: var(--space-4);
+			right: var(--space-4);
+			max-width: none;
+			position-try-fallbacks: flip-block;
+		}
+	}
+}
+
+/* Поле со справкой: значок стоит в строке подписи у правого края поля — там, где
+   у текстового поля Material живёт замыкающий значок; ни значение, ни подпись не уходят
+   под него. У выпадающего списка значок левее шеврона. У флажка значок идёт сразу за
+   подписью. */
+.field-help { position: relative; display: flex; flex-direction: column; min-width: 0; }
+.field-help > .help { position: absolute; z-index: 1; top: 16px; right: var(--space-3); margin: 0; }
+.field-help > .field > .field__control { padding-right: 48px; }
+.field-help > .field > select.field__control { padding-right: 76px; }
+.field-help:has(> .field > select.field__control) > .help { right: 44px; }
+.field-help > .field > .field__label { max-width: calc(100% - 72px); }
+.field-help > .field:not([data-empty]) > .field__label,
+.field-help > .field:focus-within > .field__label { max-width: calc((100% - 72px) * 4 / 3); }
+.field-help:has(> .field--check) { flex-direction: row; align-items: flex-start; }
+.field-help > .field--check { flex: 0 1 auto; }
+.field-help:has(> .field--check) > .help { position: static; margin: -2px 0 0 var(--space-1); }
