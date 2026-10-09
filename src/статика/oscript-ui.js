@@ -1707,7 +1707,14 @@
 		if (!verifyOwn(control) || !verifyTouched.has(control)) {
 			return;
 		}
-		verifyJudge(control);
+		// Уход в кнопку отправки своей формы отказ сейчас не печатает: его напечатает проверка
+		// отправки на том же щелчке. Иначе текст отказа появлялся между нажатием и отпусканием
+		// мыши, сдвигал кнопку вниз на свою строку — и отпускание приходилось мимо неё: щелчок
+		// пропадал, форма не проверялась, фокус не вставал на негодное поле.
+		var to = e.relatedTarget;
+		if (!(to && to.form === control.form && to.type === 'submit')) {
+			verifyJudge(control);
+		}
 		if (control.hasAttribute('data-check')) {
 			verifyAsk(control, 0);
 		}
