@@ -3796,6 +3796,36 @@ div.entry__head:hover { --_state: 0%; }
 	.segments__text { white-space: normal; text-overflow: clip; overflow-wrap: break-word; text-align: center; }
 }
 
+/* Источник значения сегментов (слово Источник, 0.13 дев-сборка 6) — справка о значении, как
+   у поля и тумблера: мелко и приглушённо. Сервер печатает его перед группой, и он стоит
+   справа на строке подписи группы: подпись (<legend>) встаёт влево обтеканием, источник —
+   вправо, группа — под обоими. Не влез рядом — уходит под подпись, у правого края. Без
+   подписи группы источник — своей строкой над пилюлей, справа. */
+.segments__origin {
+	display: block;
+	min-width: 0;
+	text-align: end;
+	overflow-wrap: anywhere;
+	font: var(--type-label-small);
+	letter-spacing: var(--md-sys-typescale-label-small-tracking);
+	color: var(--md-sys-color-on-surface-variant);
+}
+fieldset > legend:has(+ .segments__origin) { float: left; padding: 0; }
+fieldset > legend + .segments__origin {
+	float: right;
+	max-width: 100%;
+	margin: 0 0 0 var(--space-3);
+	/* строка источника той же высоты, что строка подписи: базовые линии почти совпадают */
+	line-height: inherit;
+}
+fieldset > legend + .segments__origin + * { clear: both; }
+/* clear действует только на блок: строчная пилюля (inline-grid) встала бы рядом с подписью,
+   поэтому здесь она — блочная сетка своей ширины (на телефоне — во всю, как всегда там) */
+fieldset > legend + .segments__origin + .segments { display: grid; width: fit-content; }
+@media (max-width: 600px) {
+	fieldset > legend + .segments__origin + .segments { width: 100%; }
+}
+
 /* Наборы полей под сегментами. Панель номер N видна, пока отмечен сегмент номер N: лист
    сопоставляет их по номеру, правила перечислены до восьми сегментов (столько же
    проверяет Сегменты.НаборовНаЛисте). Движок без :has() показывает все наборы сразу —

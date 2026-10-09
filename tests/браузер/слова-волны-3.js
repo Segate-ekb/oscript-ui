@@ -94,9 +94,34 @@ async function колонкаЧисел(b) {
   }
 }
 
+// Источник сегментов: справа на строке подписи группы, пилюля под ними; на 390 — так же.
+async function источникСегментов(b) {
+  for (const w of [1280, 390]) {
+    const { ctx, p } = await страница(b, 'сегменты', w);
+    const обр = образец(p, 'Тема и откуда она взялась');
+    const з = await обр.evaluate((f) => {
+      const r = (s) => f.querySelector(s).getBoundingClientRect();
+      const группа = f.querySelector('.segments');
+      return {
+        подпись: r('fieldset > legend'), источник: r('.segments__origin'), пилюля: r('.segments'),
+        рамка: r('fieldset'),
+        описана: группа.getAttribute('aria-describedby') === f.querySelector('.segments__origin').id,
+      };
+    });
+    проверить(Math.abs(з.источник.top - з.подпись.top) <= 4, `сегменты ${w}: источник на строке подписи группы (${Math.round(з.источник.top - з.подпись.top)})`);
+    проверить(з.источник.left >= з.подпись.right, `сегменты ${w}: источник справа от подписи`);
+    проверить(Math.abs(з.источник.right - з.рамка.right) <= 1, `сегменты ${w}: источник у правого края группы`);
+    проверить(з.пилюля.top >= Math.max(з.подпись.bottom, з.источник.bottom) - 0.5, `сегменты ${w}: пилюля под подписью и источником`);
+    проверить(з.описана, `сегменты ${w}: группа ссылается на источник aria-describedby`);
+    await обр.screenshot({ path: path.join(OUT, `источник-сегментов-${w}.png`) });
+    await ctx.close();
+  }
+}
+
 (async () => {
   const b = await браузер();
   await колонкаЧисел(b);
+  await источникСегментов(b);
   await b.close();
   if (беды.length) {
     console.log(`\n${беды.length} бед`);
