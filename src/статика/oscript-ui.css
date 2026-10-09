@@ -2348,13 +2348,21 @@ form[data-quiet][aria-busy="true"] { cursor: progress; }
    Раскладки в 1–2 колонки — это ДВЕ КОЛОНКИ СОДЕРЖИМОГО (текст рядом с текстом, список
    рядом со списком): им нужен auto-fit, чтобы пара блоков занимала ширину целиком,
    как на flex.
-   Раскладки в 3–4 колонки — СЕТКА КАРТОЧЕК: у них auto-fill, то есть колонка одной ширины
-   всегда, даже когда карточек меньше, чем колонок.
-   min(100%, …) в минимуме трека: на узком экране колонка не выпирает за контейнер. */
+   Раскладки в 3–4 колонки — СЕТКА КАРТОЧЕК, и число в имени — ПОТОЛОК: колонок не больше
+   трёх (четырёх) на любой ширине, а уже экрана их меньше по точкам перелома. Прежний
+   auto-fill (колонки по 280 и 220 px, сколько влезет) на широком мониторе ставил в ряд
+   «трёх колонок» четыре карточки, и шесть карточек ложились рядом 4 + 2. Теперь шесть
+   карточек в .grid--3 заполняют ряды всегда: 3 + 3, 2 + 2 + 2 или по одной.
+   minmax(0, 1fr): длинное слово в карточке не раздвигает свою колонку шире соседних. */
 .grid--1 { display: grid; grid-template-columns: 1fr; }
 .grid--2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); }
-.grid--3 { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }
-.grid--4 { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); }
+.grid--3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid--4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1000px) { .grid--4 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 900px) { .grid--3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .grid--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .grid--3 { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 520px) { .grid--4 { grid-template-columns: minmax(0, 1fr); } }
 .grid--tight { gap: var(--space-2); }
 
 /* --- страницы: формы, отборы, свёртки --- */
