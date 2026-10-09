@@ -24,13 +24,14 @@ body:has(.docs) .wrap { max-width: 1440px; }
 	padding-bottom: var(--space-5);
 	scrollbar-width: thin;
 }
+/* Заголовок группы навигации — как рубрика кита: заголовок секции ящика навигации Material,
+   title-small обычным регистром (прописные label-medium — стиль M2). */
 .docs__group {
 	margin: var(--space-5) 0 var(--space-1);
 	padding: 0 var(--space-4);
-	font: var(--type-label-medium);
-	letter-spacing: .08em;
-	text-transform: uppercase;
-	color: var(--md-sys-color-primary);
+	font: var(--type-title-small);
+	letter-spacing: var(--md-sys-typescale-title-small-tracking);
+	color: var(--md-sys-color-on-surface-variant);
 }
 .docs__group:first-child { margin-top: 0; }
 .docs__nav .tree--column .tree__link { min-height: 36px; }

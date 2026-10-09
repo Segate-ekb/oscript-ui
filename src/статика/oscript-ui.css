@@ -276,14 +276,15 @@ main.wrap { padding-top: var(--space-6); padding-bottom: var(--space-8); min-hei
    На телефоне полоса ходов спрятана, и шторка — единственное место, где они есть. */
 .hubmenu__section--roads { display: block; }
 /* Рубрика внутри группы разделов — та же подпись, что над разделами колонки дома:
-   label-medium прописными, приглушённо, с воздухом сверху. */
+   заголовок секции ящика навигации Material — title-small обычным регистром, приглушённо,
+   с воздухом сверху. Прописные label-medium — стиль M2: в шторке они стояли рядом с
+   заголовком группы title-small, и было два стиля одной роли (аудит M3, S10). */
 .hubmenu__rubric {
 	margin: 0;
 	padding: var(--space-3) var(--space-4) var(--space-1);
 	color: var(--md-sys-color-on-surface-variant);
-	font: var(--type-label-medium);
-	letter-spacing: var(--md-sys-typescale-label-medium-tracking);
-	text-transform: uppercase;
+	font: var(--type-title-small);
+	letter-spacing: var(--md-sys-typescale-title-small-tracking);
 }
 /* Строка переключателя оформления: на широком её прячет медиа-блок — там переключатель
    стоит в самой шапке, и вторая такая же строка в меню была бы дублем. На телефоне полоса
@@ -1538,15 +1539,15 @@ span.checktree__item { cursor: default; }
    дома настроек на узком экране, а на широком под курсором хватает и этой. */
 .tree--column .tree__link { display: flex; min-height: 36px; }
 .tree--column .tree__list--1 { margin-left: var(--space-4); }
-/* Рубрика — подпись над первым разделом своей группы: label-medium прописными,
-   приглушённо и с отступом сверху, чтобы группа читалась отдельно. В ряду шапки рубрик
-   нет: их там не печатает компонент. */
+/* Рубрика — подпись над первым разделом своей группы: заголовок секции ящика навигации
+   Material — title-small обычным регистром, приглушённо и с отступом сверху, чтобы группа
+   читалась отдельно (было label-medium прописными, стиль M2; аудит M3, S10). В ряду шапки
+   рубрик нет: их там не печатает компонент. */
 .tree__rubric {
 	padding: var(--space-3) var(--space-4) var(--space-1);
 	color: var(--md-sys-color-on-surface-variant);
-	font: var(--type-label-medium);
-	letter-spacing: var(--md-sys-typescale-label-medium-tracking);
-	text-transform: uppercase;
+	font: var(--type-title-small);
+	letter-spacing: var(--md-sys-typescale-title-small-tracking);
 }
 /* Опасный раздел — цветом ошибки и на наведении; текущий опасный залит error-container. */
 .tree__link--danger, .tree__link--danger:hover { color: var(--md-sys-color-error); }

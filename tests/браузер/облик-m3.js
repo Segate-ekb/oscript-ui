@@ -323,6 +323,26 @@ async function целиКасания(b) {
   await мышь.close();
 }
 
+// S10: рубрики колонки разделов (боковая навигация документации) и шторки — title-small
+// обычным регистром, одного стиля с подписью группы шторки.
+async function рубрики(b) {
+  const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
+  const p = await ctx.newPage();
+  await p.goto(адрес('дерево-разделов'), { waitUntil: 'networkidle' });
+  const стиль = (sel) => p.evaluate((sel) => {
+    const r = document.querySelector(sel);
+    if (!r) return null;
+    const ст = getComputedStyle(r);
+    return `${ст.textTransform} ${ст.fontSize} ${ст.fontWeight}`;
+  }, sel);
+  const колонка = await стиль('.docs-sample__preview .tree__rubric');
+  проверить(колонка === 'none 14px 500', `S10: рубрика колонки разделов — title-small обычным регистром (${колонка})`);
+  const группа = await стиль('.docs__group');
+  проверить(группа === 'none 14px 500', `S10: группа навигации документации — тем же стилем (${группа})`);
+  await образец(p, 'Три рубрики').screenshot({ path: path.join(OUT, 'рубрики-1280.png') }).catch(() => {});
+  await ctx.close();
+}
+
 (async () => {
   const b = await браузер();
   try {
@@ -333,6 +353,7 @@ async function целиКасания(b) {
     await карточкаВКарточке(b);
     await ссылкиВТексте(b);
     await целиКасания(b);
+    await рубрики(b);
   } finally {
     await b.close();
   }
