@@ -126,9 +126,76 @@ async function подписиСегментов(b) {
   }
 }
 
+// Образец, перенесённый на голую страницу кита: голова (лист и токены темы) та же, что у
+// страницы документации, а тело — поле страницы .wrap и разметка образца. Так ширины те же,
+// что на странице приложения, а не в рамке образца документации со своими полями.
+async function образецНаСтранице(p, подпись) {
+  const з = await p.evaluate((подпись) => {
+    const f = [...document.querySelectorAll('figure.docs-sample')]
+      .find((x) => x.querySelector('.docs-sample__title').textContent.includes(подпись));
+    const сцена = f.querySelector('.card, .section').parentElement;
+    const голова = [...document.head.querySelectorAll('link[rel="stylesheet"], style')]
+      .map((x) => (x.tagName === 'LINK' ? `<link rel="stylesheet" href="${x.href}">` : x.outerHTML)).join('');
+    return { голова, тело: сцена.innerHTML, тема: document.documentElement.getAttribute('data-theme') || '' };
+  }, подпись);
+  await p.setContent(`<!doctype html><html lang="ru" data-theme="${з.тема}"><head><meta charset="utf-8">`
+    + `<meta name="viewport" content="width=device-width, initial-scale=1">${з.голова}</head>`
+    + `<body><main class="wrap">${з.тело}</main></body></html>`, { waitUntil: 'networkidle' });
+  return p.locator('main.wrap');
+}
+
+// П. 0: на 390 карточка со списком карточек объектов плоская, а карточки в ней — карточки
+// во всю ширину экрана без полей страницы (390 − 2 × 16 = 358). На 1280 — как было.
+async function секцияСоСпискомКарточек(b) {
+  for (const [ширина, тема] of [[390, 'light'], [390, 'dark'], [1280, 'light']]) {
+    const { ctx, p } = await страница(b, 'сетка', ширина);
+    await p.evaluate((т) => document.documentElement.setAttribute('data-theme', т), тема);
+    const обр = await образецНаСтранице(p, 'Секция со списком карточек');
+    const з = await обр.evaluate((f) => {
+      const внешняя = f.querySelector('.card');
+      const карточки = [...f.querySelectorAll('.objcard')];
+      const с = getComputedStyle(внешняя);
+      return {
+        кольцоВнешней: с.boxShadow,
+        заливкаВнешней: с.backgroundColor,
+        поляВнешней: [с.paddingLeft, с.paddingRight],
+        карточки: карточки.map((к) => {
+          const ск = getComputedStyle(к);
+          return {
+            ширина: Math.round(к.getBoundingClientRect().width),
+            кольцо: ск.boxShadow,
+            заливка: ск.backgroundColor,
+            скругление: ск.borderTopLeftRadius,
+            черта: ск.borderTopWidth,
+          };
+        }),
+        прокрутка: document.documentElement.scrollWidth > window.innerWidth,
+      };
+    });
+    const к = `секция со списком ${ширина} ${тема}`;
+    проверить(з.карточки.length === 3, `${к}: три карточки (${з.карточки.length})`);
+    проверить(з.карточки.every((с) => с.кольцо !== 'none' && с.заливка !== 'rgba(0, 0, 0, 0)'),
+      `${к}: у карточек объектов кольцо и заливка (${з.карточки.map((с) => с.заливка).join(', ')})`);
+    проверить(з.карточки.every((с) => с.скругление === '16px' && с.черта === '0px'),
+      `${к}: скругление 16, без черты (${з.карточки.map((с) => с.скругление + '/' + с.черта).join(', ')})`);
+    if (ширина === 390) {
+      проверить(з.кольцоВнешней === 'none' && з.заливкаВнешней === 'rgba(0, 0, 0, 0)',
+        `${к}: у внешней карточки нет кольца и заливки (${з.кольцоВнешней}; ${з.заливкаВнешней})`);
+      проверить(з.поляВнешней.join() === '0px,0px', `${к}: у внешней карточки нет боковых полей (${з.поляВнешней.join(' ')})`);
+      проверить(з.карточки.every((с) => с.ширина >= 350),
+        `${к}: карточки во всю ширину без полей страницы, ≥ 350 (${з.карточки.map((с) => с.ширина).join(', ')})`);
+      проверить(!з.прокрутка, `${к}: страница не прокручивается вбок`);
+    } else {
+      проверить(з.кольцоВнешней !== 'none', `${к}: на широком экране внешняя карточка — карточка`);
+    }
+    await обр.screenshot({ path: path.join(OUT, `секция-со-списком-${ширина}-${тема}.png`) });
+    await ctx.close();
+  }
+}
+
 (async () => {
   const b = await браузер();
-  const шаги = { подписиСегментов };
+  const шаги = { секцияСоСпискомКарточек, подписиСегментов };
   try {
     for (const [имя, шаг] of Object.entries(шаги)) {
       if (ТОЛЬКО && !ТОЛЬКО.split(',').includes(имя)) continue;

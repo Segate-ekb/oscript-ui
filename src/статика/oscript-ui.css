@@ -2960,7 +2960,8 @@ div.entry__head:hover { --_state: 0%; }
    карточка, секция и карточка объекта ВНУТРИ карточки или секции становятся частью
    родителя — без тени, кольца, своей заливки и боковых полей; соседей разделяет черта
    outline-variant, как пункты списка. Таблица внутри — без своей обводки. Содержимое
-   вложенного блока получает всю ширину родителя: на 390 — 326 px.
+   вложенного блока получает всю ширину родителя: на 390 — 326 px. Карточки объектов сетки
+   — исключение (правило ниже): плоской становится родитель, а они остаются карточками.
    На широком экране всё как было: вложенная карточка там — карточка. */
 @media (max-width: 600px) {
 	.wrap { padding-left: var(--space-4); padding-right: var(--space-4); }
@@ -2977,6 +2978,46 @@ div.entry__head:hover { --_state: 0%; }
 	.card .objcard:hover, .section .objcard:hover { box-shadow: none; }
 	.card .grid, .section .grid { gap: var(--space-3); }
 	.card .table-scroll, .section .table-scroll { border: 0; border-radius: 0; }
+}
+
+/* Секция со списком карточек на телефоне (0.13, дев-сборка 7). Правило выше делало плоскими
+   карточки объектов СЕТКИ внутри карточки или секции: список «Недавно обновлённые» на 390
+   разваливался в полосы с чертами — без рамки и фона, плашки торчали справа от имени (слово
+   владельца к превью 3). Одна поверхность на compact — верная цель, но плоской становится
+   ВНЕШНЯЯ карточка или секция, в которой лежит сетка (или список) карточек объектов: без
+   кольца, заливки, тени и боковых полей, её заголовок и пояснение стоят на поле страницы 16.
+   Карточки объектов внутри — карточки, как на широком экране: кольцо outline-variant,
+   заливка поверхности карточки (surface-container в тёмной теме), скругление 16, свои поля,
+   во всю ширину (на 390 — 358 px), зазор сетки --space-3, без черты между ними. Вложенная
+   таблица и одиночная вложенная карточка — по правилу выше. Движок без :has() правила не
+   применит — останется прежний вид, а не карточки в карточке. */
+@media (max-width: 600px) {
+	@supports selector(:has(*)) {
+		.card:has(> .card__body > .grid .objcard),
+		.card:has(> .card__body > .objcard-list > .objcard),
+		.section:has(> .section__body > .grid .objcard),
+		.section:has(> .section__body > .objcard-list > .objcard) {
+			background: transparent;
+			box-shadow: none;
+			border-radius: 0;
+			padding-left: 0;
+			padding-right: 0;
+		}
+		.card .grid > .grid__cell > .objcard,
+		.section .grid > .grid__cell > .objcard,
+		.card .objcard-list > .objcard,
+		.section .objcard-list > .objcard {
+			background: var(--surface-card);
+			box-shadow: var(--elevation-ring-level1);
+			border-radius: var(--md-sys-shape-corner-large);
+			padding: var(--space-3) var(--space-4);
+			border-top: 0;
+		}
+		.card .grid > .grid__cell > .objcard:hover,
+		.section .grid > .grid__cell > .objcard:hover,
+		.card .objcard-list > .objcard:hover,
+		.section .objcard-list > .objcard:hover { box-shadow: var(--elevation-ring-level2); }
+	}
 }
 
 /* --- модальное окно формы -------------------------------------------------------
