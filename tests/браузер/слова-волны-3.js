@@ -1,6 +1,6 @@
 // Слова дев-сборки 0.13.0-dev.6 для пробелов хаба волны 3 на образцах сайта документации:
 // колонка чисел, источник сегментов, отказ слота картинки, кнопка без отправки, образцы
-// акцента темы, зеркало акцента в образце. Сайт документации должен быть запущен:
+// акцента темы, зеркало акцента в образце, строка поиска со значком. Сайт документации должен быть запущен:
 //
 //   cd документация && oscript main.os --порт 3391
 //   NODE_PATH=/tmp/claude-501/pw/node_modules node tests/браузер/слова-волны-3.js [адрес] [каталог снимков]
@@ -226,6 +226,41 @@ async function зеркалоАкцента(b) {
   await ctx.close();
 }
 
+// Строка поиска со значком (слово владельца к превью 2): на 390 значок внутри рамки поля, ничего
+// не переносится; Enter в поле и щелчок по значку отправляют форму (переход GET с q=).
+async function строкаПоиска(b) {
+  for (const w of [390, 1280]) {
+    const { ctx, p } = await страница(b, 'форма-отбора', w);
+    const обр = образец(p, 'Значок поиска в строке');
+    const з = await обр.evaluate((f) => {
+      const r = (s) => f.querySelector(s).getBoundingClientRect();
+      return { форма: r('form.filters'), ввод: r('.search-bar .field__control'), значок: r('.search-bar > .button'),
+        имя: f.querySelector('.search-bar > .button').getAttribute('aria-label') };
+    });
+    const внутри = з.значок.left >= з.ввод.left && з.значок.right <= з.ввод.right + 0.5
+      && з.значок.top >= з.ввод.top - 0.5 && з.значок.bottom <= з.ввод.bottom + 0.5;
+    проверить(внутри, `поиск ${w}: значок внутри рамки поля`);
+    проверить(Math.abs((з.значок.top + з.значок.bottom) / 2 - (з.ввод.top + з.ввод.bottom) / 2) <= 1, `поиск ${w}: значок по центру поля`);
+    проверить(з.форма.height <= з.ввод.height + 1, `поиск ${w}: ничего не переносится (форма ${Math.round(з.форма.height)}, поле ${Math.round(з.ввод.height)})`);
+    проверить(з.имя === 'Найти', `поиск ${w}: имя значка «Найти» (${з.имя})`);
+    if (w === 390) {
+      await обр.screenshot({ path: path.join(OUT, 'строка-поиска-390.png') });
+      const ждать = () => p.waitForRequest((r) => r.isNavigationRequest() && /[?&]q=/.test(r.url()), { timeout: 8000 }).then(() => true).catch(() => false);
+      const ждёмEnter = ждать();
+      await обр.locator('.search-bar .field__control').press('Enter');
+      проверить(await ждёмEnter, 'поиск 390: Enter в поле отправляет форму');
+      // щелчок — на свежей странице: переход после Enter ещё мог идти
+      const вторая = await страница(b, 'форма-отбора', w);
+      const ждёмЩелчок = вторая.p.waitForRequest((r) => r.isNavigationRequest() && /[?&]q=/.test(r.url()), { timeout: 8000 })
+        .then(() => true).catch(() => false);
+      await образец(вторая.p, 'Значок поиска в строке').locator('.search-bar > .button').click();
+      проверить(await ждёмЩелчок, 'поиск 390: щелчок по значку отправляет форму');
+      await вторая.ctx.close();
+    }
+    await ctx.close();
+  }
+}
+
 (async () => {
   const b = await браузер();
   await колонкаЧисел(b);
@@ -234,6 +269,7 @@ async function зеркалоАкцента(b) {
   await кнопкаБезОтправки(b);
   await палитраАкцента(b);
   await зеркалоАкцента(b);
+  await строкаПоиска(b);
   await b.close();
   if (беды.length) {
     console.log(`\n${беды.length} бед`);

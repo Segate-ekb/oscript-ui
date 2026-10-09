@@ -2505,6 +2505,13 @@ form[data-quiet][aria-busy="true"] { cursor: progress; }
 .filters { display: flex; align-items: flex-start; gap: var(--space-2); margin: var(--space-4) 0; }
 .filters > .field { flex: 1; min-width: 0; }
 .filters > .button { margin-top: var(--space-1); }
+/* Строка поиска со значком (0.13, дев-сборка 6): кнопка-значок «поиск» внутри рамки поля,
+   справа — trailing icon строки поиска Material. Поле занимает всю строку, ввод отступает
+   справа под значок, значок стоит по центру контрола (44 − 36 = по 4 сверху и снизу), что
+   бы ни печаталось под полем. На телефоне ничего не переносится: кнопки снаружи нет. */
+.filters > .search-bar { position: relative; flex: 1 1 auto; min-width: 0; }
+.search-bar > .field > .field__control { padding-right: 48px; }
+.search-bar > .button { position: absolute; top: var(--space-1); right: var(--space-1); }
 /* На телефоне поля отбора встают каждое во всю строку, а кнопка — под ними: в одну строку
    три поля и кнопка сжимались до нечитаемого. */
 @media (max-width: 640px) {
