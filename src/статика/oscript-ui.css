@@ -3647,3 +3647,21 @@ div.entry__head:hover { --_state: 0%; }
 .field-help:has(> .field--check) { flex-direction: row; align-items: flex-start; }
 .field-help > .field--check { flex: 0 1 auto; }
 .field-help:has(> .field--check) > .help { position: static; margin: -2px 0 0 var(--space-1); }
+
+/* --- проверка до отправки и тост (выпуск 0.12, шаги 18 и 19) ----------------------------
+   Отказ до отправки скрипт пишет в тот же field__error и ставит тот же field--error, что
+   печатает сервер: правила поля выше уже его красят, своих здесь нет. Тост из ответа тихой
+   отправки скрипт поднимает из потока страницы (data-toast-live) и показывает внизу экрана
+   по одному, как Snackbar у Material: ждущий очереди не виден. */
+.toast[data-toast-live] {
+	position: fixed;
+	z-index: 30;
+	left: var(--space-4);
+	right: var(--space-4);
+	bottom: var(--space-4);
+	width: fit-content;
+	max-width: 40rem;
+	margin: 0 auto;
+	box-shadow: var(--md-sys-elevation-level3);
+}
+.toast[data-toast-live="wait"] { display: none; }
