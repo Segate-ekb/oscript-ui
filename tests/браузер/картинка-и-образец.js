@@ -156,6 +156,15 @@ async function зеркало(b) {
   проверить(цвет.свойство === '#ff5722', '17: цвет ушёл в свойство --mirror-accent');
   проверить(цвет.полоса === 'rgb(255, 87, 34)', '17: лист сайта взял цвет из свойства: ' + цвет.полоса);
 
+  // акцент — поле вида «цвет»: кружок пишет код в поле кода, зеркало берёт его оттуда;
+  // «по умолчанию» снимает свойство
+  const зеркалоАкцента = () => p.evaluate(() => document.querySelector('#obrazec-shapki [data-mirror="accent"]')
+    .style.getPropertyValue('--mirror-accent').trim());
+  await p.locator('#forma-shapki .swatches__item[title="Синий"]').click();
+  проверить(await зеркалоАкцента() === '#1a73e8', '17: кружок поля «цвет» перекрасил зеркало');
+  await p.locator('#forma-shapki .swatches__item--default').click();
+  проверить(await зеркалоАкцента() === '', '17: «по умолчанию» сняло свойство зеркала');
+
   // тема рамки
   const фон = () => p.evaluate(() => ({
     рамка: getComputedStyle(document.querySelector('#obrazec-shapki .preview__frame')).backgroundColor,

@@ -1873,9 +1873,10 @@
 
 	// Зеркало значения (data-mirror="имя"): узел показывает текущее значение поля с этим
 	// именем. Текст узла — то, что напечатал сервер; он и возвращается, когда поле опустело.
-	// Поле цвета (системный выбор цвета или образцы-кружки) пишет не текст, а свойство CSS
-	// --mirror-<имя> на узле: его берёт лист приложения, а пустое значение («по умолчанию»)
-	// свойство снимает. Текст пишется textContent-ом — разметка из поля не исполняется.
+	// Поле цвета (системный выбор цвета, образцы-кружки или поле вида «цвет» — его код
+	// .swatches__code, раздел 9) пишет не текст, а свойство CSS --mirror-<имя> на узле: его
+	// берёт лист приложения, а пустое значение («по умолчанию») свойство снимает. Текст
+	// пишется textContent-ом — разметка из поля не исполняется.
 	var MIRROR_TEXT = 'oscriptUiMirrorText'; // свойство узла: текст, напечатанный сервером
 	var HEX = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 
@@ -1890,10 +1891,13 @@
 		return out;
 	}
 
+	// Поле вида «цвет» узнаётся по своему полю кода: его кружки раздел 9 уводит в группу
+	// со своим именем, и под именем поля остаётся одно текстовое поле.
 	function mirrorIsColor(name) {
 		var list = doc.getElementsByName(name);
 		for (var i = 0; i < list.length; i++) {
-			if (list[i].type === 'color' || (list[i].type === 'radio' && HEX.test(list[i].value))) {
+			if (list[i].type === 'color' || (list[i].type === 'radio' && HEX.test(list[i].value))
+				|| (list[i].classList && list[i].classList.contains('swatches__code'))) {
 				return true;
 			}
 		}
@@ -1935,7 +1939,8 @@
 			if (color) {
 				if (!value) {
 					t.style.removeProperty('--mirror-' + name);
-				} else if (HEX.test(value)) {
+				} else if (HEX.test(value) && !(control.validity && control.validity.patternMismatch)) {
+					// код, который не пропустит pattern поля (#abc у поля «цвет»), — ещё не цвет
 					t.style.setProperty('--mirror-' + name, value);
 				}
 				continue;
