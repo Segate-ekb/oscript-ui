@@ -18,6 +18,10 @@
  *      сервер напечатал открытым, — модальным, окно по адресу (data-window-link) в одной
  *      на страницу оболочке и подтверждение отправки формы (data-confirm).
  *   8. шаги (data-steps) — одна панель длинной формы за раз, «Дальше» проверяет поля шага.
+ *   9. проверка до отправки (data-error-*, data-check) — отказ браузера и ответ сервера
+ *      о занятости значения пишутся под полем словами словаря, поле — aria-invalid;
+ *  10. тост из ответа (data-toast-live) — тосты из ответа тихой отправки по очереди внизу
+ *      экрана, каждый на 5 с; тост с ролью alert остаётся на месте.
  *
  * Глобальных имён скрипт не заводит, разметку не печатает — только атрибуты и рябь.
  * Обновив страницу на месте, он сообщает об этом событием «oscript-ui:update» на document:
@@ -496,6 +500,7 @@
 		}
 		markAll();
 		paintTop();
+		toastLift(); // проверка до отправки и тост (выпуск 0.12): тосты ответа — в очередь
 		doc.dispatchEvent(new CustomEvent('oscript-ui:update', { detail: { url: url.href } }));
 		if (closing) {
 			focusMarked();
@@ -617,6 +622,12 @@
 		var b = to.firstChild;
 		while (b) {
 			var nextB = b.nextSibling;
+			// проверка до отправки и тост (выпуск 0.12): тост, поднятый скриптом, сервер
+			// не печатал — морфинг его не трогает
+			if (toastOwned(a)) {
+				a = a.nextSibling;
+				continue;
+			}
 			if (a && a.classList && a.classList.contains('ripple')) {
 				var gone = a;
 				a = a.nextSibling;
@@ -639,7 +650,9 @@
 		}
 		while (a) {
 			var rest = a.nextSibling;
-			from.removeChild(a);
+			if (!toastOwned(a)) {
+				from.removeChild(a);
+			}
 			a = rest;
 		}
 	}
@@ -1159,4 +1172,349 @@
 	// шаги оживают заново.
 	doc.addEventListener('oscript-ui:update', function () { stepsInit(); });
 	stepsInit();
+
+	/* --- 9. проверка до отправки (выпуск 0.12, шаг 18) ------------------------------- */
+
+	// Без скрипта поле проверяет браузер (required, pattern, minlength, type=email/url —
+	// своим пузырём) и сервер (отказ под полем после отправки). Скрипт берёт отказ браузера
+	// на себя только у поля, которое принесло тексты отказов словаря (data-error-*) или адрес
+	// проверки (data-check), — их печатает ПолеФормы: пишет текст в field__error того же
+	// поля, куда сервер кладёт свой, и ставит aria-invalid. Поле без этих признаков скрипт
+	// не трогает. Когда — на попытке отправить (invalid) и на уходе из поля, в котором
+	// человек что-то набрал; исправленное поле снимает отказ сразу, на вводе.
+	//
+	// Поле с data-check спрашивает сервер, свободно ли значение: GET адрес?имя=значение,
+	// когда человек перестал набирать (CHECK_DELAY) или ушёл из поля. 200 — свободно, 409 —
+	// занято, текст ответа — отказ: он держит форму (setCustomValidity), пока значение не
+	// сменят. Сеть и другие ответы молчат: занятость проверит сервер при отправке.
+
+	var VERIFY_KINDS = [
+		['valueMissing', 'required'], ['typeMismatch', 'type'], ['badInput', 'number'],
+		['patternMismatch', 'pattern'], ['tooShort', 'minlength'], ['tooLong', 'maxlength'],
+		['rangeUnderflow', 'min'], ['rangeOverflow', 'max']
+	];
+	var CHECK_DELAY = 500;             // мс тишины ввода до вопроса серверу
+	var verifyAsked = new WeakMap();   // поле → { timer, ctrl, value, busy }
+	var verifyTouched = new WeakSet(); // поле, в котором человек что-то набрал
+	var verifyFocusing = false;        // первое негодное поле этой отправки уже в фокусе
+
+	function verifyOwn(control) {
+		if (!control || !control.attributes || !control.closest || !control.willValidate
+			|| !control.closest('.field')) {
+			return false;
+		}
+		if (control.hasAttribute('data-check')) {
+			return true;
+		}
+		for (var i = 0; i < control.attributes.length; i++) {
+			if (control.attributes[i].name.indexOf('data-error-') === 0) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	// Текст отказа — словом словаря, которое принесло поле; слова нет — словами браузера.
+	function verifyMessage(control) {
+		var v = control.validity;
+		if (v.customError) {
+			return control.validationMessage;
+		}
+		for (var i = 0; i < VERIFY_KINDS.length; i++) {
+			if (v[VERIFY_KINDS[i][0]]) {
+				return control.getAttribute('data-error-' + VERIFY_KINDS[i][1]) || control.validationMessage;
+			}
+		}
+		return control.validationMessage;
+	}
+
+	// Ссылка поля на текст отказа — одна из возможных: подсказку рядом с подписью поле
+	// называет из того же aria-describedby.
+	function verifyDescribe(control, id, on) {
+		var list = (control.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean);
+		var at = list.indexOf(id);
+		if (on && at < 0) {
+			list.push(id);
+		} else if (!on && at >= 0) {
+			list.splice(at, 1);
+		}
+		if (list.length) {
+			control.setAttribute('aria-describedby', list.join(' '));
+		} else {
+			control.removeAttribute('aria-describedby');
+		}
+	}
+
+	// Место отказа то же, что у сервера: последний ребёнок подписи поля, с тем же id.
+	function verifyBox(control, create) {
+		var field = control.closest('.field');
+		var box = field.querySelector(':scope > .field__error');
+		if (!box && create) {
+			box = doc.createElement('span');
+			box.className = 'field__error';
+			box.setAttribute('role', 'alert');
+			if (control.id) {
+				box.id = control.id + '-err';
+			}
+			field.appendChild(box);
+		}
+		return box;
+	}
+
+	function verifyShow(control, text) {
+		var box = verifyBox(control, true);
+		if (box.textContent !== text) {
+			box.textContent = text;
+		}
+		control.closest('.field').classList.add('field--error');
+		control.setAttribute('aria-invalid', 'true');
+		if (box.id) {
+			verifyDescribe(control, box.id, true);
+		}
+	}
+
+	function verifyClear(control) {
+		var box = verifyBox(control, false);
+		if (box) {
+			if (box.id) {
+				verifyDescribe(control, box.id, false);
+			}
+			box.parentNode.removeChild(box);
+		}
+		control.closest('.field').classList.remove('field--error');
+		control.removeAttribute('aria-invalid');
+	}
+
+	function verifyJudge(control) {
+		if (control.validity.valid) {
+			verifyClear(control);
+		} else {
+			verifyShow(control, verifyMessage(control));
+		}
+	}
+
+	// Браузер не пускает форму: пузырь заменяет текст под полем, а фокус встаёт на первое
+	// негодное поле — пузыря нет, и фокус браузер теперь не ставит.
+	doc.addEventListener('invalid', function (e) {
+		var control = e.target;
+		if (!verifyOwn(control)) {
+			return;
+		}
+		e.preventDefault();
+		verifyTouched.add(control);
+		verifyShow(control, verifyMessage(control));
+		if (!verifyFocusing) {
+			verifyFocusing = true;
+			setTimeout(function () { verifyFocusing = false; }, 0);
+			if (doc.activeElement !== control && control.focus) {
+				control.focus();
+			}
+		}
+	}, true);
+
+	doc.addEventListener('input', function (e) {
+		var control = e.target;
+		if (!verifyOwn(control)) {
+			return;
+		}
+		verifyTouched.add(control);
+		if (control.hasAttribute('data-check')) {
+			verifyAsk(control, CHECK_DELAY);
+		}
+		// отказ на экране судится на каждом вводе: исправил — отказ ушёл сразу
+		if (control.getAttribute('aria-invalid') === 'true') {
+			verifyJudge(control);
+		}
+	});
+
+	doc.addEventListener('focusout', function (e) {
+		var control = e.target;
+		if (!verifyOwn(control) || !verifyTouched.has(control)) {
+			return;
+		}
+		verifyJudge(control);
+		if (control.hasAttribute('data-check')) {
+			verifyAsk(control, 0);
+		}
+	});
+
+	function verifyAsk(control, delay) {
+		var state = verifyAsked.get(control);
+		if (!state) {
+			state = { timer: 0, ctrl: null, value: null, busy: '', pending: null };
+			verifyAsked.set(control, state);
+		}
+		clearTimeout(state.timer);
+		var value = control.value;
+		// ответ про это значение уже есть: занятое снова держит форму, свободное — нет
+		control.setCustomValidity(state.value === value ? state.busy : '');
+		if (state.value === value || state.pending === value || value === '' || !window.fetch) {
+			return;
+		}
+		state.timer = setTimeout(function () {
+			// своё сначала: про значение, которое не прошло шаблон, сервер спрашивать незачем
+			if (control.value !== value || !control.validity.valid) {
+				return;
+			}
+			if (state.ctrl) {
+				state.ctrl.abort();
+			}
+			state.ctrl = window.AbortController ? new AbortController() : null;
+			var url = new URL(control.getAttribute('data-check'), location.href);
+			url.searchParams.set(control.name, value);
+			state.pending = value;
+			control.setAttribute('aria-busy', 'true');
+			fetch(url.href, { credentials: 'same-origin', headers: { 'Accept': 'text/plain, text/html' },
+				signal: state.ctrl ? state.ctrl.signal : undefined })
+				.then(function (response) {
+					if (response.status !== 409 && !response.ok) {
+						return null;
+					}
+					return response.text().then(function (text) {
+						if (control.value !== value) {
+							return;
+						}
+						var busy = response.status === 409 ? verifyText(response, text) : '';
+						state.value = value;
+						state.busy = busy;
+						control.setCustomValidity(busy);
+						verifyJudge(control);
+					});
+				})
+				.catch(function () { /* сеть или отменён: проверит сервер при отправке */ })
+				.finally(function () {
+					if (state.pending === value) {
+						state.pending = null;
+					}
+					if (control.value === value) {
+						control.removeAttribute('aria-busy');
+					}
+				});
+		}, delay);
+	}
+
+	// Отказ — текст ответа; страница вместо текста отдаёт свой текст без разметки.
+	function verifyText(response, text) {
+		if (/text\/html/i.test(response.headers.get('Content-Type') || '') && window.DOMParser) {
+			text = new DOMParser().parseFromString(text, 'text/html').body.textContent || '';
+		}
+		text = text.replace(/\s+/g, ' ').trim();
+		return text || response.statusText || String(response.status);
+	}
+
+	// Сброс формы (так тихая отправка встречает успех) забывает ответы про прежние значения.
+	doc.addEventListener('reset', function (e) {
+		var list = e.target.querySelectorAll ? e.target.querySelectorAll('[data-check]') : [];
+		for (var i = 0; i < list.length; i++) {
+			list[i].setCustomValidity('');
+			verifyAsked.delete(list[i]);
+		}
+	});
+
+	/* --- 10. тост из ответа (выпуск 0.12, шаг 19) ------------------------------------ */
+
+	// Без скрипта тост стоит в потоке страницы, где его напечатал сервер, и там остаётся.
+	// После тихой отправки тост ответа ложится морфингом на своё место — скрипт поднимает
+	// его оттуда вниз экрана (data-toast-live: wait — ждёт очереди, show — виден, gone —
+	// гаснет) и показывает тосты по одному, каждый TOAST_TIME; пока на тосте мышь или фокус,
+	// время стоит. Крестик закрывает раньше (раздел 5). Тост с ролью alert скрипт не трогает:
+	// он остаётся на месте, пока его не закроют или не уберёт следующий ответ сервера.
+	// Поднятый тост живёт в конце <body>, и морфинг его не трогает (toastOwned).
+
+	var TOAST_TIME = 5000;
+	var toastTimer = 0;
+	var toastLeft = 0;
+	var toastStart = 0;
+	var toastPaused = false;
+
+	function toastOwned(node) {
+		return !!(node && node.nodeType === 1 && node.hasAttribute('data-toast-live'));
+	}
+
+	function toastLift() {
+		var list = doc.body.querySelectorAll('.toast:not([data-toast-live])');
+		for (var i = 0; i < list.length; i++) {
+			var toast = list[i];
+			if (toast.getAttribute('role') === 'alert'
+				|| toast.closest('dialog, [hidden], [data-window-error]')) {
+				continue;
+			}
+			toast.setAttribute('data-toast-live', 'wait');
+			doc.body.appendChild(toast);
+		}
+		toastPump();
+	}
+
+	function toastLive(state) {
+		return doc.body.querySelector(':scope > .toast[data-toast-live="' + state + '"]');
+	}
+
+	function toastPump() {
+		if (toastLive('show')) {
+			return;
+		}
+		var next = toastLive('wait');
+		if (!next) {
+			return;
+		}
+		next.setAttribute('data-toast-live', 'show');
+		toastLeft = TOAST_TIME;
+		toastPaused = false;
+		toastRun(next);
+	}
+
+	function toastRun(toast) {
+		clearTimeout(toastTimer);
+		toastStart = Date.now();
+		toastTimer = setTimeout(function () { toastGone(toast); }, toastLeft);
+	}
+
+	function toastGone(toast) {
+		clearTimeout(toastTimer);
+		toast.setAttribute('data-toast-live', 'gone');
+		var done = function () {
+			if (toast.parentNode) {
+				toast.parentNode.removeChild(toast);
+			}
+			toastPump();
+		};
+		if (calm && calm.matches) {
+			done();
+			return;
+		}
+		toast.classList.add('toast--closing');
+		setTimeout(done, 250);
+	}
+
+	function toastHold(e, hold) {
+		var toast = toastLive('show');
+		if (!toast || !toast.contains(e.target) || hold === toastPaused) {
+			return;
+		}
+		if (!hold && e.relatedTarget && toast.contains(e.relatedTarget)) {
+			return;
+		}
+		toastPaused = hold;
+		if (hold) {
+			clearTimeout(toastTimer);
+			toastLeft = Math.max(1000, toastLeft - (Date.now() - toastStart));
+		} else {
+			toastRun(toast);
+		}
+	}
+	doc.addEventListener('mouseover', function (e) { toastHold(e, true); });
+	doc.addEventListener('focusin', function (e) { toastHold(e, true); });
+	doc.addEventListener('mouseout', function (e) { toastHold(e, false); });
+	doc.addEventListener('focusout', function (e) { toastHold(e, false); });
+
+	// Крестик поднятого тоста гасит его сам (раздел 5); очередь идёт дальше, как по времени.
+	doc.addEventListener('click', function (e) {
+		var close = e.target.closest ? e.target.closest('.toast[data-toast-live="show"] [data-close]') : null;
+		if (!close) {
+			return;
+		}
+		clearTimeout(toastTimer);
+		close.closest('.toast').setAttribute('data-toast-live', 'gone');
+		setTimeout(toastPump, 260);
+	});
 })();
