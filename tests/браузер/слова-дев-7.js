@@ -193,9 +193,95 @@ async function секцияСоСпискомКарточек(b) {
   }
 }
 
+// П. 2: окно по адресу без скрипта — поверх страницы. На образце окон окно правки напечатано
+// открытым, а ниже него — секция с записями реестра (свёрнутая строка — position: relative):
+// до dev.7 запись рисовалась поверх окна и забирала щелчок в поле. Теперь щелчок в поле
+// проходит, окно по центру экрана и выше шапки, подложка затемняет страницу, щелчок мимо окна
+// страницу не нажимает, страница под окном прокручивается, «Закрыть» ведёт на адрес без ?окно.
+async function окноБезСкрипта(b) {
+  for (const ширина of [1280, 390]) {
+    const { ctx, p } = await страница(b, '/образец-окон?окно=правка&project=' + encodeURIComponent('Альфа'), ширина, false);
+    await p.waitForTimeout(600);
+    const к = `окно без скрипта ${ширина}`;
+    const з = await p.evaluate(() => {
+      const d = document.querySelector('dialog[open]');
+      const r = d.getBoundingClientRect();
+      const поле = d.querySelector('input[name="name"]');
+      const пр = поле.getBoundingClientRect();
+      const сверху = document.elementFromPoint(пр.left + пр.width / 2, пр.top + пр.height / 2);
+      const запись = document.querySelector('.entry__head, summary.panel__head');
+      const зр = запись ? запись.getBoundingClientRect() : null;
+      const с = getComputedStyle(d);
+      const мимо = document.elementFromPoint(8, window.innerHeight - 8);
+      return {
+        модальное: d.matches(':modal'),
+        позиция: с.position,
+        слой: с.zIndex,
+        прозрачность: с.opacity,
+        центрX: Math.round(r.left + r.width / 2 - window.innerWidth / 2),
+        центрY: Math.round(r.top + r.height / 2 - window.innerHeight / 2),
+        полеСверху: сверху === поле || поле.contains(сверху),
+        записьПодОкном: !!зр && зр.top < r.bottom && зр.bottom > r.top,
+        подложка: с.boxShadow.includes('100vmax') || /0px 0px 0px \d{3,}px/.test(с.boxShadow),
+        мимоВОкне: d.contains(мимо),
+        высотаСтраницы: document.documentElement.scrollHeight,
+      };
+    });
+    проверить(!з.модальное, `${к}: окно не модальное — скрипта нет (:modal ${з.модальное})`);
+    проверить(з.позиция === 'fixed' && Number(з.слой) > 20, `${к}: окно закреплено выше шапки (${з.позиция}, z-index ${з.слой})`);
+    проверить(з.прозрачность === '1', `${к}: появление дошло до конца (opacity ${з.прозрачность})`);
+    проверить(Math.abs(з.центрX) <= 1 && Math.abs(з.центрY) <= 1, `${к}: окно по центру экрана (${з.центрX}, ${з.центрY})`);
+    проверить(з.полеСверху, `${к}: поле окна сверху, его никто не перекрывает`);
+    проверить(з.подложка, `${к}: подложка затемняет страницу`);
+    проверить(з.мимоВОкне, `${к}: щелчок мимо окна ловит подложка окна, а не страница`);
+    await p.locator('dialog[open] input[name="name"]').click({ timeout: 3000 }).then(
+      () => проверить(true, `${к}: щелчок в поле окна проходит`),
+      (e) => проверить(false, `${к}: щелчок в поле окна проходит (${e.message.split('\n')[0]})`));
+    await p.keyboard.press('End');
+    await p.keyboard.type('-2');
+    проверить((await p.inputValue('dialog[open] input[name="name"]')).endsWith('-2'), `${к}: в поле окна печатается`);
+    await p.screenshot({ path: path.join(OUT, `окно-без-скрипта-${ширина}.png`) });
+    if (ширина === 1280) {
+      // правило dev.7 снято — поле окна обязано оказаться под записью ниже: шаг проверяет то, что надо
+      const до = await p.evaluate(() => {
+        const ст = document.createElement('style');
+        ст.textContent = '.modal[open]:not(:modal) { position: absolute !important; inset: auto 0 !important;'
+          + ' z-index: auto !important; margin: auto !important; box-shadow: none !important; }'
+          + ' .modal[open]:not(:modal)::before { display: none !important; }';
+        document.head.appendChild(ст);
+        const поле = document.querySelector('dialog[open] input[name="name"]');
+        поле.scrollIntoView({ block: 'center' });
+        const пр = поле.getBoundingClientRect();
+        const сверху = document.elementFromPoint(пр.left + 20, пр.top + пр.height / 2);
+        const ответ = сверху === поле || поле.contains(сверху) ? 'поле' : (сверху && сверху.className) || '?';
+        ст.remove();
+        window.scrollTo(0, 0);
+        return ответ;
+      });
+      проверить(до !== 'поле', `${к}: без правила dev.7 поле окна перекрыто (${до}) — шаг проверяет то, что надо`);
+    }
+    if (з.высотаСтраницы > 900) {
+      await p.mouse.move(10, 450);
+      await p.mouse.wheel(0, 400);
+      await p.waitForTimeout(300);
+      проверить(await p.evaluate(() => window.scrollY) > 0, `${к}: страница под окном прокручивается колесом`);
+    }
+    await Promise.all([p.waitForNavigation(), p.locator('dialog[open] .modal__actions a', { hasText: 'Закрыть' }).click()]);
+    const адрес = decodeURIComponent(p.url());
+    проверить(!адрес.includes('окно='), `${к}: «Закрыть» ведёт на адрес без ?окно (${адрес})`);
+    проверить(await p.locator('dialog[open]').count() === 0, `${к}: после «Закрыть» окна нет`);
+    await ctx.close();
+  }
+  // со скриптом окно, напечатанное открытым, по-прежнему поднимается модальным
+  const { ctx, p } = await страница(b, '/образец-окон?окно=правка&project=' + encodeURIComponent('Альфа'), 1280, true);
+  await p.waitForTimeout(400);
+  проверить(await p.evaluate(() => document.querySelector('dialog[open]').matches(':modal')), 'окно со скриптом: поднято модальным');
+  await ctx.close();
+}
+
 (async () => {
   const b = await браузер();
-  const шаги = { секцияСоСпискомКарточек, подписиСегментов };
+  const шаги = { секцияСоСпискомКарточек, подписиСегментов, окноБезСкрипта };
   try {
     for (const [имя, шаг] of Object.entries(шаги)) {
       if (ТОЛЬКО && !ТОЛЬКО.split(',').includes(имя)) continue;
