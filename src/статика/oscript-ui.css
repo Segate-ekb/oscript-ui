@@ -2190,24 +2190,43 @@ form[data-quiet][aria-busy="true"] { cursor: progress; }
 	transition: box-shadow var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-standard);
 }
 .objcard:hover { box-shadow: var(--elevation-ring-level2); }
-/* Строка заголовка не переносится: плашка состояния и кнопки держат свою ширину, а имя
-   объекта усекается многоточием — длинное имя больше не ломает ряд. */
-.objcard__head { display: flex; align-items: center; gap: var(--space-3); flex-wrap: nowrap; }
-.objcard__name {
+/* Шапка карточки: имя, плашки, действия. Имя — главное в карточке (M3 Cards: заголовок
+   первым), поэтому сжимается последним и не уже 8–9 знаков: основа 0 и min-width 9ch, а
+   плашки и действия держат свою ширину (flex: none). Не хватает места на всё в строке —
+   ряд переносится, а не давит имя в ноль, как было (аудит M3, S1: в узкой карточке сетки
+   с плашкой и кнопкой «Настройки» имя пропадало целиком).
+   В узкой шапке (меньше 28rem — карточка в колонке сетки, телефон) плашки уходят второй
+   строкой ПОД имя, а действия остаются справа от него: так имя получает всю ширину, кроме
+   кнопки. Шапка — контейнер запросов: ширину решает сама карточка, а не окно, поэтому
+   одна и та же карточка в широком списке и в сетке в три колонки ведёт себя по-своему.
+   Контейнер — только по ширине (inline-size): высота шапки по-прежнему растёт под ряд. */
+.objcard__head {
 	display: flex;
 	align-items: center;
-	gap: var(--space-2);
+	gap: var(--space-2) var(--space-3);
+	flex-wrap: wrap;
+	container-type: inline-size;
+}
+/* Имя — блок со строкой в одну линию и многоточием, а не flex: многоточие умеет только
+   блочный контейнер, и так оно работает и у имени-ссылки, и у имени-текста. Подсказку с
+   именем целиком у обрезанного имени ставит скрипт кита (title на наведении). */
+.objcard__name {
+	display: block;
 	margin: 0;
 	font: var(--type-title-medium);
 	letter-spacing: var(--md-sys-typescale-title-medium-tracking);
-	min-width: 0;
-	flex: 1 1 auto;
+	flex: 1 1 0;
+	min-width: min(9ch, 100%);
 	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
 }
-.objcard__name .icon { color: var(--md-sys-color-primary); flex: 0 0 auto; }
-.objcard__name a { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.objcard__chips { display: flex; gap: var(--space-1); flex: 0 0 auto; }
-.objcard__actions { margin-left: auto; display: flex; gap: var(--space-2); flex: 0 0 auto; }
+.objcard__name .icon { color: var(--md-sys-color-primary); margin-right: var(--space-2); }
+.objcard__chips { display: flex; flex-wrap: wrap; gap: var(--space-1); flex: none; max-width: 100%; }
+.objcard__actions { margin-left: auto; display: flex; gap: var(--space-2); flex: none; }
+@container (max-width: 28rem) {
+	.objcard__chips { order: 1; flex: 1 0 100%; }
+}
 /* Описание — ровно две строки с многоточием: карточка перестаёт расти под текст, а ряд
    остаётся ровным. Обрезает БРАУЗЕР по строкам, сервер отдаёт описание целиком. */
 .objcard__desc {

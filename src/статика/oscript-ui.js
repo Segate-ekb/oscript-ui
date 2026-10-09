@@ -38,6 +38,8 @@
  *      ветки по «Показать ещё» и при раскрытии, поиск через сервер на месте веток, правки
  *      плашками и форма, которая отдаёт только правки. Плашку правки скрипт берёт из
  *      шаблона сервера.
+ *  15. подсказку обрезанного имени (выпуск 0.13): имя карточки объекта, которое лист
+ *      обрезал многоточием, на наведении получает title с именем целиком.
  *
  * Глобальных имён скрипт не заводит, разметку не печатает — только атрибуты, рябь и текст
  * отказа под полем (field__error — тот же, что печатает сервер; выпуск 0.12).
@@ -3167,4 +3169,26 @@
 		ctInit(doc);
 	});
 	ctInit(doc);
+
+	/* --- 15. подсказка обрезанного имени --------------------------------------------
+	   Имя карточки объекта лист держит одной строкой с многоточием (.objcard__name). Что
+	   именно обрезано, знает только движок после раскладки, поэтому title ставится не
+	   сервером, а здесь — на наведении и только у обрезанного имени: у целого подсказка
+	   повторяла бы видимое. Свой title, напечатанный сервером, скрипт не трогает. */
+
+	var cutTitled = typeof WeakSet === 'function' ? new WeakSet() : null; // title поставил скрипт
+
+	doc.addEventListener('mouseover', function (e) {
+		var name = e.target && e.target.closest ? e.target.closest('.objcard__name') : null;
+		if (!name || !cutTitled || (name.hasAttribute('title') && !cutTitled.has(name))) {
+			return;
+		}
+		if (name.scrollWidth > name.clientWidth) {
+			name.setAttribute('title', name.textContent.replace(/\s+/g, ' ').trim());
+			cutTitled.add(name);
+		} else if (cutTitled.has(name)) {
+			name.removeAttribute('title');
+			cutTitled.delete(name);
+		}
+	});
 })();
