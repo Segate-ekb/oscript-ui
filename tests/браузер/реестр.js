@@ -8,7 +8,8 @@
 // меню ⚙, а у свёрнутой его нет; меню ⚙ не открывается или в нём не те пункты, что внизу
 // тела; на узком экране кнопки тела не столбиком во всю ширину; кнопка формы тумблера видна
 // при скрипте или спрятана без него; страница уехала вбок; окно или подтверждение из тела
-// записи стоит внутри свёрнутой записи, а не после списка, и из меню ⚙ открывается невидимым.
+// записи стоит внутри свёрнутой записи, а не после списка, и из меню ⚙ открывается невидимым;
+// id на странице повторяются.
 
 const { chromium } = require('playwright-core');
 const { execSync } = require('child_process');
@@ -70,6 +71,12 @@ async function окнаЗаписи(b, беды) {
       return !!д && !д.closest('details') && !д.closest('.entries');
     }));
     if (!вне.every(Boolean)) беды.push(имя + ': окно записи стоит внутри списка ' + JSON.stringify(вне));
+    // набор кнопок печатается дважды (меню ⚙ и кнопки внизу), а id несёт только пункт меню
+    const ids = await p.evaluate(() => {
+      const все = [...document.querySelectorAll('[id]')].map((э) => э.id);
+      return все.filter((ид, н) => все.indexOf(ид) !== н);
+    });
+    if (ids.length) беды.push(имя + ': id на странице не уникальны: ' + [...new Set(ids)].join(', '));
 
     if (скрипт) {
       const запись = p.locator('.entry:has(.entry__gear [data-confirm="udalit-klyuch-sborka"])');
@@ -97,6 +104,19 @@ async function окнаЗаписи(b, беды) {
       if (!(await p.evaluate(() => window.__метка === 1))) беды.push(имя + ': ссылка окна увела со страницы');
       const меню = await запись.locator('.menu__panel').evaluate((э) => э.matches(':popover-open'));
       if (меню) беды.push(имя + ': меню ⚙ осталось открытым под окном');
+      await p.keyboard.press('Escape');
+
+      // копия набора внизу раскрытой записи — без id: её форма открывает то же подтверждение,
+      // а кнопка окна шлёт форму меню (атрибут form)
+      await запись.locator('summary').click();
+      await запись.locator('.entry__buttons form[data-confirm] button[type=submit]').click();
+      await p.waitForTimeout(300);
+      if (!(await виден('udalit-klyuch-sborka'))) беды.push(имя + ': подтверждение из кнопок внизу не открылось');
+      const связь = await p.evaluate(() => {
+        const кнопка = document.querySelector('#udalit-klyuch-sborka [name="confirmed"]');
+        return !!кнопка.form && кнопка.form.closest('.entry__gear') !== null;
+      });
+      if (!связь) беды.push(имя + ': кнопка подтверждения не шлёт форму меню');
       await p.keyboard.press('Escape');
     }
     console.log(имя, 'проверено');
