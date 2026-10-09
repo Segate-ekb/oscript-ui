@@ -3938,4 +3938,40 @@ div.entry__head:hover { --_state: 0%; }
 	.props { grid-template-columns: minmax(0, 1fr); row-gap: 0; }
 	.props dt { white-space: normal; }
 	.props dd + dt { margin-top: var(--space-3); }
+/* --- страницы и отбор без перезагрузки (выпуск 0.13, шаг 20) -----------------------------
+   Диапазон «41–60 из 137» стоит рядом с номером страницы и звучит тише его. Заголовок
+   сортируемой колонки — ссылка цветом заголовка со стрелкой порядка: у колонки, по которой
+   список отсортирован (aria-sort), стрелка видна и смотрит по порядку — вверх по возрастанию,
+   вниз по убыванию; у прочих проявляется на наведении и фокусе — знак, что колонка
+   сортируется. Пока тихий переход в пути, навигация и таблица помечены aria-busy. */
+.pagination__count { color: var(--md-sys-color-on-surface-variant); font: var(--type-body-small); }
+.table__sort {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-2);
+	color: inherit;
+	border-radius: var(--md-sys-shape-corner-extra-small);
+}
+.table__sort::after {
+	content: "";
+	width: 6px; height: 6px;
+	border-right: 1.5px solid currentColor;
+	border-bottom: 1.5px solid currentColor;
+	transform: translateY(-2px) rotate(45deg);
+	opacity: 0;
+	transition: opacity var(--motion-fast) var(--motion-ease), transform var(--motion-fast) var(--motion-ease);
+}
+.table__sort:hover { color: var(--md-sys-color-on-surface); text-decoration: none; }
+.table__sort:hover::after, .table__sort:focus-visible::after { opacity: .5; }
+.table__sort:focus-visible { outline: 3px solid var(--md-sys-color-secondary); outline-offset: 2px; }
+th[aria-sort] { color: var(--md-sys-color-on-surface); }
+th[aria-sort] > .table__sort::after { opacity: 1; }
+th[aria-sort="ascending"] > .table__sort::after { transform: translateY(2px) rotate(-135deg); }
+.pagination[aria-busy="true"], table[aria-busy="true"] { cursor: progress; }
+/* на узком экране с диапазоном шаги стоят первой строкой, номер страницы и диапазон — под ними:
+   втроём с состоянием им в 390 px не уместиться, и «Вперёд» уехал бы строкой ниже один */
+@media (max-width: 640px) {
+	.pagination:has(.pagination__count) > .pagination__status,
+	.pagination:has(.pagination__count) > .pagination__count { order: 1; flex-basis: 100%; text-align: center; }
+	.pagination:has(.pagination__count) { row-gap: var(--space-1); }
 }

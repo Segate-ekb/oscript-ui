@@ -29,6 +29,10 @@
  *      (data-autosubmit, раздел 6) и тут же показывает выбранное в предпросмотре; зеркало
  *      значения (data-mirror) пишет набранное в узел образца; переключатель темы образца
  *      (data-preview-theme) красит рамку палитрой из блока токенов страницы.
+ *  13. страницы и отбор без перезагрузки (выпуск 0.13): ссылка с data-quiet (страница
+ *      пагинации, сортировка колонки) берётся в фоне и морфится, как ответ тихой формы,
+ *      адрес — в историю вкладки (pushState), «Назад» по помеченной записи — тоже тихо;
+ *      тихая GET-форма отбора уходит сама по изменению поля с задержкой.
  *
  * Глобальных имён скрипт не заводит, разметку не печатает — только атрибуты, рябь и текст
  * отказа под полем (field__error — тот же, что печатает сервер; выпуск 0.12).
@@ -437,7 +441,9 @@
 	}
 
 	function fallback(form, submitter, p, response) {
-		if (response && p.init.method === 'GET') {
+		if (form.tagName !== 'FORM') {
+			location.assign(p.url); // страницы и отбор без перезагрузки (выпуск 0.13): ссылка, «Назад»
+		} else if (response && p.init.method === 'GET') {
 			location.assign(response.url);
 		} else if (response && response.ok && response.redirected) {
 			location.assign(response.url); // POST уже исполнен: повторять его нельзя
@@ -482,12 +488,16 @@
 		var url = new URL(response.url);
 		var here = new URL(location.href);
 		var moved = url.pathname !== here.pathname || url.search !== here.search;
+		if (moved) {
+			remember(); // страницы и отбор без перезагрузки (выпуск 0.13): место для «Назад»
+		}
 
 		// Удачно сохранённая форма сбрасывается к умолчаниям, и значения берутся с сервера:
 		// поле комментария после отправки пустеет, сохранённый тумблер — то, что запомнил
 		// сервер. Ответ с ошибкой (4xx) несёт введённое и подсказки — его поля не трогаем.
 		// Не трогаем и форму, в которой человек успел что-то поменять, пока шёл запрос.
-		if (response.ok && form.isConnected && !form.hasAttribute('data-edited')) {
+		if (response.ok && form.isConnected && !form.hasAttribute('data-edited')
+			&& !inPlace(form)) { // страницы и отбор без перезагрузки (выпуск 0.13)
 			form.reset();
 		}
 
@@ -505,7 +515,9 @@
 		if (moved) {
 			history.pushState({ oscriptUi: true }, '', url.href + here.hash);
 			pushed = true;
-			window.scrollTo(0, 0);
+			if (!inPlace(form)) {
+				window.scrollTo(0, 0);
+			}
 		}
 		markAll();
 		paintTop();
@@ -565,7 +577,11 @@
 
 	// Адрес вкладки, уведённый pushState-ом, показывает страницу, которой в истории
 	// браузера нет: назад и вперёд по такой истории честно загружают страницу заново.
-	window.addEventListener('popstate', function () {
+	// Выпуск 0.13: запись истории, которую кит пометил сам, берётся тихо (раздел 13).
+	window.addEventListener('popstate', function (e) {
+		if (quietBack(e.state)) {
+			return;
+		}
 		if (pushed) {
 			location.reload();
 		}
@@ -2075,6 +2091,170 @@
 		previewInit();
 	});
 	previewInit();
+
+	/* --- 13. страницы и отбор без перезагрузки (выпуск 0.13, шаг 20) ------------------ */
+
+	// Ссылка с data-quiet (страница пагинации, сортировка колонки) берётся запросом в фоне,
+	// и ответ ложится на страницу тем же морфингом, что ответ тихой формы (раздел 6): список
+	// меняется на месте, прокрутка и фокус остаются, адрес вкладки уходит в её историю.
+	// GET-форма с data-quiet (строка поиска, форма отбора) уходит разделом 6, а здесь ещё
+	// и сама — по изменению поля, с задержкой: набрал — и список уже отобран. «Назад»
+	// и «Вперёд» по записям истории, которые пометил кит, тоже берутся тихо, и прокрутка
+	// встаёт туда, где была. Без скрипта всё это — обычные ссылки и обычная GET-форма.
+
+	var TYPE_DELAY = 400; // мс после последней буквы: поиск не уходит на каждую
+	var PICK_DELAY = 150; // мс после выбора в списке, флажка, даты — выбор уже сделан
+	var FILTER_TIMER = 'oscriptUiFilterTimer';
+	var FILTER_SENT = 'oscriptUiFilterSent';
+	var hop = 0;          // номер последнего тихого перехода: на страницу ложится только он
+	var scrollSave = 0;
+	var shown = sansHash(location.href); // адрес страницы, которая сейчас на экране
+
+	function sansHash(href) {
+		return String(href).split('#')[0];
+	}
+
+	// Обновив страницу, скрипт уже перевёл адрес вкладки (pushState раздела 6): на экране
+	// теперь страница этого адреса.
+	doc.addEventListener('oscript-ui:update', function () {
+		shown = sansHash(location.href);
+	});
+
+	// Ссылка и GET-форма листают и отбирают тот же список: страница остаётся на месте,
+	// а форма не сбрасывается — в поле поиска то, что человек набрал и ещё набирает.
+	function inPlace(el) {
+		return !el || el.tagName !== 'FORM'
+			|| (el.getAttribute('method') || 'get').toLowerCase() === 'get';
+	}
+
+	function quietGet() {
+		return { method: 'GET', credentials: 'same-origin', headers: { 'Accept': 'text/html' } };
+	}
+
+	// Запись истории, с которой уходим, помечается: на неё «Назад» вернётся тихо и встанет
+	// на ту же прокрутку. Чужие поля состояния остаются как были.
+	function remember() {
+		var was = history.state && typeof history.state === 'object' ? history.state : {};
+		var state = {};
+		for (var key in was) {
+			if (Object.prototype.hasOwnProperty.call(was, key)) {
+				state[key] = was[key];
+			}
+		}
+		state.oscriptUi = true;
+		state.scroll = window.scrollY || 0;
+		try {
+			history.replaceState(state, '');
+		} catch (err) {
+			// состояние не записалось — «Назад» перезагрузит страницу, как раньше
+		}
+	}
+
+	window.addEventListener('scroll', function () {
+		if (!history.state || !history.state.oscriptUi) {
+			return;
+		}
+		clearTimeout(scrollSave);
+		scrollSave = setTimeout(remember, 200);
+	}, { passive: true });
+
+	doc.addEventListener('click', function (e) {
+		if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) {
+			return; // новая вкладка, окно, загрузка — это навигация, её делает браузер
+		}
+		var link = e.target && e.target.closest ? e.target.closest('a[data-quiet][href]') : null;
+		if (!link || link.hasAttribute('download') || (link.getAttribute('target') || '') !== ''
+			|| !window.fetch || !window.DOMParser || !sameOrigin(link.href)) {
+			return;
+		}
+		e.preventDefault();
+		var mine = ++hop;
+		var host = link.closest('nav, table, form') || link;
+		host.setAttribute('aria-busy', 'true');
+		send(link, null, { url: link.href, init: quietGet(), blank: false },
+			function () { return mine === hop; }).then(function () {
+			host.removeAttribute('aria-busy');
+		});
+	});
+
+	// «Назад» на запись, которую пометил кит: страница этого адреса берётся тихо. Поля тихих
+	// отборов возвращаются к значениям с сервера — иначе в поиске осталось бы набранное
+	// позже, а список был бы прежним.
+	function quietBack(state) {
+		if (sansHash(location.href) === shown) {
+			return true; // сменилась только решётка: страница та же, якорь браузер найдёт сам
+		}
+		if (!state || !state.oscriptUi || !window.fetch || !window.DOMParser) {
+			return false;
+		}
+		var mine = ++hop;
+		var url = location.href;
+		send(doc.body, null, { url: url, init: quietGet(), blank: false }, function () {
+			return mine === hop && location.href === url;
+		}).then(function () {
+			if (mine !== hop || location.href !== url) {
+				return;
+			}
+			var forms = doc.querySelectorAll('form[data-quiet]');
+			for (var i = 0; i < forms.length; i++) {
+				if (quietFilter(forms[i])) {
+					clearTimeout(forms[i][FILTER_TIMER]);
+					forms[i][FILTER_SENT] = undefined;
+					forms[i].reset();
+				}
+			}
+			markAll();
+			window.scrollTo(0, state.scroll || 0);
+		});
+		return true;
+	}
+
+	/* отбор по изменению поля */
+
+	function quietFilter(form) {
+		return quietForm(form) && inPlace(form);
+	}
+
+	// Отбор уходит, когда человек перестал набирать; тот же отбор дважды не уходит —
+	// ни вслед за Enter, ни на уходе из поля, ни когда набранное вернули как было.
+	function filterSoon(form, delay) {
+		clearTimeout(form[FILTER_TIMER]);
+		form[FILTER_TIMER] = setTimeout(function () {
+			var url = plan(form).url;
+			if (url === form[FILTER_SENT] || url === location.href || !form.isConnected) {
+				return;
+			}
+			if (form.requestSubmit) {
+				form.requestSubmit();
+			} else {
+				form[FILTER_SENT] = url;
+				enqueue(form, null, plan(form));
+			}
+		}, delay);
+	}
+
+	['input', 'change'].forEach(function (type) {
+		doc.addEventListener(type, function (e) {
+			var control = e.target;
+			var form = control && control.form;
+			if (!form || !quietFilter(form) || control.hasAttribute('data-autosubmit')
+				|| /^(submit|button|reset|file|hidden)$/.test(control.type || '')) {
+				return;
+			}
+			var typing = e.type === 'input' && (control.tagName === 'TEXTAREA'
+				|| /^(text|search|email|url|tel|number|password)$/.test(control.type || 'text'));
+			filterSoon(form, typing ? TYPE_DELAY : PICK_DELAY);
+		});
+	});
+
+	// Отправка руками (Enter, кнопка) снимает отложенную и запоминает, что ушло.
+	doc.addEventListener('submit', function (e) {
+		var form = e.target;
+		if (quietFilter(form)) {
+			clearTimeout(form[FILTER_TIMER]);
+			form[FILTER_SENT] = plan(form, e.submitter).url;
+		}
+	}, true);
 
 	/* --- таблица карточками и свойства (выпуск 0.13) -------------------------------------
 	   Своего поведения у них нет: карточку раскладывает лист, секрет показывает лист
