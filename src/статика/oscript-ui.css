@@ -1264,6 +1264,13 @@ tbody tr.row-accent.table__record:hover + .table__expand { background: color-mix
    Соседние столбцы забирают освободившуюся ширину себе. */
 .col-narrow, .cell-narrow { width: 1%; white-space: nowrap; }
 
+/* Колонка чисел (вид «число» у колонки и ячейки): число и заголовок над ним — по правому
+   краю, цифры одной ширины (tabular-nums) — разряды встают друг под другом, и 1 204 сравнивается
+   с 87 взглядом, без чтения. Строку число не рвёт. Стрелка сортировки у такого заголовка —
+   слева от подписи, чтобы подпись стояла над числами, а не сдвигалась стрелкой. */
+.col-num, .cell-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.col-num > .table__sort { flex-direction: row-reverse; }
+
 /* --- компонент: тост --- */
 
 /* Тост — сообщение в потоке страницы, как Alert у MUI: тональный контейнер статуса,
@@ -3505,6 +3512,8 @@ div.entry__head:hover { --_state: 0%; }
 	.table-cards tr { padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--md-sys-color-outline-variant); }
 	.table-cards tr:last-child { border-bottom: none; }
 	.table-cards td { width: auto; white-space: normal; border-bottom: none; padding: var(--space-1) 0; }
+	/* в карточке число — обычная строка под подписью колонки: справа оно оторвалось бы от неё */
+	.table-cards td.cell-num { text-align: left; }
 	.table-cards td.cell-empty { display: none; }
 	.table-cards td[data-label]::before {
 		content: attr(data-label);
