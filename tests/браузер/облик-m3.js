@@ -362,6 +362,30 @@ async function сегментыНаТелефоне(b) {
   await ctx.close();
 }
 
+// Пробел dev.4 п. 14: тумблер с источником и справкой — источник мелко (label-small) в строке
+// подсказки, «?» открывает поповер, ряд не выходит за экран на 390.
+async function тумблерСоСправкой(b) {
+  for (const w of [1280, 390]) {
+    const ctx = await b.newContext({ viewport: { width: w, height: 900 } });
+    const p = await ctx.newPage();
+    await p.goto(адрес('тумблер'), { waitUntil: 'networkidle' });
+    const обр = образец(p, 'Источник значения и справка');
+    const з = await обр.locator('.docs-sample__preview .field-help').evaluate((h) => ({
+      кегльИсточника: getComputedStyle(h.querySelector('.field__origin')).fontSize,
+      кегльПодсказки: getComputedStyle(h.querySelector('.toggle__hint')).fontSize,
+      право: Math.round(h.getBoundingClientRect().right), экран: innerWidth,
+    }));
+    проверить(parseFloat(з.кегльИсточника) <= parseFloat(з.кегльПодсказки),
+      `тумблер ${w}: источник не крупнее подсказки (${з.кегльИсточника} при ${з.кегльПодсказки})`);
+    проверить(з.право <= з.экран, `тумблер ${w}: ряд в пределах экрана`);
+    await обр.locator('.docs-sample__preview button.help').click();
+    await p.waitForTimeout(300);
+    проверить(await обр.locator('.docs-sample__preview .help__pop').isVisible(), `тумблер ${w}: «?» открывает справку`);
+    await обр.screenshot({ path: path.join(OUT, `тумблер-справка-${w}.png`) });
+    await ctx.close();
+  }
+}
+
 (async () => {
   const b = await браузер();
   try {
@@ -374,6 +398,7 @@ async function сегментыНаТелефоне(b) {
     await целиКасания(b);
     await рубрики(b);
     await сегментыНаТелефоне(b);
+    await тумблерСоСправкой(b);
   } finally {
     await b.close();
   }
