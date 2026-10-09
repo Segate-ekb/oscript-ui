@@ -190,6 +190,42 @@ async function палитраАкцента(b) {
   await ctx.close();
 }
 
+// Зеркало акцента: сервер напечатал красный — основная кнопка образца красная, текст на ней
+// контрастный; выбор зелёного кружка перекрашивает кнопку и плашку, кнопка страницы вокруг —
+// в своём акценте; «по умолчанию» возвращает акцент рамки.
+async function зеркалоАкцента(b) {
+  const { ctx, p } = await страница(b, 'образец', 1280);
+  const обр = образец(p, 'Акцент перекрашивает кнопку и плашку образца');
+  const цвета = () => обр.evaluate((f) => {
+    // цвет слоями color-mix() движок отдаёт в своём пространстве — сводим к rgb пикселем холста
+    const к = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+    const rgb = (c) => { к.clearRect(0, 0, 1, 1); к.fillStyle = c; к.fillRect(0, 0, 1, 1); const d = к.getImageData(0, 0, 1, 1).data; return `rgb(${d[0]},${d[1]},${d[2]})`; };
+    const bg = (el) => rgb(getComputedStyle(el).backgroundColor);
+    const кнопка = f.querySelector('.preview .button--primary');
+    return {
+      кнопка: bg(кнопка), текст: rgb(getComputedStyle(кнопка).color),
+      плашка: bg(f.querySelector('.preview .tag--accent')),
+      снаружи: bg(f.querySelector('form .button--primary')),
+    };
+  });
+  const норм = (c) => c.replace(/\s+/g, '');
+  const до = await цвета();
+  проверить(норм(до.кнопка) === 'rgb(229,72,77)', `акцент: сервер напечатал красный — кнопка образца красная (${до.кнопка})`);
+  проверить(норм(до.текст) === 'rgb(0,0,0)', `акцент: текст на светлом красном — чёрный (${до.текст})`);
+  проверить(норм(до.снаружи) !== норм(до.кнопка), 'акцент: кнопка формы вокруг — в своём акценте');
+  await обр.locator('.swatches__item[title="Синий"]').click();
+  await p.waitForTimeout(500);
+  const синий = await цвета();
+  проверить(норм(синий.кнопка) === 'rgb(79,134,247)', `акцент: выбор синего перекрашивает кнопку (${синий.кнопка})`);
+  проверить(норм(синий.плашка) !== норм(до.плашка), 'акцент: и плашку accent');
+  await обр.screenshot({ path: path.join(OUT, 'зеркало-акцента-1280.png') });
+  await обр.locator('.swatches__item--default').click();
+  await p.waitForTimeout(500);
+  const умолч = await цвета();
+  проверить(норм(умолч.кнопка) !== 'rgb(79,134,247)', `акцент: «по умолчанию» возвращает акцент рамки (${умолч.кнопка})`);
+  await ctx.close();
+}
+
 (async () => {
   const b = await браузер();
   await колонкаЧисел(b);
@@ -197,6 +233,7 @@ async function палитраАкцента(b) {
   await отказСлота(b);
   await кнопкаБезОтправки(b);
   await палитраАкцента(b);
+  await зеркалоАкцента(b);
   await b.close();
   if (беды.length) {
     console.log(`\n${беды.length} бед`);

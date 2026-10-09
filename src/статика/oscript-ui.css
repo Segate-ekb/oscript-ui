@@ -4089,7 +4089,8 @@ fieldset > legend + .segments__origin + .segments { display: grid; width: fit-co
    токенов страницы, а здесь рамка лишь берёт фон и текст своей палитры. Без скрипта
    рамка в теме страницы, а переключатель спрятан: кнопка, которая ничего не меняет, хуже,
    чем никакой. Зеркало значения (data-mirror) кладёт цвет поля в свойство --mirror-<имя>
-   узла: им пользуется лист приложения, у кита своих правил на него нет. */
+   узла: им пользуется лист приложения. Своё правило у кита одно — зеркало поля accent
+   (ниже): узлы кита в образце перекрашиваются акцентом сами. */
 
 .preview {
 	display: grid;
@@ -4143,6 +4144,28 @@ fieldset > legend + .segments__origin + .segments { display: grid; width: fit-co
 
 @media (scripting: enabled) {
 	.preview__themes { display: inline-flex; }
+}
+
+/* Зеркало акцента (0.13, дев-сборка 6). Узел образца, на котором зеркало поля accent напечатало
+   (сервер) или написало (скрипт) свойство --mirror-accent, пересобирает акцентные роли своей
+   палитры из него: основная кнопка, плашка и чип вида accent, ссылка, контурная кнопка внутри
+   берут выбранный цвет, как возьмут его на сайте. Контейнер — тот же цвет на 30 % поверх
+   поверхности рамки, текст на нём — on-surface; текст на самом акценте — белый или чёрный
+   по светлоте цвета (порог OKLCH 0,6 — там, где белый и чёрный дают равный контраст),
+   где движок умеет относительный цвет; иначе остаётся on-primary палитры. Селектор по
+   атрибуту style: свойство без значения правило не включает — пустое поле («по умолчанию»)
+   возвращает узлу акцент рамки. Зеркало на самой рамке образца перекрашивает рамку целиком. */
+.preview__frame [style*="--mirror-accent:"],
+.preview[style*="--mirror-accent:"] > .preview__frame {
+	--md-sys-color-primary: var(--mirror-accent);
+	--md-sys-color-primary-container: color-mix(in srgb, var(--mirror-accent) 30%, var(--md-sys-color-surface));
+	--md-sys-color-on-primary-container: var(--md-sys-color-on-surface);
+}
+@supports (color: oklch(from red l c h)) {
+	.preview__frame [style*="--mirror-accent:"],
+	.preview[style*="--mirror-accent:"] > .preview__frame {
+		--md-sys-color-on-primary: oklch(from var(--mirror-accent) clamp(0, (0.6 - l) * 1000, 1) 0 0);
+	}
 }
 
 @media (prefers-reduced-motion: reduce) {
