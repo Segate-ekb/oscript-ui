@@ -7,7 +7,8 @@
 // Код выхода 1, если: свёрнутая строка налезает на действия записи; у раскрытой записи видно
 // меню ⚙, а у свёрнутой его нет; меню ⚙ не открывается или в нём не те пункты, что внизу
 // тела; на узком экране кнопки тела не столбиком во всю ширину; кнопка формы тумблера видна
-// при скрипте или спрятана без него; страница уехала вбок.
+// при скрипте или спрятана без него; страница уехала вбок; окно или подтверждение из тела
+// записи стоит внутри свёрнутой записи, а не после списка, и из меню ⚙ открывается невидимым.
 
 const { chromium } = require('playwright-core');
 const { execSync } = require('child_process');
@@ -54,9 +55,59 @@ function замерить() {
   };
 }
 
+// Окна записи (0.13.0-dev.3): подтверждение и окно правки положены в тело записи, а кит
+// печатает их после списка. Из меню ⚙ свёрнутой записи они открываются на виду: модальными
+// и не нулевого размера; без скрипта — стоят вне раскрывашки.
+async function окнаЗаписи(b, беды) {
+  for (const скрипт of [true, false]) {
+    const ctx = await b.newContext({ viewport: { width: 1280, height: 900 }, javaScriptEnabled: скрипт });
+    const p = await ctx.newPage();
+    p.setDefaultTimeout(15000);
+    await p.goto(B + '/' + encodeURIComponent('реестр'), { waitUntil: 'networkidle' });
+    const имя = 'окна записи' + (скрипт ? '' : ', без скрипта');
+    const вне = await p.evaluate(() => ['udalit-klyuch-sborka', 'prava-klyuch-sborka'].map((ид) => {
+      const д = document.getElementById(ид);
+      return !!д && !д.closest('details') && !д.closest('.entries');
+    }));
+    if (!вне.every(Boolean)) беды.push(имя + ': окно записи стоит внутри списка ' + JSON.stringify(вне));
+
+    if (скрипт) {
+      const запись = p.locator('.entry:has(.entry__gear [data-confirm="udalit-klyuch-sborka"])');
+      const виден = (ид) => p.evaluate((ид) => {
+        const д = document.getElementById(ид);
+        const к = д.getBoundingClientRect();
+        const над = document.elementFromPoint(к.left + к.width / 2, к.top + к.height / 2);
+        return д.open && д.matches(':modal') && к.width > 100 && к.height > 100 && !!над && д.contains(над);
+      }, ид);
+
+      await запись.locator('.entry__gear .menu > .button').click();
+      await запись.locator('.menu__panel form[data-confirm] button[type=submit]').click();
+      await p.waitForTimeout(300);
+      if (!(await виден('udalit-klyuch-sborka'))) беды.push(имя + ': подтверждение из меню ⚙ свёрнутой записи не видно');
+      await p.screenshot({ path: path.join(OUT, 'реестр-подтверждение-из-меню.png') });
+      await p.keyboard.press('Escape');
+      await p.waitForTimeout(100);
+      if (await p.evaluate(() => document.getElementById('udalit-klyuch-sborka').open)) беды.push(имя + ': Esc не закрыл подтверждение');
+
+      await p.evaluate(() => { window.__метка = 1; });
+      await запись.locator('.entry__gear .menu > .button').click();
+      await запись.locator('.menu__panel a[data-opens="prava-klyuch-sborka"]').click();
+      await p.waitForTimeout(300);
+      if (!(await виден('prava-klyuch-sborka'))) беды.push(имя + ': окно из меню ⚙ свёрнутой записи не видно');
+      if (!(await p.evaluate(() => window.__метка === 1))) беды.push(имя + ': ссылка окна увела со страницы');
+      const меню = await запись.locator('.menu__panel').evaluate((э) => э.matches(':popover-open'));
+      if (меню) беды.push(имя + ': меню ⚙ осталось открытым под окном');
+      await p.keyboard.press('Escape');
+    }
+    console.log(имя, 'проверено');
+    await ctx.close();
+  }
+}
+
 (async () => {
   const b = await браузер();
   const беды = [];
+  await окнаЗаписи(b, беды);
 
   for (const скрипт of [true, false]) {
     for (const ширина of [1280, 390]) {
