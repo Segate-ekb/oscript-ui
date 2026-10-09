@@ -49,6 +49,27 @@ body {
 
 a { color: var(--md-sys-color-primary); text-decoration: none; }
 a:hover { text-decoration: underline; }
+/* Ссылка в тексте подчёркнута всегда: в абзаце, пункте списка, описании, лиде, подсказке
+   под полем и в прозе документа её нельзя отличить от текста одним цветом — primary к
+   тексту 2.67:1 в светлой теме и 1.32:1 в тёмной при норме 3:1 (WCAG 1.4.1; аудит M3, S4).
+   Поднять контраст цветом не выйдет: в тёмной теме и текст, и primary светлые, а ссылка,
+   тёмная настолько, чтобы отличаться от текста, перестала бы читаться на фоне. Ссылка вне
+   текста — пункт навигации, кнопка, ячейка таблицы, имя карточки — отличается местом и
+   формой, а не цветом: у неё есть класс или она стоит одна, и подчёркивания ей не нужно.
+   :not([class]) — у ссылок-компонентов кита всегда есть класс. Проза документа (.prose)
+   отдельно не названа: её текст — те же абзацы и пункты, а ссылка в ячейке таблицы README
+   стоит одна, как в любой таблице. */
+p a:not([class]), li a:not([class]), dd a:not([class]), blockquote a:not([class]),
+figcaption a:not([class]), .card__lead a:not([class]),
+.section__lead a:not([class]), .modal__lead a:not([class]), .field__hint a:not([class]),
+.cmd__note a:not([class]), .toast a:not([class]) {
+	text-decoration: underline;
+	text-decoration-thickness: from-font;
+	text-underline-offset: .2em;
+}
+/* Список ссылок в навигации — меню, а не текст: подчёркивание только под указателем. */
+nav li a:not([class]) { text-decoration: none; }
+nav li a:not([class]):hover { text-decoration: underline; }
 /* Индикатор фокуса Material: обводка 3px цветом secondary с зазором. Скругление у обводки
    своё не задаётся — она идёт по форме самого элемента, и пилюля остаётся пилюлей. */
 a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible,

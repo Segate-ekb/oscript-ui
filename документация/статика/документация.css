@@ -48,6 +48,11 @@ body:has(.docs) .wrap { max-width: 1440px; }
 	color: var(--md-sys-color-on-surface);
 }
 .docs__toc ul { list-style: none; margin: 0; padding: 0; border-left: 1px solid var(--md-sys-color-outline-variant); }
+/* Оглавление — навигация, а не текст: ссылка пункта без подчёркивания, которое кит даёт
+   ссылке в пункте списка (li a). Селектор сильнее правила кита. */
+.docs__toc li > a {
+	text-decoration: none;
+}
 .docs__toc a {
 	display: block;
 	padding: var(--space-1) var(--space-3);

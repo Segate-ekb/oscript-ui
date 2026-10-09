@@ -228,6 +228,37 @@ async function карточкаВКарточке(b) {
   await ctx.close();
 }
 
+// S4: ссылка в тексте подчёркнута в обеих темах; ссылка навигации, ячейки таблицы и имя
+// карточки объекта — нет.
+async function ссылкиВТексте(b) {
+  const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
+  const p = await ctx.newPage();
+  await p.goto(адрес('окно'), { waitUntil: 'networkidle' });
+  const з = await p.evaluate(() => {
+    const линия = (el) => el ? getComputedStyle(el).textDecorationLine : 'нет элемента';
+    const таблица = document.createElement('table');
+    таблица.innerHTML = '<tbody><tr><td><a href="#x">ячейка</a></td></tr></tbody>';
+    document.querySelector('main').appendChild(таблица);
+    return {
+      абзац: линия(document.querySelector('main p a:not([class])')),
+      пункт: линия(document.querySelector('main li a:not([class])')),
+      навигация: линия(document.querySelector('a[class*="tree__link"], nav a[class]')),
+      ячейка: линия(таблица.querySelector('a')),
+      оглавление: линия(document.querySelector('.docs__toc li > a')),
+    };
+  });
+  проверить(з.абзац === 'underline', `S4: ссылка в абзаце подчёркнута (${з.абзац})`);
+  проверить(з.пункт === 'underline', `S4: ссылка в пункте списка подчёркнута (${з.пункт})`);
+  проверить(з.навигация === 'none', `S4: ссылка навигации без подчёркивания (${з.навигация})`);
+  проверить(з.оглавление === 'none', `S4: пункт оглавления страницы без подчёркивания (${з.оглавление})`);
+  проверить(з.ячейка === 'none', `S4: ссылка в ячейке таблицы без подчёркивания (${з.ячейка})`);
+  await p.goto(адрес('раскладка'), { waitUntil: 'networkidle' });
+  const имя = await образец(p, 'Карточка объекта').locator('.objcard__name a').first()
+    .evaluate((a) => getComputedStyle(a).textDecorationLine);
+  проверить(имя === 'none', `S4: имя карточки объекта без подчёркивания (${имя})`);
+  await ctx.close();
+}
+
 (async () => {
   const b = await браузер();
   try {
@@ -236,6 +267,7 @@ async function карточкаВКарточке(b) {
     await окноПоЦентру(b);
     await окнаНаТелефоне(b);
     await карточкаВКарточке(b);
+    await ссылкиВТексте(b);
   } finally {
     await b.close();
   }
