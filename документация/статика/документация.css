@@ -357,3 +357,11 @@ body:has(.docs) .wrap { max-width: 1440px; }
 .docs-map__card:hover { box-shadow: var(--md-sys-elevation-level2); text-decoration: none; }
 .docs-map__title { font: var(--type-title-medium); color: var(--md-sys-color-primary); }
 .docs-map__text { font: var(--type-body-medium); color: var(--md-sys-color-on-surface-variant); }
+
+/* --- образцы шапки сайта (страницы «Образец» и «Слот картинки», выпуск 0.12) ---
+   Лист приложения сам решает, что делает цвет из зеркала: здесь акцент — полоса слева
+   у шапки образца. Без значения — primary темы рамки. */
+.preview [data-mirror="accent"] {
+	padding-left: var(--space-3);
+	border-left: 6px solid var(--mirror-accent, var(--md-sys-color-primary));
+}

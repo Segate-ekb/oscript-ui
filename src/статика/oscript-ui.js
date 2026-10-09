@@ -18,6 +18,10 @@
  *      сервер напечатал открытым, — модальным, окно по адресу (data-window-link) в одной
  *      на страницу оболочке и подтверждение отправки формы (data-confirm).
  *   8. шаги (data-steps) — одна панель длинной формы за раз, «Дальше» проверяет поля шага.
+ *   9. слот картинки и образец (выпуск 0.12): выбор файла отправляет слот сразу
+ *      (data-autosubmit, раздел 6) и тут же показывает выбранное в предпросмотре; зеркало
+ *      значения (data-mirror) пишет набранное в узел образца; переключатель темы образца
+ *      (data-preview-theme) красит рамку палитрой из блока токенов страницы.
  *
  * Глобальных имён скрипт не заводит, разметку не печатает — только атрибуты и рябь.
  * Обновив страницу на месте, он сообщает об этом событием «oscript-ui:update» на document:
@@ -1159,4 +1163,249 @@
 	// шаги оживают заново.
 	doc.addEventListener('oscript-ui:update', function () { stepsInit(); });
 	stepsInit();
+
+	/* --- 9. картинка и образец (выпуск 0.12, шаги 16–17) ----------------------------- */
+
+	// Слот картинки отправляет себя сам: на файловом поле признак data-autosubmit, и выбор
+	// файла уходит формой слота тихой отправкой (раздел 6, multipart). Здесь — только то, что
+	// человек видит, пока файл в пути: выбранная картинка сразу встаёт в предпросмотр. Ответ
+	// сервера морфингом вернёт адрес сохранённой; отказ — прежнюю.
+	var PICKED = 'oscriptUiPicked'; // свойство картинки слота: адрес выбранного файла в памяти
+
+	doc.addEventListener('change', function (e) {
+		var input = e.target;
+		if (!input || input.type !== 'file' || !input.files || !input.files[0]
+			|| !window.URL || !URL.createObjectURL) {
+			return;
+		}
+		var slot = input.closest ? input.closest('.imgslot') : null;
+		var img = slot ? slot.querySelector('.imgslot__image') : null;
+		if (!img) {
+			return; // пустой слот: картинки ещё нет, ждём ответа сервера
+		}
+		if (img[PICKED]) {
+			URL.revokeObjectURL(img[PICKED]);
+		}
+		img[PICKED] = URL.createObjectURL(input.files[0]);
+		img.src = img[PICKED];
+	});
+
+	// Окно сброса открывает пункт меню ⚙: меню закрылось вместе с открытием окна, и движок,
+	// закрыв окно, вернул бы фокус в спрятанный пункт — то есть никуда. Фокус встаёт на
+	// кнопку ⚙ того же слота. Ход позже: движок возвращает фокус своим порядком.
+	doc.addEventListener('close', function (e) {
+		var box = e.target;
+		var slot = box && box.tagName === 'DIALOG' && box.closest ? box.closest('.imgslot') : null;
+		if (!slot) {
+			return;
+		}
+		setTimeout(function () {
+			var lost = !doc.activeElement || doc.activeElement === doc.body
+				|| !doc.activeElement.getClientRects().length;
+			var gear = slot.isConnected ? slot.querySelector('.imgslot__gear .menu > .button') : null;
+			if (lost && gear) {
+				gear.focus();
+			}
+		}, 0);
+	}, true);
+
+	// Зеркало значения (data-mirror="имя"): узел показывает текущее значение поля с этим
+	// именем. Текст узла — то, что напечатал сервер; он и возвращается, когда поле опустело.
+	// Поле цвета (системный выбор цвета или образцы-кружки) пишет не текст, а свойство CSS
+	// --mirror-<имя> на узле: его берёт лист приложения, а пустое значение («по умолчанию»)
+	// свойство снимает. Текст пишется textContent-ом — разметка из поля не исполняется.
+	var MIRROR_TEXT = 'oscriptUiMirrorText'; // свойство узла: текст, напечатанный сервером
+	var HEX = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+
+	function mirrorsOf(name) {
+		var all = doc.querySelectorAll('[data-mirror]');
+		var out = [];
+		for (var i = 0; i < all.length; i++) {
+			if (all[i].getAttribute('data-mirror') === name) {
+				out.push(all[i]);
+			}
+		}
+		return out;
+	}
+
+	function mirrorIsColor(name) {
+		var list = doc.getElementsByName(name);
+		for (var i = 0; i < list.length; i++) {
+			if (list[i].type === 'color' || (list[i].type === 'radio' && HEX.test(list[i].value))) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	function mirrorValue(control) {
+		if (control.type === 'radio') {
+			if (control.checked) {
+				return control.value;
+			}
+			var list = doc.getElementsByName(control.name);
+			for (var i = 0; i < list.length; i++) {
+				if (list[i].checked) {
+					return list[i].value;
+				}
+			}
+			return '';
+		}
+		if (control.type === 'checkbox') {
+			return control.checked ? control.value : '';
+		}
+		return control.type === 'file' ? null : control.value;
+	}
+
+	function mirror(control) {
+		var name = control && control.name;
+		if (!name || !('value' in control)) {
+			return;
+		}
+		var targets = mirrorsOf(name);
+		var value = targets.length ? mirrorValue(control) : null;
+		if (value === null) {
+			return;
+		}
+		var color = mirrorIsColor(name);
+		for (var i = 0; i < targets.length; i++) {
+			var t = targets[i];
+			if (color) {
+				if (!value) {
+					t.style.removeProperty('--mirror-' + name);
+				} else if (HEX.test(value)) {
+					t.style.setProperty('--mirror-' + name, value);
+				}
+				continue;
+			}
+			if (!(MIRROR_TEXT in t)) {
+				t[MIRROR_TEXT] = t.textContent;
+			}
+			t.textContent = value !== '' ? value : t[MIRROR_TEXT];
+		}
+	}
+
+	['input', 'change'].forEach(function (type) {
+		doc.addEventListener(type, function (e) { mirror(e.target); });
+	});
+
+	// Сброс формы возвращает полям значения по умолчанию — зеркала идут за ними; значения
+	// поля уже другие только после события, поэтому ход позже.
+	doc.addEventListener('reset', function (e) {
+		var form = e.target;
+		setTimeout(function () {
+			var list = form.elements || [];
+			for (var i = 0; i < list.length; i++) {
+				if (list[i].name && (list[i].type !== 'radio' || list[i].checked)) {
+					mirror(list[i]);
+				}
+			}
+		}, 0);
+	});
+
+	// Образец: тема рамки — атрибут data-theme на .preview__frame. Палитры в голове страницы
+	// привязаны к <html>, вложенная рамка их не наследует, поэтому палитру рамки скрипт
+	// собирает из того же блока токенов (#токены-темы): тёмная — правило :root, светлая —
+	// оно же, перекрытое светлым. Лист подключается adoptedStyleSheets — в разметку страницы
+	// ничего не печатается; сменились токены (тихая отправка с новым акцентом) — лист
+	// пересобирается. Выбор темы переживает морфинг: он помнится на фигуре.
+	var THEME = 'oscriptUiPreviewTheme'; // свойство фигуры образца: тема, выбранная человеком
+	var palette = null;
+	var paletteOf = '';
+
+	function previewPalette() {
+		var tokens = doc.getElementById('токены-темы');
+		if (!tokens || !tokens.sheet || !doc.adoptedStyleSheets || !window.CSSStyleSheet) {
+			return false;
+		}
+		if (palette && paletteOf === tokens.textContent) {
+			return true;
+		}
+		var dark = '';
+		var light = '';
+		var rules = tokens.sheet.cssRules;
+		for (var i = 0; i < rules.length; i++) {
+			var r = rules[i];
+			if (!r.style) {
+				continue;
+			}
+			if (r.selectorText === ':root') {
+				dark = r.style.cssText;
+			} else if (/data-theme/.test(r.selectorText)) {
+				light = r.style.cssText;
+			}
+		}
+		if (!dark) {
+			return false;
+		}
+		try {
+			if (!palette) {
+				palette = new CSSStyleSheet();
+				doc.adoptedStyleSheets = doc.adoptedStyleSheets.concat([palette]);
+			}
+			palette.replaceSync('.preview__frame[data-theme="dark"]{' + dark + '}'
+				+ '.preview__frame[data-theme="light"]{' + dark + light + '}');
+		} catch (err) {
+			return false;
+		}
+		paletteOf = tokens.textContent;
+		return true;
+	}
+
+	function previewFrame(figure) {
+		return figure.querySelector(':scope > .preview__frame');
+	}
+
+	function previewTheme(figure, theme) {
+		var frame = previewFrame(figure);
+		if (!frame) {
+			return;
+		}
+		if (theme) {
+			frame.setAttribute('data-theme', theme);
+		} else {
+			frame.removeAttribute('data-theme');
+		}
+		var buttons = figure.querySelectorAll(':scope > .preview__themes [data-preview-theme]');
+		for (var i = 0; i < buttons.length; i++) {
+			buttons[i].setAttribute('aria-pressed',
+				buttons[i].getAttribute('data-preview-theme') === theme ? 'true' : 'false');
+		}
+	}
+
+	// Нажатая тема — ещё раз нажата — снимается: рамка возвращается к теме страницы.
+	doc.addEventListener('click', function (e) {
+		var button = e.target.closest ? e.target.closest('[data-preview-theme]') : null;
+		var figure = button ? button.closest('.preview') : null;
+		if (!figure || !previewPalette()) {
+			return;
+		}
+		var theme = button.getAttribute('data-preview-theme');
+		var frame = previewFrame(figure);
+		figure[THEME] = frame && frame.getAttribute('data-theme') === theme ? '' : theme;
+		previewTheme(figure, figure[THEME]);
+	});
+
+	function previewInit() {
+		var figures = doc.querySelectorAll('.preview');
+		if (!figures.length || !previewPalette()) {
+			return;
+		}
+		for (var i = 0; i < figures.length; i++) {
+			if (figures[i][THEME] !== undefined) {
+				previewTheme(figures[i], figures[i][THEME]);
+			}
+		}
+	}
+
+	// Морфинг возвращает разметке серверный вид: выбор темы и текст зеркал берутся заново,
+	// а пересобранный блок токенов (новый акцент) — пересобирает палитру рамки.
+	doc.addEventListener('oscript-ui:update', function () {
+		var all = doc.querySelectorAll('[data-mirror]');
+		for (var i = 0; i < all.length; i++) {
+			delete all[i][MIRROR_TEXT];
+		}
+		previewInit();
+	});
+	previewInit();
 })();

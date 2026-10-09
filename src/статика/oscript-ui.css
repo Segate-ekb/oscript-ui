@@ -3235,3 +3235,155 @@ div.entry__head:hover { --_state: 0%; }
 	/* вкладки стоят у левого края, а не растянуты линиями мастера */
 	.steps--tabs > .steps__bar > .steps__item { flex: 0 1 auto; }
 }
+
+/* --- картинка и образец (выпуск 0.12): слот картинки -----------------------------
+   Узел Кит.СлотКартинки: предпросмотр на шахматке, подпись и строка состояния, кнопка
+   «Загрузить / Заменить» и меню ⚙. Слот — своя форма (и форма сброса рядом), формы стоят
+   display: contents — их дети раскладываются одной строкой слота; на узком экране
+   кнопки переносятся под подпись. Без скрипта видно системное файловое поле и кнопку
+   отправки: только так форму и отправить. Со скриптом выбор файла отправляет форму сам —
+   поле уходит из вида (но не из порядка обхода: фокус с клавиатуры встаёт на него, и
+   обводку рисует кнопка-подпись над ним), кнопка отправки прячется. */
+
+.imgslot {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space-3) var(--space-4);
+}
+.imgslot__upload, .imgslot__reset { display: contents; }
+
+/* Шахматка — фон «прозрачного» из редакторов картинок: на ней видно, где у логотипа
+   прозрачные края, в обеих темах. */
+.imgslot__preview {
+	--_a: var(--md-sys-color-surface-container-highest);
+	--_b: var(--md-sys-color-surface-container-low);
+	flex: none;
+	display: grid;
+	place-items: center;
+	width: 72px;
+	height: 72px;
+	overflow: hidden;
+	border: 1px solid var(--md-sys-color-outline-variant);
+	border-radius: var(--md-sys-shape-corner-medium);
+	background: repeating-conic-gradient(var(--_a) 0 25%, var(--_b) 0 50%) 0 0 / 16px 16px;
+	transition: opacity var(--motion-fast) var(--motion-ease);
+}
+.imgslot__image { display: block; max-width: 100%; max-height: 100%; object-fit: contain; }
+/* пока файл в пути, предпросмотр приглушён: форма слота помечена aria-busy */
+.imgslot:has(.imgslot__upload[aria-busy="true"]) .imgslot__preview { opacity: 0.6; }
+
+.imgslot__text { flex: 1 1 12rem; min-width: 0; }
+.imgslot__label {
+	margin: 0;
+	font: var(--type-title-small);
+	letter-spacing: var(--md-sys-typescale-title-small-tracking);
+	color: var(--md-sys-color-on-surface);
+}
+.imgslot__state {
+	margin: var(--space-1) 0 0;
+	font: var(--type-body-medium);
+	letter-spacing: var(--md-sys-typescale-body-medium-tracking);
+	color: var(--md-sys-color-on-surface-variant);
+	overflow-wrap: anywhere;
+}
+
+.imgslot__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.imgslot__pick { display: inline-flex; position: relative; min-width: 0; }
+.imgslot .imgslot__face { display: none; }
+.imgslot__file { max-width: 100%; font: var(--type-body-medium); color: var(--md-sys-color-on-surface); }
+.imgslot__gear { display: inline-flex; }
+/* окно сброса, напечатанное открытым без скрипта, стоит в потоке страницы — во всю строку */
+.imgslot > .modal[open] { flex: 1 1 100%; }
+
+@media (scripting: enabled) {
+	.imgslot .imgslot__face { display: inline-flex; cursor: pointer; }
+	.imgslot__file {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		margin: -1px;
+		padding: 0;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+		border: 0;
+		opacity: 0;
+	}
+	.imgslot__actions > .button { display: none; }
+	.imgslot__pick:has(.imgslot__file:focus-visible) .imgslot__face {
+		--_state: var(--state-focus);
+		outline: 3px solid var(--md-sys-color-secondary);
+		outline-offset: 2px;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.imgslot__preview { transition: none; }
+}
+
+/* --- картинка и образец (выпуск 0.12): образец --------------------------------------
+   Узел Кит.Образец: подпись, переключатель темы и рамка, в которой лежит любое дерево.
+   Тема рамки — data-theme на .preview__frame; палитры для неё скрипт кита собирает из блока
+   токенов страницы, а здесь рамка лишь берёт фон и текст своей палитры. Без скрипта
+   рамка в теме страницы, а переключатель спрятан: кнопка, которая ничего не меняет, хуже,
+   чем никакой. Зеркало значения (data-mirror) кладёт цвет поля в свойство --mirror-<имя>
+   узла: им пользуется лист приложения, у кита своих правил на него нет. */
+
+.preview {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: center;
+	gap: var(--space-2) var(--space-3);
+	margin: 0;
+}
+.preview__label {
+	min-width: 0;
+	font: var(--type-label-large);
+	letter-spacing: var(--md-sys-typescale-label-large-tracking);
+	color: var(--md-sys-color-on-surface-variant);
+}
+.preview__themes { display: none; gap: var(--space-1); }
+.preview__theme {
+	--_state: 0%;
+	min-height: 32px;
+	padding: 0 var(--space-3);
+	border: 1px solid var(--md-sys-color-outline-variant);
+	border-radius: var(--md-sys-shape-corner-small);
+	background-color: color-mix(in srgb, var(--md-sys-color-on-surface) var(--_state), transparent);
+	color: var(--md-sys-color-on-surface-variant);
+	font: var(--type-label-large);
+	letter-spacing: var(--md-sys-typescale-label-large-tracking);
+	cursor: pointer;
+	transition: background-color var(--motion-fast) var(--motion-ease),
+	            color var(--motion-fast) var(--motion-ease);
+}
+.preview__theme:hover { --_state: var(--state-hover); }
+.preview__theme:active { --_state: var(--state-pressed); }
+.preview__theme[aria-pressed="true"] {
+	border-color: transparent;
+	background-color: var(--md-sys-color-secondary-container);
+	color: var(--md-sys-color-on-secondary-container);
+}
+.preview__frame {
+	grid-column: 1 / -1;
+	min-width: 0;
+	padding: var(--space-4);
+	border: 1px solid var(--md-sys-color-outline-variant);
+	border-radius: var(--md-sys-shape-corner-medium);
+	background: var(--md-sys-color-surface);
+	color: var(--md-sys-color-on-surface);
+}
+/* в студии (поля слева, образец справа) образец делит строку с полями и уезжает под них
+   на узком экране — как .studio__sample, но во всю свою колонку */
+.studio > .preview { flex: 1 1 18rem; min-width: 0; }
+.preview__frame > :first-child { margin-top: 0; }
+.preview__frame > :last-child { margin-bottom: 0; }
+
+@media (scripting: enabled) {
+	.preview__themes { display: inline-flex; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.preview__theme { transition: none; }
+}
