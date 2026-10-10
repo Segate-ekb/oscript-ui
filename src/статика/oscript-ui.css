@@ -3927,6 +3927,51 @@ fieldset > legend + .segments__origin + .segments { display: grid; width: fit-co
 	.segments-set:has(> .segments > :nth-child(8) > :checked) > .segments__panel:nth-child(9):not(:empty) { display: flex; }
 }
 
+/* Панель сегмента вне его набора (Кит.ПанельСегмента, Сегменты.Панель — 0.13, дев-сборка 7).
+   Та же панель набора, только стоит не под группой, а где угодно в той же форме — в другом
+   шаге мастера, в другой группе. Видна, пока в форме отмечен сегмент номер N группы с тем же
+   местом (data-segments-slot): CSS не сравнит имя поля панели с именем радиокнопок, поэтому
+   сервер нумерует группы с панелями в форме, а правила перечислены по месту (до четырёх
+   групп, Сегменты.МестПанелейНаЛисте) и номеру сегмента (до восьми). Движок без :has()
+   показывает все панели — поля не теряются, лишние отбрасывает сервер. */
+.segments-panel { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.segments-panel:empty { display: none; }
+@supports selector(:has(*)) {
+	.segments-panel { display: none; }
+	form:has(.segments[data-segments-slot="1"] > :nth-child(1) > :checked) .segments-panel[data-segments-slot="1"][data-segments-number="1"]:not(:empty),
+	form:has(.segments[data-segments-slot="1"] > :nth-child(2) > :checked) .segments-panel[data-segments-slot="1"][data-segments-number="2"]:not(:empty),
+	form:has(.segments[data-segments-slot="1"] > :nth-child(3) > :checked) .segments-panel[data-segments-slot="1"][data-segments-number="3"]:not(:empty),
+	form:has(.segments[data-segments-slot="1"] > :nth-child(4) > :checked) .segments-panel[data-segments-slot="1"][data-segments-number="4"]:not(:empty),
+	form:has(.segments[data-segments-slot="1"] > :nth-child(5) > :checked) .segments-panel[data-segments-slot="1"][data-segments-number="5"]:not(:empty),
+	form:has(.segments[data-segments-slot="1"] > :nth-child(6) > :checked) .segments-panel[data-segments-slot="1"][data-segments-number="6"]:not(:empty),
+	form:has(.segments[data-segments-slot="1"] > :nth-child(7) > :checked) .segments-panel[data-segments-slot="1"][data-segments-number="7"]:not(:empty),
+	form:has(.segments[data-segments-slot="1"] > :nth-child(8) > :checked) .segments-panel[data-segments-slot="1"][data-segments-number="8"]:not(:empty),
+	form:has(.segments[data-segments-slot="2"] > :nth-child(1) > :checked) .segments-panel[data-segments-slot="2"][data-segments-number="1"]:not(:empty),
+	form:has(.segments[data-segments-slot="2"] > :nth-child(2) > :checked) .segments-panel[data-segments-slot="2"][data-segments-number="2"]:not(:empty),
+	form:has(.segments[data-segments-slot="2"] > :nth-child(3) > :checked) .segments-panel[data-segments-slot="2"][data-segments-number="3"]:not(:empty),
+	form:has(.segments[data-segments-slot="2"] > :nth-child(4) > :checked) .segments-panel[data-segments-slot="2"][data-segments-number="4"]:not(:empty),
+	form:has(.segments[data-segments-slot="2"] > :nth-child(5) > :checked) .segments-panel[data-segments-slot="2"][data-segments-number="5"]:not(:empty),
+	form:has(.segments[data-segments-slot="2"] > :nth-child(6) > :checked) .segments-panel[data-segments-slot="2"][data-segments-number="6"]:not(:empty),
+	form:has(.segments[data-segments-slot="2"] > :nth-child(7) > :checked) .segments-panel[data-segments-slot="2"][data-segments-number="7"]:not(:empty),
+	form:has(.segments[data-segments-slot="2"] > :nth-child(8) > :checked) .segments-panel[data-segments-slot="2"][data-segments-number="8"]:not(:empty),
+	form:has(.segments[data-segments-slot="3"] > :nth-child(1) > :checked) .segments-panel[data-segments-slot="3"][data-segments-number="1"]:not(:empty),
+	form:has(.segments[data-segments-slot="3"] > :nth-child(2) > :checked) .segments-panel[data-segments-slot="3"][data-segments-number="2"]:not(:empty),
+	form:has(.segments[data-segments-slot="3"] > :nth-child(3) > :checked) .segments-panel[data-segments-slot="3"][data-segments-number="3"]:not(:empty),
+	form:has(.segments[data-segments-slot="3"] > :nth-child(4) > :checked) .segments-panel[data-segments-slot="3"][data-segments-number="4"]:not(:empty),
+	form:has(.segments[data-segments-slot="3"] > :nth-child(5) > :checked) .segments-panel[data-segments-slot="3"][data-segments-number="5"]:not(:empty),
+	form:has(.segments[data-segments-slot="3"] > :nth-child(6) > :checked) .segments-panel[data-segments-slot="3"][data-segments-number="6"]:not(:empty),
+	form:has(.segments[data-segments-slot="3"] > :nth-child(7) > :checked) .segments-panel[data-segments-slot="3"][data-segments-number="7"]:not(:empty),
+	form:has(.segments[data-segments-slot="3"] > :nth-child(8) > :checked) .segments-panel[data-segments-slot="3"][data-segments-number="8"]:not(:empty),
+	form:has(.segments[data-segments-slot="4"] > :nth-child(1) > :checked) .segments-panel[data-segments-slot="4"][data-segments-number="1"]:not(:empty),
+	form:has(.segments[data-segments-slot="4"] > :nth-child(2) > :checked) .segments-panel[data-segments-slot="4"][data-segments-number="2"]:not(:empty),
+	form:has(.segments[data-segments-slot="4"] > :nth-child(3) > :checked) .segments-panel[data-segments-slot="4"][data-segments-number="3"]:not(:empty),
+	form:has(.segments[data-segments-slot="4"] > :nth-child(4) > :checked) .segments-panel[data-segments-slot="4"][data-segments-number="4"]:not(:empty),
+	form:has(.segments[data-segments-slot="4"] > :nth-child(5) > :checked) .segments-panel[data-segments-slot="4"][data-segments-number="5"]:not(:empty),
+	form:has(.segments[data-segments-slot="4"] > :nth-child(6) > :checked) .segments-panel[data-segments-slot="4"][data-segments-number="6"]:not(:empty),
+	form:has(.segments[data-segments-slot="4"] > :nth-child(7) > :checked) .segments-panel[data-segments-slot="4"][data-segments-number="7"]:not(:empty),
+	form:has(.segments[data-segments-slot="4"] > :nth-child(8) > :checked) .segments-panel[data-segments-slot="4"][data-segments-number="8"]:not(:empty) { display: flex; }
+}
+
 /* Подсказка — значок «?» и поповер при нём (rich tooltip Material): контейнер
    surface-container, второй уровень возвышения, текст body-medium. Открывает и закрывает
    поповер движок (popovertarget, Esc, щелчок мимо), скрипта нет. Значок 24px, а зона

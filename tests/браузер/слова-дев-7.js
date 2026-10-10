@@ -318,9 +318,39 @@ async function зеркалоПризнаком(b) {
   await ctx.close();
 }
 
+// П. 4: панель сегмента вне его набора — в другом шаге той же формы видна панель отмеченного
+// канала. Без скрипта шаги стоят подряд, и смена сегмента сразу меняет панель (лист, :has);
+// со скриптом — после «Дальше» во втором шаге видна панель выбранного в первом.
+async function панельСегмента(b) {
+  const видимые = (обр) => обр.evaluate((f) => [...f.querySelectorAll('.segments-panel')]
+    .filter((x) => x.getClientRects().length > 0).map((x) => x.getAttribute('data-segment')));
+  {
+    const { ctx, p } = await страница(b, 'сегменты', 1280, false);
+    const обр = образец(p, 'Канал выбирают');
+    проверить((await видимые(обр)).join() === 'chat', `панель сегмента без скрипта: видна панель «Чат» (${(await видимые(обр)).join()})`);
+    await обр.locator('.segments__item', { hasText: 'Почта' }).click();
+    проверить((await видимые(обр)).join() === 'mail', `панель сегмента без скрипта: «Почта» — видна панель письма (${(await видимые(обр)).join()})`);
+    await обр.locator('.segments__item', { hasText: 'Вебхук' }).click();
+    проверить((await видимые(обр)).join() === 'hook', `панель сегмента без скрипта: «Вебхук» — видна панель вебхука (${(await видимые(обр)).join()})`);
+    await обр.screenshot({ path: path.join(OUT, 'панель-сегмента-без-скрипта-1280.png') });
+    await ctx.close();
+  }
+  {
+    const { ctx, p } = await страница(b, 'сегменты', 390, true);
+    const обр = образец(p, 'Канал выбирают');
+    await обр.locator('.segments__item', { hasText: 'Почта' }).click();
+    await обр.locator('input[name="target"]').fill('team@example.org');
+    await обр.locator('[data-steps-next]').first().click();
+    await p.waitForTimeout(300);
+    проверить((await видимые(обр)).join() === 'mail', `панель сегмента 390: во втором шаге — панель письма (${(await видимые(обр)).join()})`);
+    await обр.screenshot({ path: path.join(OUT, 'панель-сегмента-шаг-2-390.png') });
+    await ctx.close();
+  }
+}
+
 (async () => {
   const b = await браузер();
-  const шаги = { секцияСоСпискомКарточек, подписиСегментов, окноБезСкрипта, зеркалоПризнаком };
+  const шаги = { секцияСоСпискомКарточек, подписиСегментов, окноБезСкрипта, зеркалоПризнаком, панельСегмента };
   try {
     for (const [имя, шаг] of Object.entries(шаги)) {
       if (ТОЛЬКО && !ТОЛЬКО.split(',').includes(имя)) continue;
