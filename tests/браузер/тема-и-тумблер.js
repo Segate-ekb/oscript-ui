@@ -135,7 +135,7 @@ const ТУМБЛЕР = '.docs-sample__preview form:has(.toggle__input[data-autos
 			// форма, где кроме тумблера есть другое поле: кнопка — единственный способ отправить
 			// это поле, лист её не прячет; форма собирается копией образца с добавленным полем
 			const своя = await p.evaluate(() => {
-				const образец = document.querySelector('.docs-sample__preview form:has(.toggle__input[data-autosubmit])');
+				const образец = document.querySelector('.docs-sample__preview form:has(.toggle__input[data-autosubmit]):has(button.button[type="submit"]:not(.toggle__save))');
 				const копия = образец.cloneNode(true);
 				const поле = document.createElement('input');
 				поле.type = 'text';
