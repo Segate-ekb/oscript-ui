@@ -2573,6 +2573,38 @@ form[data-quiet][aria-busy="true"] { cursor: progress; }
 }
 .fold__head { cursor: pointer; color: var(--md-sys-color-on-surface-variant); font: var(--type-label-large); }
 .fold__head:hover { color: var(--md-sys-color-on-surface); }
+/* Шапка врезки и подробности со значком и плашками (Раскрывашка.Шапка(Иконка, Текст, Плашка,
+   Плашка) — 0.13, дев-сборка 7). Свёрнутая строка — строчная (list-item ради маркера), и дети
+   шапки слипались: значок прилипал к подписи, плашки — к ней и друг к другу. Теперь шапка —
+   строка флекса с зазором 8 px, как шапка записи реестра: зазор встаёт и между текстом и
+   узлами (текст — свой анонимный элемент строки), тесная строка переносится. Флекс снимает
+   нативный маркер, поэтому маркер свой — тот же треугольник впереди, повёрнутый у открытой. */
+.fold > .fold__head,
+.fold-detail > summary {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space-1) var(--space-2);
+	list-style: none;
+}
+.fold > .fold__head::-webkit-details-marker,
+.fold-detail > summary::-webkit-details-marker { display: none; }
+.fold > .fold__head::before,
+.fold-detail > summary::before {
+	content: "";
+	flex: none;
+	width: 0;
+	height: 0;
+	border-style: solid;
+	border-width: .3em 0 .3em .5em;
+	border-color: transparent transparent transparent currentColor;
+	transition: transform var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+}
+.fold[open] > .fold__head::before,
+.fold-detail[open] > summary::before { transform: rotate(90deg); }
+/* плашке в строке текста отступ справа нужен, в строке флекса зазор даёт gap */
+.fold > .fold__head > .tag,
+.fold-detail > summary > .tag { margin-right: 0; }
 
 /* Отрендеренный README: чужой (санитизированный) HTML, которому нужны свои отступы. */
 .prose { overflow-x: auto; }

@@ -385,10 +385,40 @@ async function запаснаяКнопкаТумблера(b) {
   }
 }
 
+// П. 7: шапка врезки со значком и плашками — между значком, подписью и плашками зазор 8 px
+// (как в шапке записи реестра), маркер впереди поворачивается у открытой.
+async function шапкаРаскрывашки(b) {
+  for (const ширина of [1280, 390]) {
+    const { ctx, p } = await страница(b, 'раскладка', ширина);
+    const обр = образец(p, 'Шапка со значком и плашками');
+    const з = await обр.evaluate((f) => {
+      const s = f.querySelector('summary.fold__head');
+      const края = [];
+      for (const n of s.childNodes) {
+        const r = document.createRange();
+        r.selectNode(n);
+        const к = r.getBoundingClientRect();
+        if (к.width > 0) края.push({ л: к.left, п: к.right, в: Math.round(к.top) });
+      }
+      const зазоры = [];
+      for (let i = 1; i < края.length; i++) {
+        if (Math.abs(края[i].в - края[i - 1].в) <= 4) зазоры.push(Math.round(края[i].л - края[i - 1].п));
+      }
+      const маркер = getComputedStyle(s, '::before');
+      return { зазоры, маркер: маркер.content, поворот: маркер.transform };
+    });
+    const к = `шапка раскрывашки ${ширина}`;
+    проверить(з.зазоры.length >= 1 && з.зазоры.every((g) => g >= 7 && g <= 9), `${к}: между детьми шапки зазор 8 px (${з.зазоры.join(', ')})`);
+    проверить(з.маркер === '""' && з.поворот !== 'none', `${к}: свой маркер впереди, у открытой повёрнут (${з.поворот})`);
+    await обр.locator('details.fold').first().screenshot({ path: path.join(OUT, `шапка-раскрывашки-${ширина}.png`) });
+    await ctx.close();
+  }
+}
+
 (async () => {
   const b = await браузер();
   const шаги = { секцияСоСпискомКарточек, подписиСегментов, окноБезСкрипта, зеркалоПризнаком, панельСегмента,
-    запаснаяКнопкаТумблера };
+    запаснаяКнопкаТумблера, шапкаРаскрывашки };
   try {
     for (const [имя, шаг] of Object.entries(шаги)) {
       if (ТОЛЬКО && !ТОЛЬКО.split(',').includes(имя)) continue;
