@@ -371,3 +371,18 @@ body:has(.docs) .wrap { max-width: 1440px; }
 	padding-left: var(--space-3);
 	border-left: 6px solid var(--mirror-accent, var(--md-sys-color-primary));
 }
+/* Зеркало признаком (страница «Образец», 0.13, дев-сборка 7): вид плашки — по признаку стиля,
+   из трёх глифов виден тот, что назван признаком значка. Так пишет лист приложения. */
+.tag[data-mirror-стиль="stable"] {
+	--_bg: var(--md-sys-color-success-container);
+	color: var(--md-sys-color-on-success-container);
+}
+.tag[data-mirror-стиль="deprecated"] {
+	--_bg: var(--md-sys-color-error-container);
+	color: var(--md-sys-color-on-error-container);
+	text-decoration: line-through;
+}
+[data-mirror-значок] [data-glyph] { display: none; }
+[data-mirror-значок="тег"] [data-glyph="тег"],
+[data-mirror-значок="ключ"] [data-glyph="ключ"],
+[data-mirror-значок="пакет"] [data-glyph="пакет"] { display: inline-flex; }

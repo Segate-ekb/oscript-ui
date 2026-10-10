@@ -28,7 +28,8 @@
  *      экрана, каждый на 5 с; тост с ролью alert остаётся на месте.
  *  12. слот картинки и образец (выпуск 0.12): выбор файла отправляет слот сразу
  *      (data-autosubmit, раздел 6) и тут же показывает выбранное в предпросмотре; зеркало
- *      значения (data-mirror) пишет набранное в узел образца; переключатель темы образца
+ *      значения (data-mirror) пишет набранное в узел образца, зеркало признаком
+ *      (data-mirrors) — значение в признак data-mirror-<имя>; переключатель темы образца
  *      (data-preview-theme) красит рамку палитрой из блока токенов страницы.
  *  13. страницы и отбор без перезагрузки (выпуск 0.13): ссылка с data-quiet (страница
  *      пагинации, сортировка колонки) берётся в фоне и морфится, как ответ тихой формы,
@@ -2062,15 +2063,34 @@
 		return control.type === 'file' ? null : control.value;
 	}
 
+	// Зеркало признаком (data-mirrors="стиль значок", 0.13, дев-сборка 7): значение поля
+	// пишется не в текст, а в признак data-mirror-<имя> узла — вид по нему задаёт лист
+	// приложения. Текст и свойство --mirror-* узла не трогаются. Имя признака — строчными,
+	// как его печатает сервер.
+	function attrMirrorsOf(name) {
+		var all = doc.querySelectorAll('[data-mirrors]');
+		var out = [];
+		for (var i = 0; i < all.length; i++) {
+			if ((' ' + all[i].getAttribute('data-mirrors') + ' ').indexOf(' ' + name.toLowerCase() + ' ') >= 0) {
+				out.push(all[i]);
+			}
+		}
+		return out;
+	}
+
 	function mirror(control) {
 		var name = control && control.name;
 		if (!name || !('value' in control)) {
 			return;
 		}
+		var attrTargets = attrMirrorsOf(name);
 		var targets = mirrorsOf(name);
-		var value = targets.length ? mirrorValue(control) : null;
+		var value = targets.length || attrTargets.length ? mirrorValue(control) : null;
 		if (value === null) {
 			return;
+		}
+		for (var a = 0; a < attrTargets.length; a++) {
+			attrTargets[a].setAttribute('data-mirror-' + name.toLowerCase(), value);
 		}
 		var color = mirrorIsColor(name);
 		for (var i = 0; i < targets.length; i++) {
