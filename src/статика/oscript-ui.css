@@ -2866,6 +2866,12 @@ form[data-quiet][aria-busy="true"] { cursor: progress; }
    Прячется она только у формы, где, кроме тумблеров с СохранятьСразу, полей нет: у формы
    с другим полем кнопка — единственный способ отправить это поле. Движок без :has()
    правило выбросит, и кнопка останется — лишняя, но рабочая. */
+/* Запасную кнопку тумблеру «сохранять сразу» в форме без своей кнопки печатает кит (0.13,
+   дев-сборка 7): тумблер и кнопка-значок — в одной строке, при работающем скрипте кнопки нет. */
+.toggle-save { display: flex; align-items: flex-start; gap: var(--space-2); min-width: 0; }
+@media (scripting: enabled) {
+	.toggle__save { display: none; }
+}
 @media (scripting: enabled) {
 	.entry__actions form:has([data-autosubmit]) .button { display: none; }
 	form:has(.toggle__input[data-autosubmit]):not(:has(input:not([type="hidden"]):not(.toggle__input[data-autosubmit]), select, textarea)) button.button[type="submit"] { display: none; }

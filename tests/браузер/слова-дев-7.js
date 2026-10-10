@@ -348,9 +348,47 @@ async function панельСегмента(b) {
   }
 }
 
+// П. 5: тумблер «сохранять сразу» в форме без своей кнопки — без скрипта рядом запасная
+// кнопка-значок, она отправляет форму; со скриптом её не видно.
+async function запаснаяКнопкаТумблера(b) {
+  for (const скрипт of [false, true]) {
+    const { ctx, p } = await страница(b, 'тумблер', 390, скрипт);
+    const обр = образец(p, 'Тумблер без своей кнопки');
+    const з = await обр.evaluate((f) => {
+      const к = f.querySelector('.toggle__save');
+      const т = f.querySelector('.toggle__track');
+      if (!к) return null;
+      const кр = к.getBoundingClientRect();
+      const тр = т.getBoundingClientRect();
+      return {
+        видна: к.getClientRects().length > 0,
+        имя: к.getAttribute('aria-label'),
+        рядом: кр.width > 0 && кр.left > тр.right && кр.top < тр.bottom && кр.bottom > тр.top,
+      };
+    });
+    const к = `запасная кнопка тумблера ${скрипт ? 'со скриптом' : 'без скрипта'}`;
+    проверить(з !== null, `${к}: кит напечатал запасную кнопку`);
+    if (!з) { await ctx.close(); continue; }
+    if (скрипт) {
+      проверить(!з.видна, `${к}: кнопки не видно — форму отправляет переключение`);
+    } else {
+      проверить(з.видна && з.рядом, `${к}: кнопка видна в строке тумблера, справа`);
+      проверить(з.имя === 'Сохранить', `${к}: имя кнопки из словаря (${з.имя})`);
+      await обр.screenshot({ path: path.join(OUT, 'запасная-кнопка-тумблера-390.png') });
+      const [запрос] = await Promise.all([
+        p.waitForRequest((r) => r.method() === 'POST'),
+        обр.locator('.toggle__save').click(),
+      ]);
+      проверить(decodeURIComponent(запрос.url()).endsWith('/проект/почта'), `${к}: кнопка отправляет форму тумблера (${decodeURIComponent(запрос.url())})`);
+    }
+    await ctx.close();
+  }
+}
+
 (async () => {
   const b = await браузер();
-  const шаги = { секцияСоСпискомКарточек, подписиСегментов, окноБезСкрипта, зеркалоПризнаком, панельСегмента };
+  const шаги = { секцияСоСпискомКарточек, подписиСегментов, окноБезСкрипта, зеркалоПризнаком, панельСегмента,
+    запаснаяКнопкаТумблера };
   try {
     for (const [имя, шаг] of Object.entries(шаги)) {
       if (ТОЛЬКО && !ТОЛЬКО.split(',').includes(имя)) continue;
