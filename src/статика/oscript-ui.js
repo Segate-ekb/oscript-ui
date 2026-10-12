@@ -2432,7 +2432,10 @@
 	//     в «выбранных»; переход «все» → «кроме» оживляет детей отмеченными, «кроме» → «все»
 	//     возвращает их галкам напечатанное и уносит их правки — исключения снимает правка
 	//     режима; скрытое поле data-checktree-shown (ПравкиБезСкрипта) при отправке без
-	//     правок пересчитывается по всем галкам обёртки, с правками — не уходит.
+	//     правок пересчитывается по всем галкам обёртки, с правками — не уходит;
+	//   — (дев-сборка 8) крестик плашки отмеченного вне показанного (data-checktree-pick) —
+	//     галка «снять» (у снятого узла — «включить»); у дерева с правками она становится
+	//     правкой того же узла в общем ряду, а ряд правок держит её в согласии с собой.
 	// Узел называет ключ: своё значение галки, иначе её имя — то же правило у сервера.
 
 	var CT_EDITS = 'oscriptUiEdits';        // свойство обёртки: Map «box:ключ» | «mode:ключ» → правка
@@ -2783,10 +2786,13 @@
 		var row = set.querySelector('[data-checktree-edits]');
 		var tpl = row ? row.querySelector('template[data-checktree-chip]') : null;
 		var list = row ? row.querySelector('.checktree__edits-list') : null;
+		var edits = ctEdits(set);
+		if (set.hasAttribute('data-checktree-edits-only')) {
+			ctPaintPicks(set, edits);
+		}
 		if (!tpl || !list || !tpl.content) {
 			return;
 		}
-		var edits = ctEdits(set);
 		while (list.firstChild) {
 			list.removeChild(list.firstChild);
 		}
@@ -2805,6 +2811,50 @@
 		});
 		row.hidden = !list.firstElementChild;
 	}
+
+	// Плашка отмеченного зачёркнута, пока её узел снят правкой (у снятого узла — включён):
+	// правку могли поставить её крестиком, галкой двойника в дереве или найденным.
+	function ctPaintPicks(set, edits) {
+		var boxes = set.querySelectorAll('[data-checktree-pick] .checktree__unpick-box');
+		for (var i = 0; i < boxes.length; i++) {
+			var ed = edits.get('box:' + boxes[i].value);
+			boxes[i].checked = !!(ed && ed.kind === (boxes[i].name === 'включить' ? 'on' : 'off'));
+		}
+	}
+
+	doc.addEventListener('change', function (e) {
+		var box = e.target;
+		if (!box || !box.classList || !box.classList.contains('checktree__unpick-box')) {
+			return;
+		}
+		var pick = box.closest('[data-checktree-pick]');
+		var set = pick ? pick.closest('[data-checktree-set]') : null;
+		if (!set) {
+			return;
+		}
+		var key = pick.getAttribute('data-checktree-pick');
+		var kind = box.name === 'включить' ? 'on' : 'off';
+		var changed = [];
+		ctBoxes(set, key).forEach(function (twin) {
+			var want = box.checked ? kind : ctOrigin(twin);
+			if (!twin.disabled && ctState(twin) !== want) {
+				ctSet(twin, want);
+				changed.push(twin);
+			}
+		});
+		if (changed.length) {
+			ctSettle(set, changed);
+		}
+		if (set.hasAttribute('data-checktree-edits-only')) {
+			var text = pick.querySelector('.chips-in__text');
+			if (box.checked) {
+				ctEdits(set).set('box:' + key, { kind: kind, key: key, label: (text && text.textContent) || key });
+			} else {
+				ctEdits(set).delete('box:' + key);
+			}
+			ctPaint(set);
+		}
+	});
 
 	// Снять правку — вернуть узлу то, что напечатал сервер. Правка ветки уносит с собой
 	// и правки её детей того же рода: они были её частью.
@@ -2861,7 +2911,11 @@
 		var next = rest[Math.min(at, rest.length - 1)];
 		if (!next) {
 			next = ctBoxes(set, ed.key).filter(function (b) { return b.offsetParent; })[0]
+				|| ctFindBy(set, 'data-checktree-pick', ed.key)
 				|| set.querySelector('[data-checktree-modes] input:checked, [data-checktree-box]');
+			if (next && next.hasAttribute('data-checktree-pick')) {
+				next = next.querySelector('input');
+			}
 		}
 		if (next) {
 			next.focus();
@@ -3243,7 +3297,7 @@
 		}
 		var sets = form.querySelectorAll('[data-checktree-set][data-checktree-edits-only]');
 		for (var s = 0; s < sets.length; s++) {
-			var all = sets[s].querySelectorAll('[data-checktree-box], [data-checktree-modes] input');
+			var all = sets[s].querySelectorAll('[data-checktree-box], [data-checktree-modes] input, [data-checktree-pick] input');
 			var names = {};
 			for (var i = 0; i < all.length; i++) {
 				if (all[i].name) {

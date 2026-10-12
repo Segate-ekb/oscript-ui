@@ -1504,6 +1504,41 @@ span.checktree__item { cursor: default; }
 /* совпадения — плоский список: места под шеврон ветки им не нужно */
 .checktree--found > .checktree__node > .checktree__row { padding-left: 0; }
 .checktree__edits { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); }
+/* Отмеченное вне показанного (дев-сборка 8): ряд «Выбрано: …» над деревом — плашки тем же
+   чипом, что правки. Крестик — настоящая галка формы под значком «закрыть»: щелчок по нему
+   отмечает снятие, и без скрипта плашка зачёркивается — снятие уйдёт с формой. Фокус
+   с клавиатуры рисуется кольцом вокруг значка. */
+.checktree__picked { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); }
+.checktree__picked-label { font: var(--type-label-medium); color: var(--md-sys-color-on-surface-variant); }
+.checktree__picked-list { display: flex; flex-wrap: wrap; gap: var(--space-1); min-width: 0; }
+.checktree__pick { max-width: 100%; }
+.checktree__pick--off { color: var(--md-sys-color-on-error-container); background: var(--md-sys-color-error-container); }
+.checktree__unpick {
+	--_state: 0%;
+	position: relative;
+	display: inline-grid;
+	place-items: center;
+	flex: none;
+	width: 24px;
+	height: 24px;
+	border-radius: 50%;
+	color: inherit;
+	background: color-mix(in srgb, currentColor var(--_state), transparent);
+	cursor: pointer;
+	transition: background-color var(--motion-fast) var(--motion-ease);
+}
+.checktree__unpick:hover { --_state: var(--state-hover); }
+.checktree__unpick:active { --_state: var(--state-pressed); }
+.checktree__unpick .icon { width: 18px; height: 18px; }
+.checktree__unpick-box {
+	position: absolute;
+	inset: 0;
+	margin: 0;
+	opacity: 0;
+	cursor: pointer;
+}
+.checktree__unpick:has(> .checktree__unpick-box:focus-visible) { outline: 3px solid var(--md-sys-color-secondary); outline-offset: 0; }
+.checktree__pick:has(.checktree__unpick-box:checked) > .chips-in__text { text-decoration: line-through; opacity: .6; }
 .checktree__edits[hidden] { display: none; }
 .checktree__edits-label { font: var(--type-label-medium); color: var(--md-sys-color-on-surface-variant); }
 .checktree__edits-list { display: flex; flex-wrap: wrap; gap: var(--space-1); min-width: 0; }
