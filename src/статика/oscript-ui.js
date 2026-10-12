@@ -610,6 +610,7 @@
 		for (var k = 0; k < fresh.length; k++) {
 			if (!fresh[k].open && fresh[k].showModal) {
 				prepareConfirm(fresh[k]);
+				prepareFocus(fresh[k]);
 				fresh[k].showModal();
 			}
 		}
@@ -890,6 +891,7 @@
 			var command = button.getAttribute('command');
 			if (command === 'show-modal' && !target.open) {
 				prepareConfirm(target);
+				prepareFocus(target);
 				target.showModal();
 			} else if (command === 'close' && target.open) {
 				target.close();
@@ -902,6 +904,7 @@
 			var target = button && doc.getElementById(button.getAttribute('commandfor'));
 			if (target && !target.open) {
 				prepareConfirm(target);
+				prepareFocus(target);
 			}
 		}, true);
 	}
@@ -916,6 +919,7 @@
 			try { modal = d.matches(':modal'); } catch (err) { /* движок без :modal */ }
 			if (!modal && d.showModal) {
 				d.close();
+				prepareFocus(d);
 				d.showModal();
 			}
 		}
@@ -940,6 +944,7 @@
 			return;
 		}
 		prepareConfirm(box);
+		prepareFocus(box);
 		box.showModal();
 		var back = function () {
 			box.removeEventListener('close', back);
@@ -982,6 +987,7 @@
 				fill(shell, picked);
 				hideError();
 				prepareConfirm(shell);
+				prepareFocus(shell);
 				shell.showModal();
 				var back = function () {
 					shell.removeEventListener('close', back);
@@ -1075,6 +1081,7 @@
 		e.preventDefault();
 		if (!box.open) {
 			prepareConfirm(box);
+			prepareFocus(box);
 			box.showModal();
 		}
 	}, true);
@@ -1089,6 +1096,41 @@
 
 	function confirmButton(box) {
 		return box.querySelector('.modal__actions [name="confirmed"]');
+	}
+
+	// Фокус при открытии окна (аудит M3 №18, дев-сборка 8). Движок ставит его на первое, что
+	// в окне можно сфокусировать, — крестик в шапке, и кольцо на нём видно сразу. Свой выбор
+	// движок берёт у признака autofocus: скрипт ставит его до открытия на первое поле тела
+	// (поле с отказом — раньше), а окну без полей — на заголовок (tabindex="-1": заголовок
+	// не элемент управления, в обход Tab он не встаёт). Свой autofocus сервера не трогаем.
+	// Команду show-modal, которую исполняет сам движок, ловит щелчок в фазе погружения.
+	function prepareFocus(box) {
+		if (!box || !box.querySelector || box.querySelector('[autofocus]')) {
+			return;
+		}
+		var body = box.querySelector('.modal__body') || box;
+		var all = body.querySelectorAll('input:not([type="hidden"]), select, textarea');
+		var first = null;
+		for (var i = 0; i < all.length; i++) {
+			var f = all[i];
+			if (f.disabled || f.closest('[hidden], details:not([open])') || (f.type === 'radio' && !f.checked)) {
+				continue;
+			}
+			if (f.getAttribute('aria-invalid') === 'true') {
+				first = f;
+				break;
+			}
+			first = first || f;
+		}
+		if (!first) {
+			first = box.querySelector('.modal__title');
+			if (first && !first.hasAttribute('tabindex')) {
+				first.setAttribute('tabindex', '-1');
+			}
+		}
+		if (first) {
+			first.setAttribute('autofocus', '');
+		}
 	}
 
 	function prepareConfirm(box) {
