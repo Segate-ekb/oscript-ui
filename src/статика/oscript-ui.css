@@ -1545,6 +1545,9 @@ span.checktree__item { cursor: default; }
 .checktree__edit { max-width: 100%; }
 .checktree__edit--on { color: var(--md-sys-color-on-success-container); background: var(--md-sys-color-success-container); }
 .checktree__edit--off { color: var(--md-sys-color-on-error-container); background: var(--md-sys-color-error-container); }
+/* Сводка правок (дев-сборка 8) — строка body-medium у кнопок формы; без правок спрятана. */
+.checktree__changes { margin: 0; font: var(--type-body-medium); color: var(--md-sys-color-on-surface-variant); }
+.checktree__changes[hidden] { display: none; }
 @media (max-width: 640px) {
 	.checktree__modes { margin-left: 0; }
 	.checktree__found-head { flex-direction: column; align-items: flex-start; }

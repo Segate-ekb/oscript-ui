@@ -2435,7 +2435,8 @@
 	//     правок пересчитывается по всем галкам обёртки, с правками — не уходит;
 	//   — (дев-сборка 8) крестик плашки отмеченного вне показанного (data-checktree-pick) —
 	//     галка «снять» (у снятого узла — «включить»); у дерева с правками она становится
-	//     правкой того же узла в общем ряду, а ряд правок держит её в согласии с собой.
+	//     правкой того же узла в общем ряду, а ряд правок держит её в согласии с собой;
+	//   — (дев-сборка 8) строка data-checktree-changes под деревом — сводка ряда правок.
 	// Узел называет ключ: своё значение галки, иначе её имя — то же правило у сервера.
 
 	var CT_EDITS = 'oscriptUiEdits';        // свойство обёртки: Map «box:ключ» | «mode:ключ» → правка
@@ -2796,10 +2797,13 @@
 		while (list.firstChild) {
 			list.removeChild(list.firstChild);
 		}
+		var count = { all: 0, on: 0, off: 0 };
 		edits.forEach(function (ed, id) {
 			if (ed.kind !== 'mode' && ctCovered(set, edits, ed)) {
 				return;
 			}
+			count.all++;
+			count[ed.kind] = (count[ed.kind] || 0) + 1;
 			var text = ctText(tpl.getAttribute('data-checktree-text-' + ed.kind) || '%1', ed.label, ed.mode);
 			var chip = tpl.content.firstElementChild.cloneNode(true);
 			chip.classList.add('checktree__edit--' + ed.kind);
@@ -2810,6 +2814,21 @@
 			list.appendChild(chip);
 		});
 		row.hidden = !list.firstElementChild;
+		ctPaintChanges(set, count);
+	}
+
+	// Сводка правок (дев-сборка 8): «Изменений: 3 (+2 −1)» — по тем же плашкам, что в ряду.
+	function ctPaintChanges(set, count) {
+		var line = set.querySelector('[data-checktree-changes]');
+		if (!line) {
+			return;
+		}
+		var text = ctText(line.getAttribute('data-checktree-text-changes') || '%1', String(count.all));
+		if (count.on || count.off) {
+			text += ' ' + ctText(line.getAttribute('data-checktree-text-split') || '', String(count.on), String(count.off));
+		}
+		line.textContent = count.all ? text : '';
+		line.hidden = !count.all;
 	}
 
 	// Плашка отмеченного зачёркнута, пока её узел снят правкой (у снятого узла — включён):
