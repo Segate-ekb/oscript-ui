@@ -1617,11 +1617,16 @@ span.checktree__item { cursor: default; }
 	border-bottom: 1px solid var(--md-sys-color-outline-variant);
 }
 
-/* --- компонент: панель сохранения --- */
+/* --- компонент: панель сохранения ---
+   Тень — только у прилипшей панели (аудит M3 №12, дев-сборка 8): Material поднимает
+   поверхность, когда под ней прокручивается содержимое, а панель в конце короткой формы
+   с тенью уровня 2 выглядела плавающим блоком посреди формы. Прилипла ли она, знает только
+   движок: скрипт ставит data-stuck (панель прилипла к низу экрана — на пиксель ниже края,
+   отсюда bottom: -1px). Без скрипта панель без тени. */
 
 .savebar {
 	position: sticky;
-	bottom: 0;
+	bottom: -1px;
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
@@ -1632,10 +1637,11 @@ span.checktree__item { cursor: default; }
 	background: var(--md-sys-color-surface-container);
 	border-top: 0;
 	border-radius: var(--md-sys-shape-corner-large);
-	box-shadow: var(--md-sys-elevation-level2);
+	box-shadow: none;
 	transition: box-shadow var(--motion-medium) var(--motion-ease),
 		background-color var(--motion-medium) var(--motion-ease);
 }
+.savebar[data-stuck] { box-shadow: var(--md-sys-elevation-level2); }
 .savebar__note { color: var(--md-sys-color-on-surface-variant); font: var(--type-body-medium); }
 /* Несохранённые правки: класс ставит скрипт кита на первом же вводе в форму, а снимает
    ответ сервера — после сохранения панель приходит без него. */

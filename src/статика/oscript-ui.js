@@ -12,7 +12,8 @@
  *   6. тихую отправку (data-quiet) — форма уходит запросом в фоне, а ответ сервера
  *      ложится на страницу НА МЕСТО: без перезагрузки, с прежней прокруткой, фокусом
  *      и раскрытыми раскрывашками; плюс мгновенная смена темы (data-theme-toggle),
- *      отправка по изменению (data-autosubmit) и подсветка несохранённого (data-savebar);
+ *      отправка по изменению (data-autosubmit) и подсветка несохранённого (data-savebar),
+ *      признак прилипшей панели сохранения (data-stuck) — по нему лист даёт ей тень;
  *      форма в окне: успех закрывает окно и ставит фокус на data-focus, отказ остаётся в нём;
  *   7. окно — команды show-modal и close там, где движок их ещё не знает, окно, которое
  *      сервер напечатал открытым, — модальным, ссылку-кнопку окна страницы (data-opens) —
@@ -822,6 +823,36 @@
 				bars[i].classList.add('savebar--dirty');
 			}
 		});
+	});
+
+	/* прилипшая панель сохранения (дев-сборка 8) */
+
+	// Тень у панели — только когда она прилипла к низу экрана и под ней прокручивается форма.
+	// Лист держит её на пиксель ниже края (bottom: -1px): прилипшая видна не целиком, и это
+	// замечает наблюдатель пересечений. Панель на своём месте в конце формы — без тени.
+	var SB_SEEN = 'oscriptUiStuckWatch';     // свойство панели: наблюдатель уже следит за ней
+	var stuckWatch = window.IntersectionObserver ? new IntersectionObserver(function (entries) {
+		entries.forEach(function (en) {
+			var box = en.boundingClientRect;
+			var view = en.rootBounds;
+			var stuck = en.intersectionRatio < 1 && view && box.top < view.bottom && box.bottom > view.bottom - 2;
+			en.target.toggleAttribute('data-stuck', !!stuck);
+		});
+	}, { threshold: [1] }) : null;
+
+	function watchSavebars(root) {
+		var bars = stuckWatch ? root.querySelectorAll('[data-savebar]') : [];
+		for (var i = 0; i < bars.length; i++) {
+			if (!bars[i][SB_SEEN]) {
+				bars[i][SB_SEEN] = true;
+				stuckWatch.observe(bars[i]);
+			}
+		}
+	}
+
+	watchSavebars(doc);
+	doc.addEventListener('oscript-ui:update', function () {
+		watchSavebars(doc);
 	});
 
 	/* --- 7. окно ------------------------------------------------------------------- */
