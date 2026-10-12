@@ -3838,9 +3838,19 @@ div.entry__head:hover { --_state: 0%; }
 .steps__panel:has(:user-invalid) > .steps__head .steps__mark { border-color: var(--md-sys-color-error); color: var(--md-sys-color-error); }
 
 /* Шаги со скриптом: панель одна, её шапку заменяет полоса номеров. Фокус на панель
-   ставит скрипт при смене шага — обводка только с клавиатуры. */
+   ставит скрипт при смене шага — обводка только с клавиатуры. Рамки и своей заливки у
+   единственной панели нет (аудит M3 №13, дев-сборка 8): в окне и в секции она была
+   поверхностью в поверхности — обведённой карточкой вокруг полей; содержимое шага стоит
+   прямо под полосой номеров, как у Stepper в MUI. Без скрипта панели — раскрывашки
+   с рамкой: им она нужна. */
 .steps[data-steps-live] > .steps__panel > .panel__head { display: none; }
-.steps[data-steps-live] > .steps__panel > .panel__body { border-top: 0; }
+.steps[data-steps-live] > .steps__panel {
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	overflow: visible;
+}
+.steps[data-steps-live] > .steps__panel > .panel__body { border-top: 0; padding: 0; }
 .steps[data-steps-live] > .steps__panel:focus { outline: none; }
 .steps[data-steps-live] > .steps__panel:focus-visible {
 	outline: 3px solid var(--md-sys-color-secondary);
