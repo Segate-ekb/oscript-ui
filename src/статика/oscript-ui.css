@@ -1467,6 +1467,9 @@ a.tag:hover { --_state: var(--state-hover); text-decoration: none; }
 .checktree-set { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
 .checktree__search { display: flex; align-items: center; gap: var(--space-2); }
 .checktree__search > .field { flex: 1 1 auto; min-width: 0; }
+/* Поиск дерева значком (дев-сборка 8) — разметка строки поиска кита: лупа внутри рамки
+   поля (правила .search-bar ниже), строка во всю ширину над деревом. */
+.checktree__search > .search-bar { position: relative; flex: 1 1 auto; min-width: 0; }
 .checktree__page { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); }
 .checktree__count { color: var(--md-sys-color-on-surface-variant); }
 .checktree-set[aria-busy="true"] .checktree__search .button,
