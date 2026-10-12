@@ -135,6 +135,7 @@
 	Тексты.Вставить("checktree.picked.return", "Вернуть «%1»");
 	Тексты.Вставить("checktree.changes", "Изменений: %1");
 	Тексты.Вставить("checktree.changes.split", "(+%1 −%2)");
+	Тексты.Вставить("tag.remove", "Снять «%1»");
 	Тексты.Вставить("checktree.edits", "Правки");
 	Тексты.Вставить("checktree.edit.on", "+ %1");
 	Тексты.Вставить("checktree.edit.off", "− %1");
