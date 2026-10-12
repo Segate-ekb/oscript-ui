@@ -1461,7 +1461,9 @@ a.tag:hover { --_state: var(--state-hover); text-decoration: none; }
    под ним — над кнопками формы. «Показать ещё» — ссылка-кнопка и счёт показанного в конце
    ветки. Ветка с режимами вместо галки несёт малые сегменты «все / выбранные / никакие»;
    при «все» и «никакие» её дети показаны тем, что решил режим: галки отмеченными или
-   пустыми, приглушённо, и указатель их не правит (клавиатуру уводит скрипт — inert). */
+   пустыми, приглушённо, и указатель их не правит (клавиатуру уводит скрипт — inert).
+   Режим лист узнаёт по значению радиокнопки, а не по месту сегмента: набор режимов у ветки
+   бывает свой, и «все, кроме» (дев-сборка 8) правится, как «выбранные». */
 .checktree-set { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
 .checktree__search { display: flex; align-items: center; gap: var(--space-2); }
 .checktree__search > .field { flex: 1 1 auto; min-width: 0; }
@@ -1471,11 +1473,11 @@ a.tag:hover { --_state: var(--state-hover); text-decoration: none; }
 .checktree__page .button[aria-busy="true"] { cursor: progress; opacity: .6; }
 span.checktree__item { cursor: default; }
 .checktree__modes { margin-left: auto; }
-.checktree__node:has(> .checktree__row > .checktree__modes > :first-child > :checked) > .checktree__branch > .checktree__children,
-.checktree__node:has(> .checktree__row > .checktree__modes > :last-child > :checked) > .checktree__branch > .checktree__children {
+.checktree__node:has(> .checktree__row > .checktree__modes > .segments__item > [value="все"]:checked) > .checktree__branch > .checktree__children,
+.checktree__node:has(> .checktree__row > .checktree__modes > .segments__item > [value="никакие"]:checked) > .checktree__branch > .checktree__children {
 	pointer-events: none;
 }
-.checktree__node:has(> .checktree__row > .checktree__modes > :first-child > :checked) > .checktree__branch > .checktree__children .checktree__box {
+.checktree__node:has(> .checktree__row > .checktree__modes > .segments__item > [value="все"]:checked) > .checktree__branch > .checktree__children .checktree__box {
 	--_mark: var(--md-sys-color-surface);
 	border-color: transparent;
 	background: linear-gradient(45deg, transparent calc(50% - 1px), var(--_mark) 0 calc(50% + 1px), transparent 0)
@@ -1484,12 +1486,12 @@ span.checktree__item { cursor: default; }
 			4px 1px / 9px 9px no-repeat,
 		color-mix(in srgb, var(--md-sys-color-on-surface) var(--state-disabled-content), transparent);
 }
-.checktree__node:has(> .checktree__row > .checktree__modes > :last-child > :checked) > .checktree__branch > .checktree__children .checktree__box {
+.checktree__node:has(> .checktree__row > .checktree__modes > .segments__item > [value="никакие"]:checked) > .checktree__branch > .checktree__children .checktree__box {
 	border-color: color-mix(in srgb, var(--md-sys-color-on-surface) var(--state-disabled-content), transparent);
 	background: transparent;
 }
-.checktree__node:has(> .checktree__row > .checktree__modes > :first-child > :checked) > .checktree__branch > .checktree__children .checktree__label,
-.checktree__node:has(> .checktree__row > .checktree__modes > :last-child > :checked) > .checktree__branch > .checktree__children .checktree__label {
+.checktree__node:has(> .checktree__row > .checktree__modes > .segments__item > [value="все"]:checked) > .checktree__branch > .checktree__children .checktree__label,
+.checktree__node:has(> .checktree__row > .checktree__modes > .segments__item > [value="никакие"]:checked) > .checktree__branch > .checktree__children .checktree__label {
 	color: var(--md-sys-color-on-surface-variant);
 }
 .checktree__found { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }

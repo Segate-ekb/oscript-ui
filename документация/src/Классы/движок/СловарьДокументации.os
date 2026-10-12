@@ -80,6 +80,7 @@
 	Тексты.Вставить("checktree.mode.all", "Все");
 	Тексты.Вставить("checktree.mode.picked", "Выбранные");
 	Тексты.Вставить("checktree.mode.none", "Никакие");
+	Тексты.Вставить("checktree.mode.except", "Все, кроме");
 	Тексты.Вставить("checktree.edits", "Правки");
 	Тексты.Вставить("checktree.edit.on", "+ %1");
 	Тексты.Вставить("checktree.edit.off", "− %1");
