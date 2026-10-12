@@ -2734,6 +2734,17 @@ form[data-quiet][aria-busy="true"] { cursor: progress; }
 	padding: var(--space-5);
 	margin-bottom: var(--space-4);
 }
+
+/* Вложенная поверхность — кольцом, без своей тени (аудит M3 №11, дев-сборка 8). Карточка,
+   карточка объекта, плитка и свёртка внутри карточки или секции в светлой теме клали свою
+   тень уровня 1 в тень родителя: две тени друг в друге читались «карточкой в карточке».
+   Material держит карточки на уровне 0–1 и отличает вложенное тоном и контуром, а не тенью:
+   внутри остаётся кольцо outline-variant, а на наведении — тень уровня 1, на ступень ниже,
+   чем у карточки на странице. Тёмная тема не меняется: тень там и так не видна. */
+.card .card, .card .objcard, .card .tile, .card .fold,
+.section .card, .section .objcard, .section .tile, .section .fold { box-shadow: var(--elevation-ring); }
+.card .objcard:hover, .section .objcard:hover,
+.card .tile--link:hover, .section .tile--link:hover { box-shadow: var(--elevation-ring-level1); }
 .section__head { margin-bottom: var(--space-4); }
 .section__title {
 	font: var(--type-title-large);
