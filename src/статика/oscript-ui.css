@@ -3076,18 +3076,31 @@ div.entry__head:hover { --_state: 0%; }
    заливка поверхности карточки (surface-container в тёмной теме), скругление 16, свои поля,
    во всю ширину (на 390 — 358 px), зазор сетки --space-3, без черты между ними. Вложенная
    таблица и одиночная вложенная карточка — по правилу выше. Движок без :has() правила не
-   применит — останется прежний вид, а не карточки в карточке. */
+   применит — останется прежний вид, а не карточки в карточке.
+   Дев-сборка 8: сетка простых карточек (.card в ячейках сетки — обзор групп, пулов) —
+   тоже список карточек: на превью ui.4 блок пулов на 390 остался в рамке, а карточки пулов
+   в нём стали полосами. Правило то же: плоская — внешняя, карточки сетки — карточки. */
 @media (max-width: 600px) {
 	@supports selector(:has(*)) {
 		.card:has(> .card__body > .grid .objcard),
 		.card:has(> .card__body > .objcard-list > .objcard),
 		.section:has(> .section__body > .grid .objcard),
-		.section:has(> .section__body > .objcard-list > .objcard) {
+		.section:has(> .section__body > .objcard-list > .objcard),
+		.card:has(> .card__body > .grid > .grid__cell > .card),
+		.section:has(> .section__body > .grid > .grid__cell > .card) {
 			background: transparent;
 			box-shadow: none;
 			border-radius: 0;
 			padding-left: 0;
 			padding-right: 0;
+		}
+		.card .grid > .grid__cell > .card,
+		.section .grid > .grid__cell > .card {
+			background: var(--surface-card);
+			box-shadow: var(--elevation-ring-level1);
+			border-radius: var(--md-sys-shape-corner-large);
+			padding: var(--space-4);
+			border-top: 0;
 		}
 		.card .grid > .grid__cell > .objcard,
 		.section .grid > .grid__cell > .objcard,
