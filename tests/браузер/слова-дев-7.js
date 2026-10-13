@@ -266,10 +266,11 @@ async function окноБезСкрипта(b) {
       await p.waitForTimeout(300);
       проверить(await p.evaluate(() => window.scrollY) > 0, `${к}: страница под окном прокручивается колесом`);
     }
-    await Promise.all([p.waitForNavigation(), p.locator('dialog[open] .modal__actions a', { hasText: 'Закрыть' }).click()]);
+    // дев-сборка 8: окно правки образца закрывает «Отмена» слова АдресЗакрытия (была своя «Закрыть»)
+    await Promise.all([p.waitForNavigation(), p.locator('dialog[open] .modal__actions a', { hasText: 'Отмена' }).click()]);
     const адрес = decodeURIComponent(p.url());
-    проверить(!адрес.includes('окно='), `${к}: «Закрыть» ведёт на адрес без ?окно (${адрес})`);
-    проверить(await p.locator('dialog[open]').count() === 0, `${к}: после «Закрыть» окна нет`);
+    проверить(!адрес.includes('окно='), `${к}: «Отмена» ведёт на адрес без ?окно (${адрес})`);
+    проверить(await p.locator('dialog[open]').count() === 0, `${к}: после «Отмена» окна нет`);
     await ctx.close();
   }
   // со скриптом окно, напечатанное открытым, по-прежнему поднимается модальным

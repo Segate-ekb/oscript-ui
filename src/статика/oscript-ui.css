@@ -2924,6 +2924,23 @@ html[data-theme="light"] .prose pre.shiki > code { filter: brightness(.7); }
 }
 .panel__head::-webkit-details-marker { display: none; }
 .panel__head:hover { --_state: var(--state-hover); }
+/* Признак раскрытия панели — шеврон справа, как у аккордеона Material/MUI (пробел хаба П3
+   ui-хвост-единообразие, дев-сборка 8): нативный маркер снят флексом, а своего у панели не
+   было — свёрнутая панель в форме не выглядела раскрываемой. Вниз — у свёрнутой, вверх —
+   у открытой. У записи реестра (шапка-строка без раскрытия) и шага со скриптом его нет. */
+.panel > .panel__head:not(.entry__head)::after {
+	content: "";
+	flex: none;
+	width: .5em;
+	height: .5em;
+	margin: -.25em .25em 0 auto;
+	border: solid currentColor;
+	border-width: 0 1.5px 1.5px 0;
+	color: var(--md-sys-color-on-surface-variant);
+	transform: rotate(45deg);
+	transition: transform var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+}
+.panel[open] > .panel__head:not(.entry__head)::after { margin-top: .25em; transform: rotate(-135deg); }
 
 .image-icon { width: 20px; height: 20px; flex: none; }
 .text-name code { white-space: nowrap; }
@@ -3920,6 +3937,9 @@ div.entry__head:hover { --_state: 0%; }
 .steps__nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2); }
 .steps__act { display: inline-flex; }
 .steps__act--back { margin-right: auto; }
+/* «Отмена» окна шагами (АдресЗакрытия, дев-сборка 8) — первой слева, «Назад» — рядом с ней. */
+.steps__act--cancel { display: inline-flex; margin-right: auto; }
+.steps__act--cancel:has(~ .steps__act--back:not([hidden])) { margin-right: 0; }
 
 /* Вид «вкладки»: правка уже заполненного — любой шаг открывается сразу. Полоса — основные
    вкладки Material: подпись без кругов и линий, текущая — цвета primary с индикатором
@@ -4061,6 +4081,58 @@ div.entry__head:hover { --_state: 0%; }
 	.segments { display: grid; grid-auto-columns: minmax(min-content, 1fr); width: 100%; }
 	.segments__label { padding: var(--space-1) var(--space-2); }
 	.segments__text { white-space: normal; text-overflow: clip; overflow-wrap: normal; text-align: center; }
+}
+
+/* Сегменты в окне (пробел хаба П5 ui-хвост-единообразие, дев-сборка 8). Окно уже экрана —
+   560 px, на телефоне 358, — а правило выше включалось по ширине ЭКРАНА: на 1280 в окне
+   тега пять сегментов резали подписи многоточием («Стабильн…», «Устар…»). В окне сегменты на
+   любой ширине держатся, как на телефоне: во всю ширину, колонка не уже самого длинного
+   слова, подпись переносится между словами. Пять и больше однословных подписей в 518 px
+   окна (на телефоне — четыре и больше в 326) всё равно не встают — тогда группа встаёт
+   столбиком: сегмент на строку, пилюля — прямоугольник со скруглением 16, между сегментами —
+   черта. Сегментов в окне по Material не больше пяти. */
+.modal .segments { display: grid; grid-auto-columns: minmax(min-content, 1fr); width: 100%; }
+.modal .segments__label { padding: var(--space-1) var(--space-2); }
+.modal .segments__text { white-space: normal; text-overflow: clip; overflow-wrap: normal; text-align: center; }
+@supports selector(:has(*)) {
+	.modal .segments:has(> :nth-child(5)) {
+		grid-auto-flow: row;
+		grid-auto-columns: auto;
+		grid-template-columns: 100%;
+		border-radius: var(--md-sys-shape-corner-large);
+	}
+	.modal .segments:has(> :nth-child(5)) > .segments__item + .segments__item {
+		border-left: 0;
+		border-top: 1px solid var(--md-sys-color-outline);
+	}
+	.modal .segments:has(> :nth-child(5)) > .segments__item > .segments__label { border-radius: 0; }
+	.modal .segments:has(> :nth-child(5)) > .segments__item:first-child > .segments__label {
+		border-radius: var(--md-sys-shape-corner-large) var(--md-sys-shape-corner-large) 0 0;
+	}
+	.modal .segments:has(> :nth-child(5)) > .segments__item:last-child > .segments__label {
+		border-radius: 0 0 var(--md-sys-shape-corner-large) var(--md-sys-shape-corner-large);
+	}
+}
+@media (max-width: 600px) {
+	@supports selector(:has(*)) {
+		.modal .segments:has(> :nth-child(4)) {
+			grid-auto-flow: row;
+			grid-auto-columns: auto;
+			grid-template-columns: 100%;
+			border-radius: var(--md-sys-shape-corner-large);
+		}
+		.modal .segments:has(> :nth-child(4)) > .segments__item + .segments__item {
+			border-left: 0;
+			border-top: 1px solid var(--md-sys-color-outline);
+		}
+		.modal .segments:has(> :nth-child(4)) > .segments__item > .segments__label { border-radius: 0; }
+		.modal .segments:has(> :nth-child(4)) > .segments__item:first-child > .segments__label {
+			border-radius: var(--md-sys-shape-corner-large) var(--md-sys-shape-corner-large) 0 0;
+		}
+		.modal .segments:has(> :nth-child(4)) > .segments__item:last-child > .segments__label {
+			border-radius: 0 0 var(--md-sys-shape-corner-large) var(--md-sys-shape-corner-large);
+		}
+	}
 }
 
 /* Источник значения сегментов (слово Источник, 0.13 дев-сборка 6) — справка о значении, как

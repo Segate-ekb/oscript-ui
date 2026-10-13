@@ -3,7 +3,8 @@
 // отмеченного вне показанного, сводка правок, правки без скрипта, плашка с крестиком тихой
 // формой), сетка простых карточек на телефоне, длинное слово в окне подтверждения и хвосты
 // аудита M3 (тень вложенной поверхности, прилипшая панель сохранения, рамка шагов в окне,
-// фокус при открытии окна, подвал у низа окна, шеврон раскрывашки). Сайт документации
+// фокус при открытии окна, подвал у низа окна, шеврон раскрывашки), адрес закрытия окна (со скриптом
+// и без), шеврон панели, сегменты в окне. Сайт документации
 // должен быть запущен:
 //
 //   cd документация && oscript main.os --порт 3598
@@ -24,6 +25,7 @@ const КУКА = 'oscript_ui_docs';
 fs.mkdirSync(OUT, { recursive: true });
 
 function адрес(страница) { return B + '/' + encodeURIComponent(страница); }
+const адрес_ = адрес;
 
 function браузер() {
   const кэш = path.join(process.env.HOME, 'Library/Caches/ms-playwright');
@@ -339,6 +341,71 @@ async function хвосты(b) {
   await ctx.close();
 }
 
+// П1–П3, П5 трека ui-хвост-единообразие: адрес закрытия окна, шеврон панели, сегменты в окне
+async function закрытиеОкна(b) {
+  const ОКНА = B + '/' + encodeURIComponent('образец-окон');
+  // без скрипта: подтверждение по адресу, «Отмена» — переход на раздел без окна
+  let ctx = await контекст(b, 1280, false);
+  let p = await ctx.newPage();
+  await p.goto(ОКНА, { waitUntil: 'networkidle' });
+  const проект = await p.locator('input[name="project"]').first().getAttribute('value');
+  await p.goto(ОКНА + '/' + encodeURIComponent('удалить') + '?project=' + encodeURIComponent(проект), { waitUntil: 'networkidle' });
+  проверить(await p.locator('dialog[open]').count() === 1, 'АдресЗакрытия без скрипта: подтверждение открыто по адресу');
+  await снимок(p.locator('dialog[open]'), 'подтверждение-отмена-ссылкой-без-скрипта');
+  await Promise.all([p.waitForURL((u) => !decodeURIComponent(u.toString()).includes('удалить'), { waitUntil: 'commit' }),
+    p.locator('dialog[open] .modal__actions a', { hasText: 'Отмена' }).click({ noWaitAfter: true })]);
+  await p.waitForLoadState('domcontentloaded');
+  const адрес = decodeURIComponent(p.url());
+  проверить(адрес.endsWith('/образец-окон') && await p.locator('dialog[open]').count() === 0,
+    `АдресЗакрытия без скрипта: «Отмена» привела на раздел без окна (${адрес})`);
+  await ctx.close();
+
+  // со скриптом: окно по адресу закрывается «Отменой» на месте, без перехода
+  ctx = await контекст(b, 1280, true);
+  p = await ctx.newPage();
+  await p.goto(ОКНА + '?' + encodeURIComponent('окно') + '=' + encodeURIComponent('правка') + '&project=' + encodeURIComponent(проект), { waitUntil: 'networkidle' });
+  await p.evaluate(() => { window.__метка = 1; });
+  проверить(await p.evaluate(() => document.getElementById('pravka').matches(':modal')), 'АдресЗакрытия со скриптом: окно правки поднято модальным');
+  await p.locator('#pravka .modal__actions a', { hasText: 'Отмена' }).click();
+  await p.waitForTimeout(300);
+  проверить(!(await p.evaluate(() => document.getElementById('pravka').open)) && await p.evaluate(() => window.__метка === 1),
+    'АдресЗакрытия со скриптом: «Отмена» закрыла окно на месте, без перезагрузки');
+  await ctx.close();
+
+  // шеврон панели
+  ctx = await контекст(b, 1280, true);
+  p = await ctx.newPage();
+  await p.goto(адрес_('раскладка'), { waitUntil: 'networkidle' });
+  const шеврон = await образец(p, 'Раскрывашка, открытая сразу').evaluate((el) => {
+    const s = el.querySelector('.panel__head');
+    const после = getComputedStyle(s, '::after');
+    return { есть: после.content === '""', справа: после.borderRightWidth !== '0px', поворот: после.transform };
+  });
+  проверить(шеврон.есть && шеврон.справа && шеврон.поворот !== 'none', `П3: у панели шеврон справа (${шеврон.поворот})`);
+  await ctx.close();
+
+  // сегменты в окне на 390 и 1280: подписи целиком, пилюля не шире окна
+  for (const ширина of [390, 1280]) {
+    ctx = await контекст(b, ширина, true);
+    p = await ctx.newPage();
+    await p.goto(адрес_('сегменты'), { waitUntil: 'networkidle' });
+    const ф = образец(p, 'Пять сегментов в окне');
+    await ф.scrollIntoViewIfNeeded();
+    await ф.locator('button', { hasText: 'Оформление' }).first().click();
+    await p.waitForTimeout(400);
+    const з = await p.evaluate(() => {
+      const d = document.getElementById('oformlenie-metki');
+      const box = d.querySelector('.modal__box').getBoundingClientRect();
+      const g = d.querySelector('.segments').getBoundingClientRect();
+      return { обрезаны: [...d.querySelectorAll('.segments__text')].filter((t) => t.scrollWidth > t.clientWidth + 1).length,
+        влезла: g.right <= box.right + 0.5 && g.left >= box.left - 0.5 };
+    });
+    проверить(з.обрезаны === 0 && з.влезла, `П5 ${ширина}: в окне подписи сегментов целиком, пилюля не шире окна`);
+    await p.screenshot({ path: path.join(OUT, `сегменты-в-окне-${ширина}.png`) });
+    await ctx.close();
+  }
+}
+
 async function снимок(локатор, имя) {
   await локатор.page().waitForTimeout(300);
   await локатор.screenshot({ path: path.join(OUT, `${имя}.png`) });
@@ -347,7 +414,8 @@ async function снимок(локатор, имя) {
 (async () => {
   const b = await браузер();
   for (const [имя, шаг] of [['дерево со скриптом', деревоСоСкриптом], ['дерево без скрипта', деревоБезСкрипта],
-    ['плашка с крестиком', плашкаСКрестиком], ['длинное слово', длинноеСлово], ['карточки', карточки], ['хвосты', хвосты]]) {
+    ['плашка с крестиком', плашкаСКрестиком], ['длинное слово', длинноеСлово], ['карточки', карточки], ['хвосты', хвосты],
+    ['закрытие окна', закрытиеОкна]]) {
     try {
       await шаг(b);
     } catch (err) {

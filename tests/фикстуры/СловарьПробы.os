@@ -136,6 +136,8 @@
 	Тексты.Вставить("checktree.changes", "Изменений: %1");
 	Тексты.Вставить("checktree.changes.split", "(+%1 −%2)");
 	Тексты.Вставить("tag.remove", "Снять «%1»");
+	Тексты.Вставить("window.cancel", "Отмена");
+	Тексты.Вставить("window.dismiss", "Закрыть");
 	Тексты.Вставить("checktree.edits", "Правки");
 	Тексты.Вставить("checktree.edit.on", "+ %1");
 	Тексты.Вставить("checktree.edit.off", "− %1");
