@@ -3987,6 +3987,15 @@ div.entry__head:hover { --_state: 0%; }
 	   в строку они не влезают. Шапке с единым меню это не нужно и вредно — там всего
 	   двое, бургер и знак, и колонка уводила бы знак на вторую строку. */
 	.top:not(.top--menu) .wrap { flex-direction: column; align-items: flex-start; gap: var(--space-2); }
+	/* Шапке узкой страницы (вход, ворота) колонка не нужна: в ней знак и пилюля темы (у
+	   вошедшего — ещё учётка), и вторая строка под знаком только удлиняла шапку (дев-сборка
+	   10). Знак слева, справа — то, что в навигации, одной строкой на любой ширине; длинное
+	   имя знака сжимается многоточием, а не сталкивает пилюлю вниз. Разметка шапки та же:
+	   узкую страницу лист узнаёт по колонке в main. */
+	body:has(> main > .narrow) > .top .wrap { flex-direction: row; align-items: center; justify-content: space-between; }
+	body:has(> main > .narrow) > .top .brand { min-width: 0; }
+	body:has(> main > .narrow) > .top .brand > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	body:has(> main > .narrow) > .top .top__nav { flex: none; flex-wrap: nowrap; }
 	main.wrap { padding-top: var(--space-5); }
 	.savebar { position: static; }
 }
