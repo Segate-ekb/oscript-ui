@@ -2649,21 +2649,36 @@ form[data-quiet][aria-busy="true"] { cursor: progress; }
 	gap: var(--space-1) var(--space-2);
 	list-style: none;
 }
+/* Маркер — шеврон, как у дерева галок и свёрнутой секции (аудит M3 №34, дев-сборка 8): один
+   набор значков на весь интерфейс, а не треугольник браузера. Простая раскрывашка (вид
+   «простая» — details без классов) получает тот же шеврон: у неё оставался системный «▸». */
+details:not([class]) > summary:not([class]) {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space-1) var(--space-2);
+	list-style: none;
+	cursor: pointer;
+}
 .fold > .fold__head::-webkit-details-marker,
-.fold-detail > summary::-webkit-details-marker { display: none; }
+.fold-detail > summary::-webkit-details-marker,
+details:not([class]) > summary:not([class])::-webkit-details-marker { display: none; }
 .fold > .fold__head::before,
-.fold-detail > summary::before {
+.fold-detail > summary::before,
+details:not([class]) > summary:not([class])::before {
 	content: "";
 	flex: none;
-	width: 0;
-	height: 0;
-	border-style: solid;
-	border-width: .3em 0 .3em .5em;
-	border-color: transparent transparent transparent currentColor;
+	width: .48em;
+	height: .48em;
+	margin: 0 .1em 0 .05em;
+	border: solid currentColor;
+	border-width: 0 1.5px 1.5px 0;
+	transform: rotate(-45deg);
 	transition: transform var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
 }
 .fold[open] > .fold__head::before,
-.fold-detail[open] > summary::before { transform: rotate(90deg); }
+.fold-detail[open] > summary::before,
+details:not([class])[open] > summary:not([class])::before { transform: rotate(45deg); }
 /* плашке в строке текста отступ справа нужен, в строке флекса зазор даёт gap */
 .fold > .fold__head > .tag,
 .fold-detail > summary > .tag { margin-right: 0; }
