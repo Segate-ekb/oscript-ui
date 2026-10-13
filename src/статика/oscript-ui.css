@@ -3273,6 +3273,26 @@ div.entry__head:hover { --_state: 0%; }
 .modal--wide { max-width: min(40rem, calc(100vw - var(--space-6))); }
 .modal--danger .modal__title { color: var(--md-sys-color-error); }
 .modal--confirm .modal__box > .modal__lead { color: var(--md-sys-color-on-surface); font: var(--type-body-large); }
+/* Длинное слово без пробелов — адрес апстрима, ключ, хеш — в тексте окна переносится по знакам
+   (пробел хаба П-пул-1, дев-сборка 8): со скриптом его обрезал край окна, без скрипта окно
+   раздвигало страницу шире экрана. Обычные слова переносятся по пробелам, как прежде. */
+.modal__title, .modal__lead, .modal__body, .modal__echo { overflow-wrap: anywhere; }
+/* Эхо-поле подтверждения: имя, которое нужно набрать, — в подписи поля. Плавающая подпись
+   в одну строку обрезала длинное имя многоточием, и его не было видно целиком: у эха подпись
+   стоит над полем обычной строкой и переносится, а образец виден в пустом поле. */
+.modal__echo > .field > .field__label {
+	position: static;
+	transform: none;
+	max-width: none;
+	overflow: visible;
+	white-space: normal;
+	font: var(--type-body-medium);
+	letter-spacing: var(--md-sys-typescale-body-medium-tracking);
+}
+.modal__echo > .field > .field__control { padding-top: 10px; padding-bottom: 10px; }
+.modal__echo > .field[data-empty]:not(:focus-within):has(> .field__label) > .field__control::placeholder {
+	color: var(--md-sys-color-on-surface-variant);
+}
 .modal__echo { max-width: 420px; }
 .modal--confirm:has(.modal__echo :invalid) .modal__actions [name="confirmed"] {
 	--_bg: color-mix(in srgb, var(--md-sys-color-on-surface) var(--state-disabled-container), transparent);
