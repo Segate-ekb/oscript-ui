@@ -784,6 +784,12 @@
 		var next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
 		var apply = function () {
 			root.setAttribute('data-theme', next);
+			// пилюля темы (дев-сборка 9): бегунок едет за темой страницы (лист), состояние
+			// переключателя для скринридера — сразу же; подпись и подсказку сверит ответ
+			var switches = doc.querySelectorAll('form[data-theme-toggle] [role="switch"]');
+			for (var i = 0; i < switches.length; i++) {
+				switches[i].setAttribute('aria-checked', next === 'dark' ? 'true' : 'false');
+			}
 		};
 		if (doc.startViewTransition && !(calm && calm.matches)) {
 			doc.startViewTransition(apply);

@@ -2056,12 +2056,72 @@ input[type="color"].field__control { padding: 17px 12px 3px; height: 44px; curso
 }
 
 /* --- переключатель темы ---
-   Не слово в шапке, а кнопка-иконка кита (вариант «только иконка»): солнце или луна
-   по ТЕКУЩЕЙ теме, которую печатает сервер. Форма POST-ит смену, поэтому переключатель
-   работает без единой строки JS. Оформление кнопки берётся у кита (.button--icon),
-   собственного здесь ровно одно правило — раскладка формы. */
+   Пилюля с бегунком, как у сайта oscript.io (VitePress; дев-сборка 9): кнопка отправки
+   формы темы с ролью переключателя — форма POST-ит смену, поэтому переключатель работает
+   без единой строки JS. Дорожка 44×24 с кольцом outline-variant, бегунок 18 px заливкой
+   surface-container-lowest (белый в светлой, самый тёмный в тёмной — как у VitePress)
+   с тенью уровня 1, в бегунке солнце (светлая) или луна (тёмная).
+   Положение бегунка и значок лист берёт у ТЕМЫ СТРАНИЦЫ (html[data-theme]), а не у
+   aria-checked: скрипт перекрашивает страницу в тот же миг, что и щёлкнули, и бегунок
+   едет вместе с ней, не дожидаясь ответа. Без атрибута темы страница тёмная — как палитры
+   кита. Строка меню — та же кнопка вариантом пункта: подпись словами, пилюля в конце. */
 
 .theme-toggle { display: inline-flex; margin: 0; }
+.theme-switch {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	flex: none;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	border-radius: var(--md-sys-shape-corner-full);
+	background: none;
+	color: var(--md-sys-color-on-surface-variant);
+	cursor: pointer;
+}
+/* зона касания 48 px вокруг пилюли 44×24 — видимый размер прежний */
+.theme-switch::before { content: ""; position: absolute; inset: -12px -2px; }
+.theme-switch__track {
+	position: relative;
+	display: inline-block;
+	flex: none;
+	width: 44px;
+	height: 24px;
+	border-radius: var(--md-sys-shape-corner-full);
+	background: var(--md-sys-color-surface-container-highest);
+	box-shadow: inset 0 0 0 1px var(--md-sys-color-outline-variant);
+	transition: box-shadow var(--motion-fast) var(--motion-ease);
+}
+.theme-switch:hover .theme-switch__track,
+.theme-switch--row:hover .theme-switch__track { box-shadow: inset 0 0 0 1px var(--md-sys-color-outline); }
+.theme-switch__thumb {
+	position: absolute;
+	top: 3px;
+	left: 3px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 18px;
+	height: 18px;
+	border-radius: var(--md-sys-shape-corner-full);
+	background: var(--md-sys-color-surface-container-lowest);
+	color: var(--md-sys-color-on-surface-variant);
+	box-shadow: var(--md-sys-elevation-level1);
+	transform: translateX(20px);
+	transition: transform var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+}
+.theme-switch__sun, .theme-switch__moon { display: inline-flex; }
+.theme-switch__sun { display: none; }
+.theme-switch__thumb .icon { width: 12px; height: 12px; }
+html[data-theme="light"] .theme-switch__thumb { transform: none; }
+html[data-theme="light"] .theme-switch__sun { display: inline-flex; }
+html[data-theme="light"] .theme-switch__moon { display: none; }
+/* строка меню — пункт ящика (вид у .hubmenu .button), пилюля прижата к правому краю */
+.theme-switch--row > .theme-switch__track { margin-left: auto; }
+@media (prefers-reduced-motion: reduce) {
+	.theme-switch__thumb { transition: none; }
+}
 
 /* --- тихая отправка ---
    Форма с data-quiet уходит запросом в фоне (скрипт кита), и пока ответ в пути, она
