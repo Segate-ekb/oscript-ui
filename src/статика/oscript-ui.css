@@ -2231,8 +2231,28 @@ form[data-quiet][aria-busy="true"] { cursor: progress; }
 .empty__title { margin: 0; font: var(--type-title-medium); letter-spacing: var(--md-sys-typescale-title-medium-tracking); color: var(--md-sys-color-on-surface); }
 .empty__text { margin: 0; max-width: 60ch; }
 .empty__action { margin-top: var(--space-2); }
+/* Два пути из пустоты (дев-сборка 9, пробел хаба П4) — рядом одной группой по центру,
+   главный первым; на телефоне столбиком во всю ширину пустоты: две кнопки рядом на 358 px
+   сжимали подписи. */
+.empty__actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: var(--space-2);
+	margin-top: var(--space-2);
+}
+@media (max-width: 600px) {
+	.empty__actions { flex-direction: column; align-self: stretch; }
+	.empty__actions > .button { width: 100%; }
+}
 .empty--compact { padding: var(--space-4) var(--space-3); gap: var(--space-1); }
 .empty--compact .empty__icon { width: 40px; height: 40px; margin-bottom: 0; font-size: 20px; }
+/* Ритм у корня (дев-сборка 9, П4): пустое состояние — такой же блок страницы, как карточка
+   и секция, и держит ту же отбивку снизу; без неё пустота и карточка под ней стояли
+   вплотную, рамка к рамке (аудит превью 3, А3). Последнему ребёнку контейнера отбивка
+   не нужна — её даёт поле контейнера; компактному в ячейке — тоже. Специфичность нулевая
+   (:where): контейнер со своим зазором (флекс с gap), снимающий маргины детей, старше. */
+:where(.empty:not(.empty--compact):not(:last-child)) { margin-bottom: var(--space-4); }
 
 /* --- компонент: опасная зона ---
    Формы компонент не печатает (вложенная форма — невалидный HTML): он живёт внутри
