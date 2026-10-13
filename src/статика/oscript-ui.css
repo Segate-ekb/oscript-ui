@@ -544,6 +544,10 @@ h3 {
 	padding: 0;
 }
 .card__title .icon { color: var(--md-sys-color-primary); }
+/* Заголовок-ссылка (Адрес) со значком (аудит M3 №16, дев-сборка 8): значок и подпись — внутри
+   ссылки, и зазор заголовка до них не доставал — «⬡Склад» слипалось. Ссылка — строка флекса
+   с тем же зазором. */
+.card__title > a, .section__title > a { display: inline-flex; align-items: center; gap: var(--space-2); }
 .card__lead {
 	color: var(--md-sys-color-on-surface-variant);
 	font: var(--type-body-medium);
