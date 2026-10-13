@@ -2144,6 +2144,68 @@ input[type="color"].field__control { padding: 17px 12px 3px; height: 44px; curso
 	border: 0;
 }
 
+/* --- страница входа (дев-сборка 9) ---
+   Узкая страница — одна колонка 360 px по центру с отступом сверху, как вход GitHub: шапка
+   колонки (знак 48 px, заголовок headline-small и подпись по центру), форма в столбик,
+   разделитель «или», кнопки провайдеров во всю ширину и рамочная строка под формой. На
+   телефоне колонка во всю ширину с полями страницы (их даёт .wrap). Блоки колонки — с
+   ритмом --space-4, столбик кнопок — --space-2. */
+.narrow {
+	width: 100%;
+	max-width: 360px;
+	margin: var(--space-6) auto var(--space-8);
+}
+.narrow > * { margin-top: 0; margin-bottom: 0; }
+.narrow > * + * { margin-top: var(--space-4); }
+.narrow .form-stack { max-width: none; }
+.narrow .form-stack > .button { align-self: stretch; }
+.narrow__head {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--space-2);
+	text-align: center;
+}
+.narrow__head > img, .narrow__head > .icon { width: auto; height: 48px; }
+.narrow__head > .icon { width: 48px; }
+.narrow__head > h1 {
+	margin: var(--space-2) 0 0;
+	font: var(--type-headline-small);
+	letter-spacing: var(--md-sys-typescale-headline-small-tracking);
+	color: var(--md-sys-color-on-surface);
+}
+.narrow__head > p { margin: 0; }
+.stack { display: flex; flex-direction: column; gap: var(--space-2); }
+.stack > .button { width: 100%; }
+/* Разделитель: линия outline-variant; с текстом — две линии по бокам текста label-medium. */
+.divider {
+	display: flex;
+	align-items: center;
+	gap: var(--space-3);
+	margin: var(--space-4) 0;
+	color: var(--md-sys-color-on-surface-variant);
+	font: var(--type-label-medium);
+	letter-spacing: var(--md-sys-typescale-label-medium-tracking);
+}
+hr.divider { display: block; height: 0; border: 0; border-top: 1px solid var(--md-sys-color-outline-variant); }
+div.divider::before, div.divider::after { content: ""; flex: 1 1 0; border-top: 1px solid var(--md-sys-color-outline-variant); }
+.divider__text { flex: none; }
+/* Рамочная строка под формой: «Нет аккаунта? Зарегистрироваться» — текст по центру в рамке
+   outline-variant со скруглением medium. */
+.note-frame {
+	margin: 0;
+	padding: var(--space-4);
+	border: 1px solid var(--md-sys-color-outline-variant);
+	border-radius: var(--md-sys-shape-corner-medium);
+	text-align: center;
+	color: var(--md-sys-color-on-surface);
+	font: var(--type-body-medium);
+	letter-spacing: var(--md-sys-typescale-body-medium-tracking);
+}
+/* Ссылка над полем справа — в строке подписи, label-large цветом ссылки. */
+.field-aside { display: flex; flex-direction: column; gap: var(--space-1); }
+.field-aside__link { align-self: flex-end; font: var(--type-label-large); letter-spacing: var(--md-sys-typescale-label-large-tracking); }
+
 /* --- переключатель темы ---
    Пилюля с бегунком, как у сайта oscript.io (VitePress; дев-сборка 9): кнопка отправки
    формы темы с ролью переключателя — форма POST-ит смену, поэтому переключатель работает
