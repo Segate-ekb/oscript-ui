@@ -256,6 +256,7 @@ async function вход(b) {
             ширина: Math.round(n.width), лево: Math.round(n.left), право: Math.round(window.innerWidth - n.right),
             дороги: h.querySelectorAll('.tree--top').length, тема: h.querySelectorAll('[data-theme-toggle]').length,
             меню: document.querySelectorAll('#hubmenu').length, зазор: Math.round(кн[1].top - кн[0].bottom),
+            доРамки: Math.round(document.querySelector('.narrow .note-frame').getBoundingClientRect().top - кн[1].bottom),
             прокрутка: document.documentElement.scrollWidth > window.innerWidth,
           };
         });
@@ -266,6 +267,7 @@ async function вход(b) {
         }
         проверить(к.дороги === 0 && к.меню === 0 && к.тема === 1, `${метка}: в шапке только знак и тема`);
         проверить(к.зазор === 8, `${метка}: кнопки провайдеров через 8 px (${к.зазор})`);
+        проверить(к.доРамки >= 16, `${метка}: рамочная строка не прилипает к кнопкам (${к.доРамки})`);
         if (тема === 'тёмная') {
           const гитхаб = await p.locator('.stack .button svg.icon--brand').first().evaluate((el) => getComputedStyle(el).fill);
           проверить(гитхаб !== 'rgb(24, 23, 23)', `${метка}: логотип GitHub на тёмной — цветом текста (${гитхаб})`);

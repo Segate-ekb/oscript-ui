@@ -2156,7 +2156,8 @@ input[type="color"].field__control { padding: 17px 12px 3px; height: 44px; curso
 	margin: var(--space-6) auto var(--space-8);
 }
 .narrow > * { margin-top: 0; margin-bottom: 0; }
-.narrow > * + * { margin-top: var(--space-4); }
+/* у блока со своим нулевым маргином (рамочная строка) ритм колонки всё равно старше */
+.narrow > :not(:first-child) { margin-top: var(--space-4); }
 .narrow .form-stack { max-width: none; }
 .narrow .form-stack > .button { align-self: stretch; }
 .narrow__head {
