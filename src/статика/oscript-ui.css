@@ -2676,6 +2676,13 @@ form[data-quiet][aria-busy="true"] { cursor: progress; }
 	border-radius: var(--md-sys-shape-corner-small);
 	overflow-x: auto;
 }
+/* Подсветка кода README (shiki, темы GitHub — цвета печатаются в разметку блока) в светлой теме
+   (аудит M3 №3, дев-сборка 8): github-light рассчитана на белый фон, и её оранжевый и красный
+   токены не дотягивали до 4.5:1 — #e36209 на фоне блока 2.7:1, на белом 3.5:1. Цвета токенов
+   приходят в атрибуте style, переписать их листом нельзя — содержимое блока притемняется
+   фильтром: цвет токена 0.7 от своего, и самый бледный токен на белом — 6.3:1, на
+   surface-container-highest — 4.9:1. Оттенки остаются те же; тёмная тема не меняется. */
+html[data-theme="light"] .prose pre.shiki > code { filter: brightness(.7); }
 .prose img { max-width: 100%; }
 .prose table { box-shadow: none; }
 
