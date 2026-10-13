@@ -4438,6 +4438,15 @@ fieldset > legend + .segments__origin + .segments { display: grid; width: fit-co
 	fieldset > legend + .segments__origin + .segments { width: 100%; }
 }
 
+/* Отказ у сегментов (дев-сборка 10): строка field__error под пилюлей, рамка пилюли и черты
+   между сегментами — цветом ошибки, как контур отбитого поля. В наборе с панелями строка
+   стоит после панелей (лист считает панели по номеру), а под пилюлю её ставит порядок флекса. */
+.segments__error { display: block; margin-top: var(--space-1); }
+.segments[aria-invalid="true"] { border-color: var(--md-sys-color-error); }
+.segments[aria-invalid="true"] > .segments__item + .segments__item { border-left-color: var(--md-sys-color-error); }
+.segments-set > .segments { order: -2; }
+.segments-set > .segments__error { order: -1; margin-top: calc(var(--space-1) - var(--space-4)); }
+
 /* Наборы полей под сегментами. Панель номер N видна, пока отмечен сегмент номер N: лист
    сопоставляет их по номеру, правила перечислены до восьми сегментов (столько же
    проверяет Сегменты.НаборовНаЛисте). Движок без :has() показывает все наборы сразу —

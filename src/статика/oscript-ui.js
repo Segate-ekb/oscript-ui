@@ -649,6 +649,10 @@
 		markAll(box);
 		doc.dispatchEvent(new CustomEvent('oscript-ui:update', { detail: { url: response.url } }));
 		var bad = box.querySelector('[aria-invalid="true"]');
+		// отбитые сегменты (дев-сборка 10) — группа, фокус встаёт на её отмеченный сегмент
+		if (bad && bad.getAttribute('role') === 'radiogroup') {
+			bad = bad.querySelector('input:checked') || bad.querySelector('input');
+		}
 		if (bad && bad.focus) {
 			bad.focus();
 		}
