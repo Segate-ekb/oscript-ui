@@ -1096,6 +1096,8 @@ fieldset > * + * { margin-top: var(--space-2); }
 	grid-template-columns: repeat(auto-fill, 40px);
 	gap: var(--space-1);
 }
+/* «без значка» — одна ячейка своей строкой над разделами */
+.iconpicker__grid--none { grid-template-columns: 40px; }
 .iconpicker__item {
 	--_state: 0%;
 	--_bg: transparent;
