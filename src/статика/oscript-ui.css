@@ -1053,6 +1053,93 @@ fieldset > * + * { margin-top: var(--space-2); }
 	color: var(--md-sys-color-on-surface-variant);
 }
 
+/* ЗНАЧОК (дев-сборка 9). Группа <fieldset>, как у цвета: подпись — <legend> над сеткой,
+   сетка — ячейки 40×40 с радиокнопкой поверх значка 24 px, разделы «Глифы» и «Бренды» —
+   мелкой подписью label-medium. Выбранная ячейка — по правилам M3 выбранного: заливка
+   secondary-container и кольцо primary 2 px внутрь; наведение — слой состояния; фокус —
+   кольцо secondary снаружи, как у любого элемента. Радиокнопка невидима и растянута
+   поверх ячейки: щелчок и клавиатура (стрелки ходят по группе) — её. Строка поиска —
+   поле со значком-лупой в рамке справа; без скрипта она спрятана (искать нечем), сетка
+   целиком. Прячет найденное скрипт атрибутом hidden. */
+.field--icons { display: block; min-width: 0; margin: 0; padding: 0; border: 0; }
+.field.field--icons > .field__label {
+	position: static;
+	max-width: none;
+	margin-bottom: var(--space-2);
+	padding: 0;
+	white-space: normal;
+	transform: none;
+	font: var(--type-body-medium);
+	letter-spacing: var(--md-sys-typescale-body-medium-tracking);
+}
+.iconpicker__search { position: relative; max-width: 20rem; }
+.iconpicker__search[hidden] { display: none; }
+.iconpicker__search > .field > .field__control { padding-right: 40px; }
+.iconpicker__glass {
+	position: absolute;
+	top: 10px;
+	right: var(--space-3);
+	width: 24px;
+	height: 24px;
+	color: var(--md-sys-color-on-surface-variant);
+	pointer-events: none;
+}
+.iconpicker__group[hidden], .iconpicker__item[hidden] { display: none; }
+.iconpicker__title {
+	margin: 0 0 var(--space-1);
+	color: var(--md-sys-color-on-surface-variant);
+	font: var(--type-label-medium);
+	letter-spacing: var(--md-sys-typescale-label-medium-tracking);
+}
+.iconpicker__grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, 40px);
+	gap: var(--space-1);
+}
+.iconpicker__item {
+	--_state: 0%;
+	--_bg: transparent;
+	position: relative;
+	display: inline-grid;
+	place-items: center;
+	width: 40px;
+	height: 40px;
+	border-radius: var(--md-sys-shape-corner-small);
+	background-color: color-mix(in srgb, var(--md-sys-color-on-surface) var(--_state), var(--_bg));
+	color: var(--md-sys-color-on-surface-variant);
+	cursor: pointer;
+	transition: background-color var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) var(--motion-ease);
+}
+.iconpicker__item:hover { --_state: var(--state-hover); }
+.iconpicker__item .icon { width: 24px; height: 24px; }
+.iconpicker__radio {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	margin: 0;
+	opacity: 0;
+	cursor: pointer;
+}
+.iconpicker__item:has(> .iconpicker__radio:checked) {
+	--_bg: var(--md-sys-color-secondary-container);
+	color: var(--md-sys-color-on-secondary-container);
+	box-shadow: inset 0 0 0 2px var(--md-sys-color-primary);
+}
+.iconpicker__item:has(> .iconpicker__radio:focus-visible) {
+	outline: 3px solid var(--md-sys-color-secondary);
+	outline-offset: 2px;
+}
+.iconpicker__item:has(> .iconpicker__radio:disabled) { cursor: not-allowed; opacity: .38; }
+/* «без значка» — перечёркнутый круг: пустая ячейка выглядела бы несработавшей загрузкой */
+.iconpicker__nothing {
+	width: 20px;
+	height: 20px;
+	border-radius: var(--md-sys-shape-corner-full);
+	box-shadow: inset 0 0 0 2px currentColor;
+	background: linear-gradient(45deg, transparent calc(50% - 1px), currentColor 0 calc(50% + 1px), transparent 0);
+}
+
 /* --- компонент: тумблер (поле из двух состояний) ---
    Без JS: всё держится на :checked у настоящего <input type="checkbox">. Флажок НЕ
    скрыт через display:none — иначе он выпал бы из порядка фокуса и тумблер перестал

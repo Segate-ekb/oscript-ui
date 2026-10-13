@@ -32,6 +32,12 @@
 	Тексты.Вставить("theme.preset.classic", "Как было");
 	Тексты.Вставить("theme.preset.material", "Новая");
 	Тексты.Вставить("theme.preset.oscript", "oscript");
+	// выбор значка (дев-сборка 9)
+	Тексты.Вставить("iconpicker.search", "Найти значок");
+	Тексты.Вставить("iconpicker.glyphs", "Глифы");
+	Тексты.Вставить("iconpicker.brands", "Бренды");
+	Тексты.Вставить("iconpicker.none", "Без значка");
+	Тексты.Вставить("iconpicker.found", "Найдено: %1");
 	Тексты.Вставить("chrome.office.nav.title", "Разделы личного");
 	Тексты.Вставить("chrome.menu.open", "Меню");
 	Тексты.Вставить("chrome.menu.close", "Закрыть меню");

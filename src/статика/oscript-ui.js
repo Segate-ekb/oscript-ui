@@ -43,6 +43,9 @@
  *      шаблона сервера.
  *  15. подсказку обрезанного имени (выпуск 0.13): имя карточки объекта, которое лист
  *      обрезал многоточием, на наведении получает title с именем целиком.
+ *  16. выбор значка (дев-сборка 9, data-iconpicker-*): строка поиска над радио-сеткой
+ *      значков — фильтр на месте и счёт найденного для скринридера; зеркало поля выбора
+ *      значка пишет в образец сам значок. Пилюля темы (раздел 6) — aria-checked сразу.
  *
  * Глобальных имён скрипт не заводит, разметку не печатает — только атрибуты, рябь и текст
  * отказа под полем (field__error — тот же, что печатает сервер; выпуск 0.12).
@@ -2191,6 +2194,11 @@
 		for (var a = 0; a < attrTargets.length; a++) {
 			attrTargets[a].setAttribute('data-mirror-' + name.toLowerCase(), value);
 		}
+		// выбор значка (дев-сборка 9, раздел 16): образец показывает сам выбранный значок
+		if (control.type === 'radio' && control.closest && control.closest('[data-iconpicker]')) {
+			iconMirror(control, targets, attrTargets);
+			return;
+		}
 		var color = mirrorIsColor(name);
 		for (var i = 0; i < targets.length; i++) {
 			var t = targets[i];
@@ -3489,6 +3497,116 @@
 		ctInit(doc);
 	});
 	ctInit(doc);
+
+	/* --- 16. выбор значка (дев-сборка 9) ----------------------------------------------
+	   Сервер печатает радио-сетку значков целиком, с разделами, и строку поиска hidden: без
+	   скрипта искать нечем. Скрипт показывает строку и фильтрует ячейки на месте по имени
+	   (data-iconpicker-name: имя значка и название бренда строчными), прячет пустые разделы
+	   и пишет счёт найденного в живую область (шаблон — значение data-iconpicker, %1 — число).
+	   Ячейка «без значка» видна всегда. Зеркало поля выбора значка (раздел 12) пишет в образец
+	   не имя, а сам значок: копию рисунка выбранной ячейки. */
+
+	function iconPickerInit(scope) {
+		var roots = (scope || doc).querySelectorAll('[data-iconpicker]');
+		for (var i = 0; i < roots.length; i++) {
+			var search = roots[i].querySelector('[data-iconpicker-search]');
+			if (search && search.hidden && !roots[i].hasAttribute('data-iconpicker-live')) {
+				search.hidden = false;
+				roots[i].setAttribute('data-iconpicker-live', '');
+			}
+		}
+	}
+
+	function iconPickerFilter(root, query) {
+		var q = query.trim().toLowerCase();
+		var groups = root.querySelectorAll('[data-iconpicker-group]');
+		var found = 0;
+		for (var g = 0; g < groups.length; g++) {
+			var items = groups[g].querySelectorAll('[data-iconpicker-name]');
+			var shown = 0;
+			for (var i = 0; i < items.length; i++) {
+				var hit = !q || items[i].getAttribute('data-iconpicker-name').indexOf(q) >= 0;
+				items[i].hidden = !hit;
+				shown += hit ? 1 : 0;
+			}
+			groups[g].hidden = shown === 0;
+			found += shown;
+		}
+		var live = root.querySelector('[data-iconpicker-found]');
+		if (live) {
+			live.textContent = q ? (root.getAttribute('data-iconpicker') || '%1').replace('%1', String(found)) : '';
+		}
+	}
+
+	doc.addEventListener('input', function (e) {
+		var target = e.target;
+		var search = target && target.closest ? target.closest('[data-iconpicker-search]') : null;
+		var root = search ? search.closest('[data-iconpicker]') : null;
+		if (root) {
+			iconPickerFilter(root, target.value || '');
+		}
+	});
+
+	// Enter в строке поиска ничего не отправляет (у неё нет формы), а первый найденный
+	// значок выбирается — так поиск заканчивается выбором, а не тупиком.
+	doc.addEventListener('keydown', function (e) {
+		var target = e.target;
+		var search = e.key === 'Enter' && target && target.closest ? target.closest('[data-iconpicker-search]') : null;
+		var root = search ? search.closest('[data-iconpicker]') : null;
+		if (!root) {
+			return;
+		}
+		e.preventDefault();
+		var first = root.querySelector('[data-iconpicker-group]:not([hidden]) [data-iconpicker-name]:not([hidden]) .iconpicker__radio');
+		if (first && !first.disabled) {
+			first.checked = true;
+			first.dispatchEvent(new Event('change', { bubbles: true }));
+			first.focus();
+		}
+	});
+
+	// Значок выбранной ячейки — в узлы зеркала: у зеркала признаком (плашка, кнопка) — вместо
+	// её первого значка или первым ребёнком, у зеркала текстом — вместо текста; «без значка»
+	// снимает значок, а текстовому зеркалу возвращает напечатанное сервером.
+	function iconMirror(control, targets, attrTargets) {
+		var radio = control.checked ? control : null;
+		if (!radio) {
+			var list = doc.getElementsByName(control.name);
+			for (var i = 0; i < list.length; i++) {
+				if (list[i].checked) {
+					radio = list[i];
+				}
+			}
+		}
+		var picture = radio && radio.parentNode ? radio.parentNode.querySelector('svg') : null;
+		for (var a = 0; a < attrTargets.length; a++) {
+			var old = attrTargets[a].querySelector('svg.icon');
+			if (!picture) {
+				if (old) {
+					old.remove();
+				}
+			} else if (old) {
+				old.replaceWith(picture.cloneNode(true));
+			} else {
+				attrTargets[a].insertBefore(picture.cloneNode(true), attrTargets[a].firstChild);
+			}
+		}
+		for (var t = 0; t < targets.length; t++) {
+			var node = targets[t];
+			if (!(MIRROR_HTML in node)) {
+				node[MIRROR_HTML] = node.innerHTML;
+			}
+			if (picture) {
+				node.replaceChildren(picture.cloneNode(true));
+			} else {
+				node.innerHTML = node[MIRROR_HTML];
+			}
+		}
+	}
+	var MIRROR_HTML = 'oscriptUiMirrorHtml'; // свойство узла: разметка, напечатанная сервером
+
+	doc.addEventListener('oscript-ui:update', function () { iconPickerInit(); });
+	iconPickerInit();
 
 	/* --- 15. подсказка обрезанного имени --------------------------------------------
 	   Имя карточки объекта лист держит одной строкой с многоточием (.objcard__name). Что
