@@ -1735,11 +1735,16 @@ span.checktree__item { cursor: default; }
    поверхность, когда под ней прокручивается содержимое, а панель в конце короткой формы
    с тенью уровня 2 выглядела плавающим блоком посреди формы. Прилипла ли она, знает только
    движок: скрипт ставит data-stuck (панель прилипла к низу экрана — на пиксель ниже края,
-   отсюда bottom: -1px). Без скрипта панель без тени. */
+   отсюда bottom: -1px). Без скрипта признака нет, и прилипшую панель отделяет от полей
+   под ней кольцо outline-variant (дев-сборка 10, ревью ui-брендирование-2): фон панели —
+   фон карточки, и без края поля срезались под ней на полуслове. Слой выше подписей полей
+   (z-index 1 у плавающей подписи и справки): иначе подпись поля под прилипшей панелью
+   просвечивала поверх неё. */
 
 .savebar {
 	position: sticky;
 	bottom: -1px;
+	z-index: 2;
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
@@ -1755,6 +1760,9 @@ span.checktree__item { cursor: default; }
 		background-color var(--motion-medium) var(--motion-ease);
 }
 .savebar[data-stuck] { box-shadow: var(--md-sys-elevation-level2); }
+@media (scripting: none) {
+	.savebar { box-shadow: 0 0 0 1px var(--md-sys-color-outline-variant); }
+}
 .savebar__note { color: var(--md-sys-color-on-surface-variant); font: var(--type-body-medium); }
 /* Несохранённые правки: класс ставит скрипт кита на первом же вводе в форму, а снимает
    ответ сервера — после сохранения панель приходит без него. */
