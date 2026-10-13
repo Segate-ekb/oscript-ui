@@ -263,26 +263,31 @@
 		Роль(Т, "on-" + Семья + "-fixed-variant", Код, 30, 30);
 	КонецЦикла;
 
-	Роль(Т, "surface", "N", 98, 6);
+	// Тёмная тема помягче (дев-сборка 8, слово владельца: «слишком тёмная, в старой версии ui
+	// была помягче»): поверхности на ~4 тона светлее схемы Material — фон 10 вместо 6, как
+	// у кита 0.8 (#161826, L* 10), карточка (контейнер) по-прежнему на 6 тонов выше фона.
+	// Контраст текста на них сверяют ПарыКонтраста; кольцо карточек (outline-variant) поднято
+	// вслед за фоном, чтобы оставалось таким же заметным.
+	Роль(Т, "surface", "N", 98, 10);
 	Роль(Т, "on-surface", "N", 10, 90);
 	Роль(Т, "surface-variant", "NV", 90, 30);
 	Роль(Т, "on-surface-variant", "NV", 30, 80);
-	Роль(Т, "surface-dim", "N", 87, 6);
-	Роль(Т, "surface-bright", "N", 98, 24);
-	Роль(Т, "surface-container-lowest", "N", 100, 4);
-	Роль(Т, "surface-container-low", "N", 96, 10);
-	Роль(Т, "surface-container", "N", 94, 12);
-	Роль(Т, "surface-container-high", "N", 92, 17);
-	Роль(Т, "surface-container-highest", "N", 90, 22);
+	Роль(Т, "surface-dim", "N", 87, 8);
+	Роль(Т, "surface-bright", "N", 98, 28);
+	Роль(Т, "surface-container-lowest", "N", 100, 6);
+	Роль(Т, "surface-container-low", "N", 96, 13);
+	Роль(Т, "surface-container", "N", 94, 16);
+	Роль(Т, "surface-container-high", "N", 92, 20);
+	Роль(Т, "surface-container-highest", "N", 90, 24);
 	Роль(Т, "inverse-surface", "N", 20, 90);
 	Роль(Т, "inverse-on-surface", "N", 95, 20);
 	Роль(Т, "inverse-primary", "P", 80, 40);
 	Роль(Т, "outline", "NV", 50, 60);
-	Роль(Т, "outline-variant", "NV", 80, 30);
+	Роль(Т, "outline-variant", "NV", 80, 32);
 	Роль(Т, "shadow", "N", 0, 0);
 	Роль(Т, "scrim", "N", 0, 0);
 	Роль(Т, "surface-tint", "P", 40, 80);
-	Роль(Т, "background", "N", 98, 6);
+	Роль(Т, "background", "N", 98, 10);
 	Роль(Т, "on-background", "N", 10, 90);
 
 	Возврат Т;
