@@ -4323,6 +4323,10 @@ div.entry__head:hover { --_state: 0%; }
 	            margin var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
 }
 .segments__check .icon { flex: none; width: 18px; height: 18px; }
+/* Значок сегмента (дев-сборка 10): перед подписью, 18 px, не сжимается — на телефоне подпись
+   переносится, а значок остаётся; галка выбранного встаёт перед ним. */
+.segments__icon { flex: none; width: 18px; height: 18px; margin-right: var(--space-2); }
+.segments--small .segments__icon { width: 16px; height: 16px; margin-right: var(--space-1); }
 .segments__item:hover > .segments__label { --_state: var(--state-hover); }
 .segments__item:active > .segments__label { --_state: var(--state-pressed); }
 .segments__input:checked + .segments__label {
