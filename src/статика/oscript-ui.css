@@ -4097,8 +4097,7 @@ div.entry__head:hover { --_state: 0%; }
 @supports selector(:has(*)) {
 	.modal .segments:has(> :nth-child(5)) {
 		grid-auto-flow: row;
-		grid-auto-columns: auto;
-		grid-template-columns: 100%;
+		grid-auto-columns: 100%;
 		border-radius: var(--md-sys-shape-corner-large);
 	}
 	.modal .segments:has(> :nth-child(5)) > .segments__item + .segments__item {
@@ -4117,8 +4116,7 @@ div.entry__head:hover { --_state: 0%; }
 	@supports selector(:has(*)) {
 		.modal .segments:has(> :nth-child(4)) {
 			grid-auto-flow: row;
-			grid-auto-columns: auto;
-			grid-template-columns: 100%;
+			grid-auto-columns: 100%;
 			border-radius: var(--md-sys-shape-corner-large);
 		}
 		.modal .segments:has(> :nth-child(4)) > .segments__item + .segments__item {

@@ -573,9 +573,9 @@
 	Ожидаем.Что(ОбъявлениеЛиста(".modal .segments", "grid-auto-columns"), "колонка не уже слова на любой ширине")
 		.Равно("minmax(min-content, 1fr)");
 	Ожидаем.Что(ОбъявлениеЛиста(".modal .segments__text", "white-space"), "подпись переносится").Равно("normal");
-	Ожидаем.Что(ОбъявлениеЛиста(".modal .segments:has(> :nth-child(5))", "grid-template-columns",
+	Ожидаем.Что(ОбъявлениеЛиста(".modal .segments:has(> :nth-child(5))", "grid-auto-columns",
 		"@supports selector(:has(*))"), "пять сегментов — столбиком").Равно("100%");
-	Ожидаем.Что(ОбъявлениеЛиста(".modal .segments:has(> :nth-child(4))", "grid-template-columns",
+	Ожидаем.Что(ОбъявлениеЛиста(".modal .segments:has(> :nth-child(4))", "grid-auto-columns",
 		"@media (max-width: 600px) @supports selector(:has(*))"), "на телефоне — с четырёх").Равно("100%");
 
 КонецПроцедуры
