@@ -4,7 +4,7 @@
 // формой), сетка простых карточек на телефоне, длинное слово в окне подтверждения и хвосты
 // аудита M3 (тень вложенной поверхности, прилипшая панель сохранения, рамка шагов в окне,
 // фокус при открытии окна, подвал у низа окна, шеврон раскрывашки), адрес закрытия окна (со скриптом
-// и без), шеврон панели, сегменты в окне. Сайт документации
+// и без), шеврон панели, сегменты в окне, тумблер и флажок со справкой. Сайт документации
 // должен быть запущен:
 //
 //   cd документация && oscript main.os --порт 3598
@@ -406,6 +406,41 @@ async function закрытиеОкна(b) {
   }
 }
 
+// Слово владельца к ui.4: тумблер и флажок со справкой — щелчок по дорожке и флажку переключает,
+// а не открывает справку; щелчок по «?» открывает
+async function справка(b) {
+  const ctx = await контекст(b, 1280, true);
+  const p = await ctx.newPage();
+  for (const [страница, строка, элемент, что] of [
+    ['тумблер', '.field-help:has(> .toggle)', '.toggle__track', 'тумблер'],
+    ['подсказка', '.field-help:has(> .field--check)', 'input[type=checkbox]', 'флажок']]) {
+    await p.goto(адрес(страница), { waitUntil: 'networkidle' });
+    const ряд = p.locator(строка).first();
+    await ряд.scrollIntoViewIfNeeded();
+    const галка = ряд.locator('input[type=checkbox]').first();
+    const было = await галка.isChecked();
+    const открыта = () => ряд.evaluate((el) => {
+      const id = el.querySelector('.help').getAttribute('popovertarget');
+      const pop = id && document.getElementById(id);
+      return !!(pop && pop.matches(':popover-open'));
+    });
+    await ряд.locator(элемент).first().click({ force: что === 'флажок' });
+    проверить(await галка.isChecked() !== было && !(await открыта()), `справка: щелчок по ${что === 'тумблер' ? 'дорожке тумблера' : 'флажку'} переключает, справка закрыта`);
+    const подпись = await ряд.evaluate((el) => {
+      const t = el.querySelector('.toggle__label, .field__label, label span');
+      const r = t.getBoundingClientRect();
+      const над = document.elementFromPoint(r.left + 4, r.top + r.height / 2);
+      return !над.closest('.help');
+    });
+    проверить(подпись, `справка: над подписью «${что}» — не значок справки`);
+    await ряд.locator('.help').click();
+    await p.waitForTimeout(200);
+    проверить(await открыта(), `справка: щелчок по «?» у «${что}» открывает поповер`);
+    await p.keyboard.press('Escape');
+  }
+  await ctx.close();
+}
+
 async function снимок(локатор, имя) {
   await локатор.page().waitForTimeout(300);
   await локатор.screenshot({ path: path.join(OUT, `${имя}.png`) });
@@ -415,7 +450,7 @@ async function снимок(локатор, имя) {
   const b = await браузер();
   for (const [имя, шаг] of [['дерево со скриптом', деревоСоСкриптом], ['дерево без скрипта', деревоБезСкрипта],
     ['плашка с крестиком', плашкаСКрестиком], ['длинное слово', длинноеСлово], ['карточки', карточки], ['хвосты', хвосты],
-    ['закрытие окна', закрытиеОкна]]) {
+    ['закрытие окна', закрытиеОкна], ['справка', справка]]) {
     try {
       await шаг(b);
     } catch (err) {

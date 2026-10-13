@@ -4338,11 +4338,16 @@ fieldset > legend + .segments__origin + .segments { display: grid; width: fit-co
 .field-help > .field:focus-within > .field__label { max-width: calc((100% - 72px) * 5 / 4); }
 .field-help:has(> .field--check) { flex-direction: row; align-items: flex-start; }
 .field-help > .field--check { flex: 0 1 auto; }
-.field-help:has(> .field--check) > .help { position: static; margin: -2px 0 0 var(--space-1); }
+/* Значок флажка и тумблера стоит в потоке, но остаётся позиционированным (position: relative,
+   дев-сборка 8): зона касания 48 px — псевдоэлемент .help::before с position: absolute —
+   отсчитывается от самого значка. С position: static она растягивалась на ближайшего
+   позиционированного предка — всю строку .field-help, — и щелчок по флажку и дорожке
+   тумблера открывал справку, а не переключал (слово владельца к ui.4, с dev.5). */
+.field-help:has(> .field--check) > .help { position: relative; margin: -2px 0 0 var(--space-1); }
 /* Тумблер со справкой: «?» стоит справа от подписи, по верху ряда, как у флажка. */
 .field-help:has(> .toggle) { flex-direction: row; align-items: flex-start; }
 .field-help > .toggle { flex: 0 1 auto; min-width: 0; }
-.field-help:has(> .toggle) > .help { position: static; margin: 4px 0 0 var(--space-1); }
+.field-help:has(> .toggle) > .help { position: relative; margin: 4px 0 0 var(--space-1); }
 /* Справка у списка и цвета (выпуск 0.12): строка ввода списка не прямой ребёнок поля,
    поэтому место под значок оставляют её рамка (со скриптом) и сам ввод (без него) —
    иначе значок лёг бы на плашки и текст. У цвета рамки нет: значок стоит в строке
