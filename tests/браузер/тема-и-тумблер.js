@@ -72,15 +72,15 @@ const ТУМБЛЕР = '.docs-sample__preview form:has(.toggle__input[data-autos
 			тема: document.documentElement.getAttribute('data-theme'),
 			история: history.length,
 			заголовок: document.querySelector('h1') && document.querySelector('h1').textContent,
-			подсказка: document.querySelector('form[data-theme-toggle] .button').getAttribute('title'),
+			подсказка: document.querySelector('form[data-theme-toggle] [role="switch"]').getAttribute('title'),
 		}));
 
 		// на телефоне переключатель живёт в панели меню; на широком — в шапке
 		if (ширина < 900) {
 			await p.locator('.hubmenu__opener .button').click();
-			await p.locator('#hubmenu form[data-theme-toggle] .button').click();
+			await p.locator('#hubmenu form[data-theme-toggle] [role="switch"]').click();
 		} else {
-			await p.locator('.top form[data-theme-toggle] .button').first().click();
+			await p.locator('.top form[data-theme-toggle] [role="switch"]').first().click();
 		}
 		await p.waitForFunction(() => !document.querySelector('form[data-theme-toggle][aria-busy]'));
 		await p.waitForTimeout(400);
@@ -91,7 +91,7 @@ const ТУМБЛЕР = '.docs-sample__preview form:has(.toggle__input[data-autos
 			история: history.length,
 			заголовок: document.querySelector('h1') && document.querySelector('h1').textContent,
 			прокрутка: window.scrollY,
-			подсказка: document.querySelector('form[data-theme-toggle] .button').getAttribute('title'),
+			подсказка: document.querySelector('form[data-theme-toggle] [role="switch"]').getAttribute('title'),
 		}));
 		проверить(запросов === 1, `${ширина}: форма темы ушла на сервер в фоне один раз (${запросов})`);
 		проверить(до.тема !== после.тема && после.тема === 'light', `${ширина}: data-theme перевернулся (${до.тема} → ${после.тема})`);
@@ -107,7 +107,7 @@ const ТУМБЛЕР = '.docs-sample__preview form:has(.toggle__input[data-autos
 
 		// второй щелчок возвращает тему и тоже не уходит
 		if (ширина >= 900) {
-			await p.locator('.top form[data-theme-toggle] .button').first().click();
+			await p.locator('.top form[data-theme-toggle] [role="switch"]').first().click();
 			await p.waitForFunction(() => !document.querySelector('form[data-theme-toggle][aria-busy]'));
 			await p.waitForTimeout(400);
 			const ещё = await p.evaluate(() => ({ адрес: location.href, тема: document.documentElement.getAttribute('data-theme') }));
