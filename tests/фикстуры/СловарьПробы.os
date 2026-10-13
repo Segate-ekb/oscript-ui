@@ -53,6 +53,7 @@
 	Тексты.Вставить("iconpicker.brands", "Бренды");
 	Тексты.Вставить("iconpicker.none", "Без значка");
 	Тексты.Вставить("iconpicker.found", "Найдено: %1");
+	Тексты.Вставить("iconpicker.service", "Служебные");
 	Тексты.Вставить("chrome.office.nav.title", "Разделы личного");
 	Тексты.Вставить("chrome.menu.open", "Меню");
 	Тексты.Вставить("chrome.menu.close", "Закрыть меню");
