@@ -2203,6 +2203,19 @@ div.divider::before, div.divider::after { content: ""; flex: 1 1 0; border-top: 
 	font: var(--type-body-medium);
 	letter-spacing: var(--md-sys-typescale-body-medium-tracking);
 }
+/* Сноска (дев-сборка 10): самый мелкий петит страницы — обязательная атрибуция базы
+   данных («IP to Country by DB-IP»), лицензия, строка о правах. body-small цветом
+   пояснения, без рамки и своих маргинов (ритм ставит контейнер); ссылка внутри того же
+   кегля, а не крупнее текста вокруг. В узкой колонке — по центру, как всё в ней, в обычной
+   странице — слева. */
+.note-footnote {
+	margin: 0;
+	font: var(--type-body-small);
+	letter-spacing: var(--md-sys-typescale-body-small-tracking);
+	color: var(--md-sys-color-on-surface-variant);
+}
+.note-footnote a { font: inherit; letter-spacing: inherit; }
+.narrow > .note-footnote { text-align: center; }
 /* Ссылка над полем справа — в строке подписи, label-large цветом ссылки. */
 .field-aside { display: flex; flex-direction: column; gap: var(--space-1); }
 .field-aside__link { align-self: flex-end; font: var(--type-label-large); letter-spacing: var(--md-sys-typescale-label-large-tracking); }
