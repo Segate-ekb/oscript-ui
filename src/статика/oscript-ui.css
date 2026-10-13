@@ -2183,7 +2183,10 @@ input[type="color"].field__control { padding: 17px 12px 3px; height: 44px; curso
 	letter-spacing: var(--md-sys-typescale-headline-small-tracking);
 	color: var(--md-sys-color-on-surface);
 }
-.narrow__head > p { margin: 0; }
+/* Подпись шапки — лид ворот (дев-сборка 10): абзац длиннее строки переносится по словам по
+   центру, не шире колонки; строки выравниваются по длине (balance), а длинное слово без
+   пробелов (адрес, логин) переносится внутри себя, а не раздвигает колонку. */
+.narrow__head > p { margin: 0; max-width: 100%; text-wrap: balance; overflow-wrap: anywhere; }
 .stack { display: flex; flex-direction: column; gap: var(--space-2); }
 .stack > .button { width: 100%; }
 /* Разделитель: линия outline-variant; с текстом — две линии по бокам текста label-medium. */
