@@ -2539,11 +2539,15 @@
 	//     против напечатанного сервером) копятся, видны плашками data-checktree-edits
 	//     (плашку скрипт клонирует из шаблона сервера) и уходят с формой вместо галок:
 	//     правки=1, включить=<ключ>, снять=<ключ>, режим=<ключ>:<режим>;
-	//   — (дев-сборка 8) режим ветки «кроме» — все, кроме снятых: дети правятся, как
-	//     в «выбранных»; переход «все» → «кроме» оживляет детей отмеченными, «кроме» → «все»
-	//     возвращает их галкам напечатанное и уносит их правки — исключения снимает правка
-	//     режима; скрытое поле data-checktree-shown (ПравкиБезСкрипта) при отправке без
-	//     правок пересчитывается по всем галкам обёртки, с правками — не уходит;
+	//   — (дев-сборка 10) три режима ветки с массовыми галками: «все» — дети отмечены
+	//     и заперты (data-checktree-locked), «никакие» — сняты и заперты, «выбранные» —
+	//     отперты и начинаются с того, что было видно: из «все» — все отмечены, из «никакие» —
+	//     все сняты, из «выбранных» — как есть. Массовая отметка — основа «выбранных»: правки
+	//     детей считаются против неё, с формой уходит «основа=<ключ>:все|никакие», и сервер
+	//     строит набор заново (все минус снятые | только отмеченные). Дети, подгруженные
+	//     позже, встают по текущему режиму. «Кроме» (дев-сборка 8) — «все, кроме снятых»:
+	//     дети отперты и отмечены; скрытое поле data-checktree-shown (ПравкиБезСкрипта) при
+	//     отправке без правок пересчитывается по всем галкам обёртки, с правками — не уходит;
 	//   — (дев-сборка 8) крестик плашки отмеченного вне показанного (data-checktree-pick) —
 	//     галка «снять» (у снятого узла — «включить»); у дерева с правками она становится
 	//     правкой того же узла в общем ряду, а ряд правок держит её в согласии с собой;
@@ -2558,6 +2562,7 @@
 	var CT_BUSY = 'oscriptUiLoading';       // свойство строки «Показать ещё»: её страница в пути
 	var CT_NATIVE = 'oscriptUiTreeNative';  // свойство формы: отправку поиска пустить к браузеру
 	var CT_MODE = 'oscriptUiMode';          // свойство группы режима: режим, отмеченный сейчас
+	var CT_BASE = 'oscriptUiBase';          // свойство группы режима: основа «выбранных» — все | никакие
 	var ctTimer = 0;
 
 	function ctKey(box) {
@@ -2741,7 +2746,7 @@
 		boxes.forEach(function (box) {
 			var key = ctKey(box);
 			var state = ctState(box);
-			if (state === 'mixed' || state === ctOrigin(box)) {
+			if (state === 'mixed' || state === ctEffOrigin(box) || ctLocked(box)) {
 				edits.delete('box:' + key);
 			} else {
 				edits.set('box:' + key, { kind: state, key: key, label: ctLabelOf(box) || key });
@@ -2772,6 +2777,80 @@
 		return checked ? checked.value : '';
 	}
 
+	// Строка ветки над страницей её детей (дев-сборка 10, фрагмент с режимом ветки): группа
+	// режима стоит в data-checktree-head, список — рядом, с тем же ключом.
+	function ctHeadGroup(list) {
+		var key = list ? list.getAttribute('data-checktree-page') : null;
+		var scope = list ? list.parentElement : null;
+		var heads = key !== null && scope ? scope.querySelectorAll(':scope > [data-checktree-head] [data-checktree-modes]') : [];
+		for (var i = 0; i < heads.length; i++) {
+			if (heads[i].getAttribute('data-checktree-modes') === key) {
+				return heads[i];
+			}
+		}
+		return null;
+	}
+
+	function ctGroupOf(node) {
+		var row = ctChild(node, 'checktree__row');
+		return row ? ctChild(row, 'checktree__modes') : null;
+	}
+
+	// Дети ветки этой группы режима: в дереве — список её узла, на странице ветки — список
+	// с её ключом рядом со строкой ветки.
+	function ctListOf(group) {
+		var node = group.closest('.checktree__node');
+		if (node) {
+			return ctList(node);
+		}
+		var head = group.closest('[data-checktree-head]');
+		var key = group.getAttribute('data-checktree-modes');
+		var lists = head && head.parentElement ? head.parentElement.querySelectorAll(':scope > [data-checktree-page]') : [];
+		for (var i = 0; i < lists.length; i++) {
+			if (lists[i].getAttribute('data-checktree-page') === key) {
+				return lists[i];
+			}
+		}
+		return null;
+	}
+
+	// Группа режима ближайшей ветки над галкой — та, что решает за неё.
+	function ctOwnerGroup(box) {
+		var node = box.closest('.checktree__node');
+		for (var p = ctParent(node); p; p = ctParent(p)) {
+			var g = ctGroupOf(p);
+			if (g) {
+				return g;
+			}
+		}
+		var list = node ? node.parentElement : null;
+		return list && list.hasAttribute('data-checktree-page') ? ctHeadGroup(list) : null;
+	}
+
+	// То, против чего считается правка галки: напечатанное сервером, а у детей «выбранных»,
+	// начатых массовой отметкой, — сама отметка (основа).
+	function ctEffOrigin(box) {
+		var g = ctOwnerGroup(box);
+		var base = g ? g[CT_BASE] : '';
+		return base === 'все' ? 'on' : base === 'никакие' ? 'off' : ctOrigin(box);
+	}
+
+	function ctLocked(box) {
+		return box.disabled && box.hasAttribute('data-checktree-locked');
+	}
+
+	// Запереть галку режимом или отпереть. Галку, которую закрыло приложение (disabled без
+	// признака запора), режим не трогает.
+	function ctLockBox(box, lock) {
+		if (lock && !box.disabled) {
+			box.disabled = true;
+			box.setAttribute('data-checktree-locked', '');
+		} else if (!lock && ctLocked(box)) {
+			box.disabled = false;
+			box.removeAttribute('data-checktree-locked');
+		}
+	}
+
 	function ctModeOrigin(group) {
 		var all = group.querySelectorAll('input');
 		for (var i = 0; i < all.length; i++) {
@@ -2786,10 +2865,15 @@
 	// (лист), ни клавиатура (inert). «Выбранные» и «кроме» дети правят. Режим узнаётся по
 	// значению: набор режимов у ветки бывает свой, и место сегмента ничего не говорит.
 	function ctModeLock(group) {
-		var list = ctList(group.closest('.checktree__node'));
+		var list = ctListOf(group);
 		if (list && group.querySelector('input')) {
 			var mode = ctModeOf(group);
-			list.inert = mode === 'все' || mode === 'никакие';
+			var lock = mode === 'все' || mode === 'никакие';
+			list.inert = lock;
+			var boxes = list.querySelectorAll('[data-checktree-box]');
+			for (var i = 0; i < boxes.length; i++) {
+				ctLockBox(boxes[i], lock);
+			}
 		}
 	}
 
@@ -2802,28 +2886,47 @@
 		ctModeLock(group);
 	}
 
-	// Переход между «все» и «кроме» (дев-сборка 8). «Все» → «кроме»: исключать начинают со
-	// всех — дети оживают отмеченными. «Кроме» → «все»: исключения снимает сама правка
-	// режима — галки детей возвращаются к напечатанному, их правки уходят.
-	function ctModeTurn(set, group, from, to) {
+	// Смена режима ветки (дев-сборка 10: три режима с массовыми галками). «Все» и «никакие»
+	// отмечают или снимают всех детей и запирают их — правки детей уходят, решает режим.
+	// «Выбранные» отпирают детей и начинают с того, что было видно: после «все» — все
+	// отмечены, после «никакие» — все сняты (массовая отметка становится основой, против неё
+	// считаются правки детей), после «выбранных» — как есть. «Кроме» — «все, кроме снятых»:
+	// дети отперты и отмечены. Restore — возврат к напечатанному (снятие правки режима):
+	// галки — к тому, что напечатал сервер, основы нет.
+	function ctModeTurn(set, group, from, to, restore) {
 		group[CT_MODE] = to;
-		var list = ctList(group.closest('.checktree__node'));
-		if (!list || from === to || !((from === 'все' && to === 'кроме') || (from === 'кроме' && to === 'все'))) {
+		var list = ctListOf(group);
+		if (!list || (from === to && !restore)) {
 			return;
 		}
+		var lock = to === 'все' || to === 'никакие';
+		if (restore || lock) {
+			group[CT_BASE] = '';
+		} else if (to === 'кроме') {
+			group[CT_BASE] = 'все';
+		} else if (from === 'все' || from === 'никакие') {
+			group[CT_BASE] = from;
+		}
+		var base = group[CT_BASE];
 		var boxes = list.querySelectorAll('[data-checktree-box]');
 		var changed = [];
 		for (var i = 0; i < boxes.length; i++) {
-			var want = to === 'кроме' ? 'on' : ctOrigin(boxes[i]);
-			if (to === 'все') {
-				boxes[i][CT_WHOLE] = '';
+			var box = boxes[i];
+			if (box.disabled && !ctLocked(box)) {
+				continue;
+			}
+			ctLockBox(box, lock);
+			var want = restore ? ctOrigin(box) : lock ? (to === 'все' ? 'on' : 'off')
+				: base === 'все' ? 'on' : base === 'никакие' ? 'off' : '';
+			if (lock || restore || base) {
+				box[CT_WHOLE] = '';
 				if (set) {
-					ctEdits(set).delete('box:' + ctKey(boxes[i]));
+					ctEdits(set).delete('box:' + ctKey(box));
 				}
 			}
-			if (!boxes[i].disabled && ctState(boxes[i]) !== want) {
-				ctSet(boxes[i], want);
-				changed.push(boxes[i]);
+			if (want && ctState(box) !== want) {
+				ctSet(box, want);
+				changed.push(box);
 			}
 		}
 		if (changed.length) {
@@ -2838,13 +2941,14 @@
 		var key = group.getAttribute('data-checktree-modes');
 		var value = ctModeOf(group);
 		var edits = ctEdits(set);
-		if (value === ctModeOrigin(group)) {
+		var base = group[CT_BASE] || '';
+		if (value === ctModeOrigin(group) && !base) {
 			edits.delete('mode:' + key);
 			return;
 		}
 		var checked = group.querySelector('input:checked');
 		var text = checked ? checked.parentNode.querySelector('.segments__text') : null;
-		edits.set('mode:' + key, { kind: 'mode', key: key, value: value, label: ctLabelOf(group) || key,
+		edits.set('mode:' + key, { kind: 'mode', key: key, value: value, base: base, label: ctLabelOf(group) || key,
 			mode: text ? text.textContent : value });
 	}
 
@@ -2966,7 +3070,7 @@
 		var kind = box.name === 'включить' ? 'on' : 'off';
 		var changed = [];
 		ctBoxes(set, key).forEach(function (twin) {
-			var want = box.checked ? kind : ctOrigin(twin);
+			var want = box.checked ? kind : ctEffOrigin(twin);
 			if (!twin.disabled && ctState(twin) !== want) {
 				ctSet(twin, want);
 				changed.push(twin);
@@ -2996,7 +3100,7 @@
 				if (groups[i].getAttribute('data-checktree-modes') === ed.key) {
 					var from = ctModeOf(groups[i]);
 					ctPickMode(groups[i], ctModeOrigin(groups[i]));
-					ctModeTurn(set, groups[i], from, ctModeOrigin(groups[i]));
+					ctModeTurn(set, groups[i], from, ctModeOrigin(groups[i]), true);
 				}
 			}
 			edits.delete('mode:' + ed.key);
@@ -3005,7 +3109,7 @@
 		var changed = [];
 		var revert = function (key) {
 			ctBoxes(set, key).forEach(function (box) {
-				ctSet(box, ctOrigin(box));
+				ctSet(box, ctEffOrigin(box));
 				box[CT_WHOLE] = '';
 				changed.push(box);
 			});
@@ -3122,15 +3226,26 @@
 		var node = list.closest('.checktree__node');
 		var parent = node ? ctBoxOf(node) : null;
 		var whole = parent && parent[CT_WHOLE] && ctState(parent) === parent[CT_WHOLE] ? parent[CT_WHOLE] : '';
+		// дев-сборка 10: дети ветки с режимом встают по режиму, который отмечен сейчас, а не
+		// по тому, с которым сервер напечатал страницу: «все» | «никакие» — заперты его
+		// состоянием, «выбранные» после массовой отметки — её основой
+		var group = node ? ctGroupOf(node) : null;
+		var mode = group ? ctModeOf(group) : '';
+		var lock = mode === 'все' || mode === 'никакие';
+		var base = group ? group[CT_BASE] || '' : '';
+		var force = lock ? (mode === 'все' ? 'on' : 'off') : base === 'все' ? 'on' : base === 'никакие' ? 'off' : '';
 		var edits = set ? ctEdits(set) : new Map();
 		var changed = [];
 		added.forEach(function (li) {
 			ctInit(li);
 			var boxes = li.querySelectorAll('[data-checktree-box]');
 			for (var i = 0; i < boxes.length; i++) {
-				var ed = edits.get('box:' + ctKey(boxes[i]));
-				var want = whole || (ed ? ed.kind : '');
-				if (want && !boxes[i].disabled && ctState(boxes[i]) !== want) {
+				if (group) {
+					ctLockBox(boxes[i], lock);
+				}
+				var ed = lock ? null : edits.get('box:' + ctKey(boxes[i]));
+				var want = (ed ? ed.kind : '') || force || whole;
+				if (want && (!boxes[i].disabled || ctLocked(boxes[i])) && ctState(boxes[i]) !== want) {
 					ctSet(boxes[i], want);
 					changed.push(boxes[i]);
 				}
@@ -3390,7 +3505,7 @@
 			var key = ctKey(boxes[i]);
 			if (!boxes[i].disabled && !seen['box:' + key]) {
 				seen['box:' + key] = true;
-				var origin = ctOrigin(boxes[i]);
+				var origin = ctEffOrigin(boxes[i]);
 				out.push((origin === 'on' ? '+' : origin === 'off' ? '-' : '~') + esc(key));
 			}
 		}
@@ -3423,6 +3538,16 @@
 		for (var v = 0; v < shown.length; v++) {
 			if (shown[v].name && !shown[v].parentNode.hasAttribute('data-checktree-edits-only')) {
 				data.append(shown[v].name, ctShownValue(shown[v].parentNode));
+				// основа «выбранных» после массовой отметки (дев-сборка 10)
+				var bases = shown[v].parentNode.querySelectorAll('[data-checktree-modes]');
+				var sent = {};
+				for (var q = 0; q < bases.length; q++) {
+					var mk = bases[q].getAttribute('data-checktree-modes');
+					if (bases[q][CT_BASE] && !sent[mk]) {
+						sent[mk] = true;
+						data.append('основа', mk + ':' + bases[q][CT_BASE]);
+					}
+				}
 			}
 		}
 		var sets = form.querySelectorAll('[data-checktree-set][data-checktree-edits-only]');
@@ -3443,6 +3568,9 @@
 					data.append('снять', ed.key);
 				} else {
 					data.append('режим', ed.key + ':' + ed.value);
+					if (ed.base) {
+						data.append('основа', ed.key + ':' + ed.base);
+					}
 				}
 			});
 		}
@@ -3466,6 +3594,10 @@
 			var sets = form.querySelectorAll('[data-checktree-set]');
 			for (var s = 0; s < sets.length; s++) {
 				ctEdits(sets[s]).clear();
+			}
+			var bases = form.querySelectorAll('[data-checktree-modes]');
+			for (var m = 0; m < bases.length; m++) {
+				bases[m][CT_BASE] = '';
 			}
 			ctInit(form);
 		}, 0);
