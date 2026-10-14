@@ -1,0 +1,3789 @@
+/* oscript-ui — скрипт кита: движение Material по образцу MUI там, где одного CSS мало.
+ *
+ * ТОЛЬКО УЛУЧШЕНИЕ. Страница без этого файла работает целиком и выглядит законченной:
+ * ссылки, формы, меню, окна и раскрывашки — разметка и движок браузера. Скрипт добавляет
+ * вот что и ничего не решает за сервер:
+ *   1. рябь — круг от точки нажатия на кнопке, ссылке-пункте, вкладке, чипе;
+ *   2. пустоту поля (data-empty) — по ней лист опускает подпись на место значения;
+ *   3. признак прокрутки шапки (data-scrolled) — по нему шапка меняет цвет и даёт тень;
+ *   4. имя перехода индикатора вкладок (data-vt) — по нему движок везёт индикатор
+ *      со старой страницы на новую (View Transitions между документами);
+ *   5. крестик закрываемого тоста — тост гаснет и уходит со страницы;
+ *   6. тихую отправку (data-quiet) — форма уходит запросом в фоне, а ответ сервера
+ *      ложится на страницу НА МЕСТО: без перезагрузки, с прежней прокруткой, фокусом
+ *      и раскрытыми раскрывашками; плюс мгновенная смена темы (data-theme-toggle),
+ *      отправка по изменению (data-autosubmit) и подсветка несохранённого (data-savebar),
+ *      признак прилипшей панели сохранения (data-stuck) — по нему лист даёт ей тень;
+ *      форма в окне: успех закрывает окно и ставит фокус на data-focus, отказ остаётся в нём;
+ *   7. окно — команды show-modal и close там, где движок их ещё не знает, окно, которое
+ *      сервер напечатал открытым, — модальным, ссылку-кнопку окна страницы (data-opens) —
+ *      открытием окна без перехода, окно по адресу (data-window-link) в одной на страницу
+ *      оболочке и подтверждение отправки формы (data-confirm); ссылку, которая закрывает
+ *      окно (data-closes, дев-сборка 8), — закрытием на месте без перехода.
+ *   8. шаги (data-steps) — одна панель длинной формы за раз, «Дальше» проверяет поля шага.
+ *   9. поле-список (data-chips) — значения плашками, Enter и запятая добавляют плашку,
+ *      строка через запятую уходит скрытым полем; поле цвета (data-swatches) — ряд
+ *      образцов в согласии с полем кода. Новую плашку скрипт берёт из шаблона сервера.
+ *  10. проверка до отправки (data-error-*, data-check) — отказ браузера и ответ сервера
+ *      о занятости значения пишутся под полем словами словаря, поле — aria-invalid;
+ *  11. тост из ответа (data-toast-live) — тосты из ответа тихой отправки по очереди внизу
+ *      экрана, каждый на 5 с; тост с ролью alert остаётся на месте.
+ *  12. слот картинки и образец (выпуск 0.12): выбор файла отправляет слот сразу
+ *      (data-autosubmit, раздел 6) и тут же показывает выбранное в предпросмотре; зеркало
+ *      значения (data-mirror) пишет набранное в узел образца, зеркало признаком
+ *      (data-mirrors) — значение в признак data-mirror-<имя>; переключатель темы образца
+ *      (data-preview-theme) красит рамку палитрой из блока токенов страницы.
+ *  13. страницы и отбор без перезагрузки (выпуск 0.13): ссылка с data-quiet (страница
+ *      пагинации, сортировка колонки) берётся в фоне и морфится, как ответ тихой формы,
+ *      адрес — в историю вкладки (pushState), «Назад» по помеченной записи — тоже тихо;
+ *      тихая GET-форма отбора уходит сама по изменению поля с задержкой.
+ *  14. дерево галок (выпуск 0.13, data-checktree-*): «частично» у веток по детям, страницы
+ *      ветки по «Показать ещё» и при раскрытии, поиск через сервер на месте веток, правки
+ *      плашками и форма, которая отдаёт только правки. Плашку правки скрипт берёт из
+ *      шаблона сервера.
+ *  15. подсказку обрезанного имени (выпуск 0.13): имя карточки объекта, которое лист
+ *      обрезал многоточием, на наведении получает title с именем целиком.
+ *  16. выбор значка (дев-сборка 9, data-iconpicker-*): строка поиска над радио-сеткой
+ *      значков — фильтр на месте и счёт найденного для скринридера; зеркало поля выбора
+ *      значка пишет в образец сам значок. Пилюля темы (раздел 6) — aria-checked сразу.
+ *
+ * Глобальных имён скрипт не заводит, разметку не печатает — только атрибуты, рябь и текст
+ * отказа под полем (field__error — тот же, что печатает сервер; выпуск 0.12).
+ * Обновив страницу на месте, он сообщает об этом событием «oscript-ui:update» на document:
+ * скрипт инсталляции, который оживляет элементы при загрузке, оживляет по нему новые.
+ * Отдаётся файлом с хешем содержимого в адресе, как и базовый лист.
+ */
+(function () {
+	'use strict';
+
+	var doc = document;
+	var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
+
+	/* --- 1. рябь ------------------------------------------------------------------- */
+
+	var RIPPLE = [
+		'.button', '.chip', '.tabs__link', '.tree__link', '.pagination__link', '.top__link',
+		'.hubmenu__account', '.panel__head', '.section__fold > .fold__head', 'a.tag',
+		'.tile--link', '.toast__close', '.cmd .copy', '.from-config__env .copy'
+	].join(',');
+
+	var MIN_VISIBLE = 225; // мс: рябь от короткого касания успевает показаться
+
+	function rippleHost(target) {
+		var host = target && target.closest ? target.closest(RIPPLE) : null;
+		if (!host || host.disabled || host.getAttribute('aria-disabled') === 'true') {
+			return null;
+		}
+		return host;
+	}
+
+	function spawn(host, x, y) {
+		var rect = host.getBoundingClientRect();
+		var cx = x === undefined ? rect.width / 2 : x - rect.left;
+		var cy = y === undefined ? rect.height / 2 : y - rect.top;
+		var r = Math.sqrt(Math.pow(Math.max(cx, rect.width - cx), 2)
+			+ Math.pow(Math.max(cy, rect.height - cy), 2));
+
+		if (getComputedStyle(host).position === 'static') {
+			host.style.position = 'relative';
+		}
+
+		var box = doc.createElement('span');
+		box.className = 'ripple';
+		box.setAttribute('aria-hidden', 'true');
+		var wave = doc.createElement('span');
+		wave.className = 'ripple__wave';
+		wave.style.width = wave.style.height = (r * 2) + 'px';
+		wave.style.left = (cx - r) + 'px';
+		wave.style.top = (cy - r) + 'px';
+		box.appendChild(wave);
+		host.appendChild(box);
+
+		var born = Date.now();
+		return function release() {
+			var wait = Math.max(0, MIN_VISIBLE - (Date.now() - born));
+			setTimeout(function () {
+				wave.classList.add('ripple__wave--out');
+				setTimeout(function () {
+					if (box.parentNode) {
+						box.parentNode.removeChild(box);
+					}
+				}, 400);
+			}, wait);
+		};
+	}
+
+	function once(release) {
+		var done = false;
+		return function () {
+			if (!done) {
+				done = true;
+				release();
+			}
+		};
+	}
+
+	doc.addEventListener('pointerdown', function (e) {
+		if (e.button !== 0 || (calm && calm.matches)) {
+			return;
+		}
+		var host = rippleHost(e.target);
+		if (!host) {
+			return;
+		}
+		var release = once(spawn(host, e.clientX, e.clientY));
+		['pointerup', 'pointercancel', 'pointerleave', 'dragstart'].forEach(function (type) {
+			host.addEventListener(type, release, { once: true });
+		});
+		setTimeout(release, 2000); // страховка: отпускание ушло мимо элемента
+	}, { passive: true });
+
+	// С клавиатуры рябь идёт из середины — как у MUI на Enter и пробеле.
+	doc.addEventListener('keydown', function (e) {
+		if ((e.key !== 'Enter' && e.key !== ' ') || e.repeat || (calm && calm.matches)) {
+			return;
+		}
+		var host = rippleHost(e.target);
+		if (host && host === e.target) {
+			once(spawn(host))();
+		}
+	});
+
+	/* --- 2. пустота поля ------------------------------------------------------------ */
+
+	// Подпись опускается только у полей, где значение — текст: выбор, дата, цвет и файл
+	// всегда что-то показывают, и подпись у них всегда наверху.
+	var FLOAT_TYPES = /^(text|search|email|url|tel|password|number)$/;
+
+	function floats(control) {
+		if (control.tagName === 'TEXTAREA') {
+			return true;
+		}
+		return control.tagName === 'INPUT' && FLOAT_TYPES.test(control.type || 'text');
+	}
+
+	function markEmpty(control) {
+		var field = control.closest('.field');
+		if (!field || !floats(control)) {
+			return;
+		}
+		var empty = control.value === '';
+		try {
+			empty = empty && !control.matches(':autofill');
+		} catch (err) { /* движок без :autofill */ }
+		field.toggleAttribute('data-empty', empty);
+	}
+
+	function markAll(root) {
+		var list = (root || doc).querySelectorAll('.field > .field__control');
+		for (var i = 0; i < list.length; i++) {
+			markEmpty(list[i]);
+		}
+	}
+
+	['input', 'change'].forEach(function (type) {
+		doc.addEventListener(type, function (e) {
+			if (e.target && e.target.classList && e.target.classList.contains('field__control')) {
+				markEmpty(e.target);
+			}
+		});
+	});
+	// Сброс формы меняет значения без события ввода.
+	doc.addEventListener('reset', function (e) {
+		setTimeout(function () { markAll(e.target); }, 0);
+	});
+	// Автозаполнение браузера приходит позже загрузки и без события ввода.
+	window.addEventListener('load', function () { markAll(); });
+	markAll();
+
+	/* --- 3. шапка при прокрутке ----------------------------------------------------- */
+
+	// Шапку ищем на каждом кадре, а не один раз: тихая отправка может заменить её узел.
+	var ticking = false;
+	function paintTop() {
+		ticking = false;
+		var tops = doc.querySelectorAll('.top');
+		var scrolled = window.scrollY > 0;
+		for (var i = 0; i < tops.length; i++) {
+			tops[i].toggleAttribute('data-scrolled', scrolled);
+		}
+	}
+	window.addEventListener('scroll', function () {
+		if (!ticking) {
+			ticking = true;
+			requestAnimationFrame(paintTop);
+		}
+	}, { passive: true });
+	paintTop();
+
+	/* --- 5. закрываемый тост --------------------------------------------------------- */
+
+	doc.addEventListener('click', function (e) {
+		var close = e.target.closest ? e.target.closest('.toast [data-close]') : null;
+		if (!close) {
+			return;
+		}
+		var toast = close.closest('.toast');
+		var gone = function () {
+			if (toast.parentNode) {
+				toast.parentNode.removeChild(toast);
+			}
+		};
+		if (calm && calm.matches) {
+			gone();
+			return;
+		}
+		toast.classList.add('toast--closing');
+		setTimeout(gone, 250);
+	});
+
+	/* --- 4. индикатор вкладок между страницами -------------------------------------- */
+
+	// Старая страница называет свой индикатор именем перехода, только если уходит по
+	// вкладке того же ряда; новая — только если пришла так (отметка в sessionStorage).
+	// Иначе индикатор не путешествует: переход на чужую страницу остаётся обычным.
+	var VT_KEY = 'oscript-ui:tabs-vt';
+
+	function sameUrl(a, b) {
+		try {
+			var x = new URL(a, location.href);
+			var y = new URL(b, location.href);
+			return x.origin === y.origin && x.pathname === y.pathname && x.search === y.search;
+		} catch (err) {
+			return false;
+		}
+	}
+
+	function activeTabFor(url) {
+		var bars = doc.querySelectorAll('.tabs');
+		for (var i = 0; i < bars.length; i++) {
+			var links = bars[i].querySelectorAll('a.tabs__link');
+			for (var j = 0; j < links.length; j++) {
+				if (sameUrl(links[j].href, url)) {
+					return bars[i].querySelector('.tabs__link--active');
+				}
+			}
+		}
+		return null;
+	}
+
+	window.addEventListener('pageswap', function (e) {
+		if (!e.viewTransition || !e.activation || !e.activation.entry) {
+			return;
+		}
+		var current = activeTabFor(e.activation.entry.url);
+		if (!current) {
+			return;
+		}
+		current.setAttribute('data-vt', '');
+		try { sessionStorage.setItem(VT_KEY, '1'); } catch (err) { /* без хранилища */ }
+	});
+
+	var revealed = false;
+	function reveal(transition) {
+		if (revealed) {
+			return;
+		}
+		revealed = true;
+		var came = false;
+		try {
+			came = sessionStorage.getItem(VT_KEY) === '1';
+			sessionStorage.removeItem(VT_KEY);
+		} catch (err) { /* без хранилища */ }
+		if (!transition || !came) {
+			return;
+		}
+		var current = activeTabFor(location.href);
+		if (!current) {
+			return;
+		}
+		current.setAttribute('data-vt', '');
+		transition.finished.finally(function () {
+			current.removeAttribute('data-vt');
+		});
+	}
+
+	window.addEventListener('pagereveal', function (e) { reveal(e.viewTransition); });
+	// Отложенный скрипт может опоздать к pagereveal: переход тогда ещё идёт, и движок,
+	// который это умеет, отдаёт его здесь.
+	if (doc.activeViewTransition) {
+		reveal(doc.activeViewTransition);
+	}
+
+	// Страница, вернувшаяся из кэша истории, несёт метку, поставленную при уходе.
+	window.addEventListener('pageshow', function (e) {
+		if (!e.persisted) {
+			return;
+		}
+		var marked = doc.querySelectorAll('.tabs__link[data-vt]');
+		for (var i = 0; i < marked.length; i++) {
+			marked[i].removeAttribute('data-vt');
+		}
+		markAll();
+	});
+	/* --- 6. тихая отправка ----------------------------------------------------------- */
+
+	// Форма с data-quiet уходит fetch-ем, а не навигацией. Сервер ничего нового не учит:
+	// он отвечает тем же, чем ответил бы браузеру, — обычно перенаправлением обратно на
+	// страницу (POST → 303 → GET), и пришедший HTML ложится на текущую страницу морфингом:
+	// узел, который не изменился, остаётся тем же узлом. Поэтому не прыгает прокрутка,
+	// не теряется фокус, раскрытая раскрывашка остаётся раскрытой, а бегунок тумблера
+	// доезжает своей анимацией, а не появляется заново.
+	//
+	// Всё, что пошло не так (сеть, не-HTML ответ, другие листы и скрипты), уводит в обычную
+	// навигацию: страница хуже не становится, она просто перезагружается, как без скрипта.
+
+	var NATIVE = 'oscriptUiNative'; // отметка формы: следующую отправку пропустить к браузеру
+	var queues = new WeakMap();      // форма → очередь её отправок
+	var pushed = false;              // уводили ли адрес вкладки pushState-ом
+
+	function quietForm(form) {
+		return form && form.hasAttribute && form.hasAttribute('data-quiet')
+			&& !form.hasAttribute('target') && window.fetch && window.DOMParser;
+	}
+
+	function sameOrigin(url) {
+		try {
+			return new URL(url, location.href).origin === location.origin;
+		} catch (err) {
+			return false;
+		}
+	}
+
+	function attr(el, name) {
+		return el && el.getAttribute ? el.getAttribute(name) : null;
+	}
+
+	// Куда и как уходит форма с учётом кнопки, которой её отправили: у кнопки свои
+	// formaction, formmethod, formtarget, formenctype.
+	function plan(form, submitter) {
+		var action = attr(submitter, 'formaction') || form.getAttribute('action') || location.href;
+		var method = (attr(submitter, 'formmethod') || form.getAttribute('method') || 'get').toLowerCase();
+		var enctype = attr(submitter, 'formenctype') || form.getAttribute('enctype') || '';
+		var data;
+		try {
+			data = submitter ? new FormData(form, submitter) : new FormData(form);
+		} catch (err) {
+			// движок без второго аргумента FormData: имя нажатой кнопки докладываем сами
+			data = new FormData(form);
+			if (submitter && submitter.name) {
+				data.append(submitter.name, submitter.value);
+			}
+		}
+		var url = new URL(action, location.href);
+		var init = { method: method === 'post' ? 'POST' : 'GET', credentials: 'same-origin',
+			headers: { 'Accept': 'text/html' } };
+		if (init.method === 'GET') {
+			url.search = new URLSearchParams(data).toString();
+		} else if (/multipart/i.test(enctype)) {
+			init.body = data;
+		} else {
+			// заголовок — ровно как у браузера при обычной отправке: fetch сам дописал бы
+			// «;charset=UTF-8», а сервер, который сверяет тип целиком (winow), тело с таким
+			// заголовком не разбирает и получает форму пустой
+			init.headers['Content-Type'] = 'application/x-www-form-urlencoded';
+			init.body = new URLSearchParams(data).toString();
+		}
+		return { url: url.href, init: init,
+			blank: (attr(submitter, 'formtarget') || '') !== '' };
+	}
+
+	function native(form, submitter) {
+		form[NATIVE] = true;
+		if (form.requestSubmit) {
+			form.requestSubmit(submitter && submitter.form === form ? submitter : undefined);
+		} else {
+			form.submit();
+		}
+	}
+
+	doc.addEventListener('submit', function (e) {
+		var form = e.target;
+		if (form[NATIVE]) {
+			form[NATIVE] = false;
+			return;
+		}
+		if (e.defaultPrevented || !quietForm(form)) {
+			return;
+		}
+		var p = plan(form, e.submitter);
+		if (p.blank || !sameOrigin(p.url)) {
+			return; // новая вкладка или чужой сайт — это навигация, её делает браузер
+		}
+		e.preventDefault();
+		if (form.hasAttribute('data-theme-toggle')) {
+			flipTheme();
+		}
+		enqueue(form, e.submitter, p);
+	});
+
+	// Отправки одной формы идут строго по очереди и каждая — со своими данными: два щелчка
+	// по теме — две смены, два щелчка по тумблеру — два сохранения. Ответ ложится на
+	// страницу только последним: промежуточный устарел ещё в дороге.
+	function enqueue(form, submitter, p) {
+		var q = queues.get(form) || { tail: Promise.resolve(), size: 0 };
+		queues.set(form, q);
+		q.size++;
+		form.setAttribute('aria-busy', 'true');
+		form.removeAttribute('data-edited');
+		q.tail = q.tail.then(function () {
+			return send(form, submitter, p, function () { return q.size === 1; });
+		}).finally(function () {
+			q.size--;
+			if (!q.size) {
+				form.removeAttribute('aria-busy');
+			}
+		});
+	}
+
+	function send(form, submitter, p, last) {
+		if (form.hasAttribute('data-theme-toggle')) {
+			return sendTheme(form, p, last);
+		}
+		return fetch(p.url, p.init).then(function (response) {
+			var type = response.headers.get('Content-Type') || '';
+			if (!/text\/html/i.test(type) || !sameOrigin(response.url)) {
+				fallback(form, submitter, p, response);
+				return null;
+			}
+			return response.text().then(function (html) {
+				if (last()) {
+					land(form, submitter, response, html);
+				}
+			});
+		}).catch(function () {
+			fallback(form, submitter, p, null);
+		});
+	}
+
+	// Форма темы. Тема уже перевёрнута на месте (flipTheme), куку ставит ответ сервера —
+	// больше от ответа ничего не нужно, и страницу он не трогает: сервер приложения отвечает
+	// перенаправлением «туда, откуда пришли», а не узнав откуда (Referer срезан политикой
+	// перехода), — на главную, и прежний путь ответа уводил человека со страницы. Из ответа
+	// берётся только сам переключатель — его значок и подсказка, которые выбирает сервер,
+	// — и только когда переключателей в ответе столько же, сколько на странице. Сбой сети
+	// тоже ничего не делает: тема на экране сменилась, а без куки следующая страница придёт
+	// в прежней — это лучше, чем перезагрузка посреди работы.
+	function sendTheme(form, p, last) {
+		return fetch(p.url, p.init).then(function (response) {
+			var type = response.headers.get('Content-Type') || '';
+			if (!response.ok || !/text\/html/i.test(type) || !sameOrigin(response.url)) {
+				return null;
+			}
+			return response.text().then(function (html) {
+				if (!last()) {
+					return;
+				}
+				var next = new DOMParser().parseFromString(html, 'text/html');
+				var mine = doc.querySelectorAll('form[data-theme-toggle]');
+				var theirs = next.querySelectorAll('form[data-theme-toggle]');
+				if (mine.length !== theirs.length) {
+					return;
+				}
+				for (var i = 0; i < mine.length; i++) {
+					morphNode(mine[i], theirs[i]);
+				}
+			});
+		}).catch(function () {});
+	}
+
+	function fallback(form, submitter, p, response) {
+		if (form.tagName !== 'FORM') {
+			location.assign(p.url); // страницы и отбор без перезагрузки (выпуск 0.13): ссылка, «Назад»
+		} else if (response && p.init.method === 'GET') {
+			location.assign(response.url);
+		} else if (response && response.ok && response.redirected) {
+			location.assign(response.url); // POST уже исполнен: повторять его нельзя
+		} else {
+			native(form, submitter);
+		}
+	}
+
+	function resources(root) {
+		var list = root.querySelectorAll('link[rel~="stylesheet"][href], script[src]');
+		var out = [];
+		for (var i = 0; i < list.length; i++) {
+			out.push(list[i].getAttribute('href') || list[i].getAttribute('src'));
+		}
+		return out.join('\n');
+	}
+
+	function land(form, submitter, response, html) {
+		var next = new DOMParser().parseFromString(html, 'text/html');
+		// другой лист или скрипт — у новой страницы другое окружение, морфинг не годится
+		if (resources(next) !== resources(doc)) {
+			location.assign(response.url);
+			return;
+		}
+
+		// Форма в окне. Отказ (4xx) ложится внутрь открытого окна — введённое и подсказки
+		// у полей на месте, остальная страница не трогается. Успех (перенаправление)
+		// закрывает окно, страница морфится по ответу, и фокус встаёт на то, что сервер
+		// пометил data-focus, — обычно только что созданную запись.
+		var box = windowOf(form, submitter);
+		var closing = false;
+		if (box && box.open) {
+			if (response.status >= 400 && response.status < 500 && landInWindow(box, next, response)) {
+				return;
+			}
+			if (response.ok && response.redirected) {
+				box.close();
+				closing = true;
+			}
+		}
+
+		var url = new URL(response.url);
+		var here = new URL(location.href);
+		var moved = url.pathname !== here.pathname || url.search !== here.search;
+		if (moved) {
+			remember(); // страницы и отбор без перезагрузки (выпуск 0.13): место для «Назад»
+		}
+
+		// Удачно сохранённая форма сбрасывается к умолчаниям, и значения берутся с сервера:
+		// поле комментария после отправки пустеет, сохранённый тумблер — то, что запомнил
+		// сервер. Ответ с ошибкой (4xx) несёт введённое и подсказки — его поля не трогаем.
+		// Не трогаем и форму, в которой человек успел что-то поменять, пока шёл запрос.
+		if (response.ok && form.isConnected && !form.hasAttribute('data-edited')
+			&& !inPlace(form)) { // страницы и отбор без перезагрузки (выпуск 0.13)
+			form.reset();
+		}
+
+		doc.title = next.title;
+		syncAttributes(doc.documentElement, next.documentElement);
+		var tokens = doc.getElementById('токены-темы');
+		var fresh = next.getElementById('токены-темы');
+		if (tokens && fresh && tokens.textContent !== fresh.textContent) {
+			tokens.textContent = fresh.textContent;
+		}
+		var toastsBefore = toastSnapshot(); // проверка до отправки и тост (выпуск 0.12)
+		morphChildren(doc.body, next.body);
+		syncAttributes(doc.body, next.body);
+		settleWindows(next); // окна ответа (0.13, дев-сборка 5)
+
+		if (moved) {
+			history.pushState({ oscriptUi: true }, '', url.href + here.hash);
+			pushed = true;
+			if (!inPlace(form)) {
+				window.scrollTo(0, 0);
+			}
+		}
+		markAll();
+		paintTop();
+		toastLift(toastsBefore); // проверка до отправки и тост (выпуск 0.12): новые тосты — в очередь
+		doc.dispatchEvent(new CustomEvent('oscript-ui:update', { detail: { url: url.href } }));
+		if (closing) {
+			focusMarked();
+		}
+	}
+
+	// Окна после ответа. Морфинг держит открытость окна за браузером (KEEP): сервер о ней не
+	// знает. Но ответ, который сам печатает окно открытым («ключ выпущен — скопируйте его
+	// сейчас»), говорит об окнах прямо, и без этого шага он не ложился на страницу: новое окно
+	// оставалось закрытым, а старое — открытым, или открытая оболочка окна по адресу
+	// оставалась пустой (пробел хаба dev.4, п. 3). Поэтому:
+	//   — открытое окно, которого в ответе нет, и пустая после морфинга оболочка закрываются;
+	//   — открытое окно, которое ответ печатает закрытым, закрывается, когда ответ открывает
+	//     другое окно: окно поверх окна кит не держит;
+	//   — окно, которое ответ печатает открытым, открывается модальным (lift).
+	function settleWindows(next) {
+		var fresh = [];
+		var printed = next.querySelectorAll('dialog.modal[open][id]');
+		for (var i = 0; i < printed.length; i++) {
+			var mine = doc.getElementById(printed[i].id);
+			if (mine && mine.tagName === 'DIALOG') {
+				fresh.push(mine);
+			}
+		}
+		var open = doc.querySelectorAll('dialog.modal[open]');
+		for (var j = 0; j < open.length; j++) {
+			var d = open[j];
+			if (fresh.indexOf(d) >= 0) {
+				continue;
+			}
+			var gone;
+			if (d.matches(SHELL)) {
+				gone = !d.querySelector('.modal__box');
+			} else {
+				var twin = d.id ? next.getElementById(d.id) : null;
+				gone = !twin || fresh.length > 0;
+			}
+			if (gone) {
+				d.close();
+			}
+		}
+		for (var k = 0; k < fresh.length; k++) {
+			if (!fresh[k].open && fresh[k].showModal) {
+				prepareConfirm(fresh[k]);
+				prepareFocus(fresh[k]);
+				fresh[k].showModal();
+			}
+		}
+		lift();
+	}
+
+	// Окно формы — то, в котором стоит кнопка отправки (подтверждение отправляет форму вне
+	// себя атрибутом form), либо то, в котором стоит сама форма.
+	function windowOf(form, submitter) {
+		var box = submitter && submitter.closest ? submitter.closest('dialog') : null;
+		return box || (form.closest ? form.closest('dialog') : null);
+	}
+
+	// Ответ с отказом несёт то же окно (тот же id; у оболочки окна по адресу — id окна,
+	// которое в ней лежит): его содержимое морфится в открытое окно.
+	function landInWindow(box, next, response) {
+		var twin = next.getElementById(box.id);
+		var shell = box.hasAttribute('data-window-shell');
+		if (shell && box[SOURCE]) {
+			twin = next.getElementById(box[SOURCE]);
+		}
+		if (!twin || twin.tagName !== 'DIALOG') {
+			return false;
+		}
+		if (!shell) {
+			syncAttributes(box, twin);
+		}
+		morphChildren(box, twin);
+		if (shell) {
+			retarget(box);
+		}
+		markAll(box);
+		doc.dispatchEvent(new CustomEvent('oscript-ui:update', { detail: { url: response.url } }));
+		var bad = box.querySelector('[aria-invalid="true"]');
+		// отбитые сегменты (дев-сборка 10) — группа, фокус встаёт на её отмеченный сегмент
+		if (bad && bad.getAttribute('role') === 'radiogroup') {
+			bad = bad.querySelector('input:checked') || bad.querySelector('input');
+		}
+		if (bad && bad.focus) {
+			bad.focus();
+		}
+		return true;
+	}
+
+	// Элемент, который сервер пометил data-focus, получает фокус; не умеет его принять —
+	// принимает программно (tabindex="-1"), в порядок обхода Tab он от этого не встаёт.
+	function focusMarked() {
+		var target = doc.querySelector('[data-focus]');
+		if (!target) {
+			return;
+		}
+		if (target.tabIndex < 0 && !target.hasAttribute('tabindex')) {
+			target.setAttribute('tabindex', '-1');
+		}
+		target.focus();
+	}
+
+	// Адрес вкладки, уведённый pushState-ом, показывает страницу, которой в истории
+	// браузера нет: назад и вперёд по такой истории честно загружают страницу заново.
+	// Выпуск 0.13: запись истории, которую кит пометил сам, берётся тихо (раздел 13).
+	window.addEventListener('popstate', function (e) {
+		if (quietBack(e.state)) {
+			return;
+		}
+		if (pushed) {
+			location.reload();
+		}
+	});
+
+	/* морфинг: старое дерево подстраивается под новое, неизменное остаётся на месте */
+
+	// Состояние, которое знает только браузер: раскрыта ли раскрывашка, открыто ли окно.
+	// Сервер о нём не знает и печатает узел закрытым, поэтому атрибут берётся у текущего.
+	var KEEP = { DETAILS: 'open', DIALOG: 'open' };
+	// Атрибуты, которые ставит сам скрипт кита.
+	var OWN = { 'data-empty': 1, 'data-scrolled': 1, 'data-vt': 1, 'data-edited': 1, 'aria-busy': 1 };
+
+	function syncAttributes(from, to) {
+		var keep = KEEP[from.tagName];
+		var i, a;
+		for (i = from.attributes.length - 1; i >= 0; i--) {
+			a = from.attributes[i];
+			if (!to.hasAttribute(a.name) && a.name !== keep && !OWN[a.name]) {
+				from.removeAttribute(a.name);
+			}
+		}
+		for (i = 0; i < to.attributes.length; i++) {
+			a = to.attributes[i];
+			if (a.name !== keep && from.getAttribute(a.name) !== a.value) {
+				from.setAttribute(a.name, a.value);
+			}
+		}
+	}
+
+	function sameKind(a, b) {
+		if (a.nodeType !== b.nodeType) {
+			return false;
+		}
+		if (a.nodeType !== 1) {
+			return true;
+		}
+		return a.tagName === b.tagName && (a.id || '') === (b.id || '')
+			&& (a.tagName !== 'INPUT' || a.type === b.type);
+	}
+
+	function morphNode(from, to) {
+		if (from.nodeType !== 1) {
+			if (from.nodeValue !== to.nodeValue) {
+				from.nodeValue = to.nodeValue;
+			}
+			return;
+		}
+		syncAttributes(from, to);
+		if (from.tagName === 'TEXTAREA') {
+			// значение textarea — её текст по умолчанию; введённое человеком браузер держит
+			// сам, пока его не сбросили
+			if (from.defaultValue !== to.defaultValue) {
+				from.defaultValue = to.defaultValue;
+			}
+			return;
+		}
+		morphChildren(from, to);
+	}
+
+	function morphChildren(from, to) {
+		var a = from.firstChild;
+		var b = to.firstChild;
+		while (b) {
+			var nextB = b.nextSibling;
+			// проверка до отправки и тост (выпуск 0.12): тост, поднятый скриптом, сервер
+			// не печатал — морфинг его не трогает
+			if (toastOwned(a)) {
+				a = a.nextSibling;
+				continue;
+			}
+			if (a && a.classList && a.classList.contains('ripple')) {
+				var gone = a;
+				a = a.nextSibling;
+				from.removeChild(gone);
+				continue;
+			}
+			if (a && sameKind(a, b)) {
+				morphNode(a, b);
+				a = a.nextSibling;
+			} else {
+				var twin = b.id ? doc.getElementById(b.id) : null;
+				if (twin && twin.parentNode === from && sameKind(twin, b)) {
+					from.insertBefore(twin, a);
+					morphNode(twin, b);
+				} else {
+					from.insertBefore(doc.importNode(b, true), a);
+				}
+			}
+			b = nextB;
+		}
+		while (a) {
+			var rest = a.nextSibling;
+			if (!toastOwned(a)) {
+				from.removeChild(a);
+			}
+			a = rest;
+		}
+	}
+
+	/* смена темы: обе палитры уже в голове страницы, переключение — один атрибут */
+
+	// Сервер о смене узнаёт тем же запросом, что и без скрипта, — просто в фоне: cookie
+	// пишет он один, второго источника правды о теме нет. Скрипт лишь не ждёт его ответа
+	// и перекрашивает страницу сразу; ответ потом поменяет значок и подсказку кнопки.
+	function flipTheme() {
+		var root = doc.documentElement;
+		// цель считается сейчас, а не в колбэке перехода: колбэк зовётся кадром позже,
+		// и успей к нему ответ сервера поставить новую тему, он перевернул бы её обратно
+		var next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+		var apply = function () {
+			root.setAttribute('data-theme', next);
+			// пилюля темы (дев-сборка 9): бегунок едет за темой страницы (лист), состояние
+			// переключателя для скринридера — сразу же; подпись и подсказку сверит ответ
+			var switches = doc.querySelectorAll('form[data-theme-toggle] [role="switch"]');
+			for (var i = 0; i < switches.length; i++) {
+				switches[i].setAttribute('aria-checked', next === 'dark' ? 'true' : 'false');
+			}
+		};
+		if (doc.startViewTransition && !(calm && calm.matches)) {
+			doc.startViewTransition(apply);
+		} else {
+			apply();
+		}
+	}
+
+	/* отправка по изменению и несохранённое */
+
+	doc.addEventListener('change', function (e) {
+		var control = e.target;
+		if (!control || !control.form) {
+			return;
+		}
+		if (control.hasAttribute('data-autosubmit')) {
+			if (control.form.requestSubmit) {
+				control.form.requestSubmit();
+			} else {
+				control.form.submit();
+			}
+		}
+	});
+
+	['input', 'change'].forEach(function (type) {
+		doc.addEventListener(type, function (e) {
+			var form = e.target && e.target.form;
+			if (!form) {
+				return;
+			}
+			if (e.target.hasAttribute('data-autosubmit')) {
+				return; // уйдёт на сервер сейчас же — несохранённым его не назвать
+			}
+			if (form.hasAttribute('aria-busy')) {
+				form.setAttribute('data-edited', '');
+			}
+			var bars = form.querySelectorAll('[data-savebar]');
+			for (var i = 0; i < bars.length; i++) {
+				bars[i].classList.add('savebar--dirty');
+			}
+		});
+	});
+
+	/* прилипшая панель сохранения (дев-сборка 8) */
+
+	// Тень у панели — только когда она прилипла к низу экрана и под ней прокручивается форма.
+	// Лист держит её на пиксель ниже края (bottom: -1px): прилипшая видна не целиком, и это
+	// замечает наблюдатель пересечений. Панель на своём месте в конце формы — без тени.
+	var SB_SEEN = 'oscriptUiStuckWatch';     // свойство панели: наблюдатель уже следит за ней
+	var stuckWatch = window.IntersectionObserver ? new IntersectionObserver(function (entries) {
+		entries.forEach(function (en) {
+			var box = en.boundingClientRect;
+			var view = en.rootBounds;
+			var stuck = en.intersectionRatio < 1 && view && box.top < view.bottom && box.bottom > view.bottom - 2;
+			en.target.toggleAttribute('data-stuck', !!stuck);
+		});
+	}, { threshold: [1] }) : null;
+
+	function watchSavebars(root) {
+		var bars = stuckWatch ? root.querySelectorAll('[data-savebar]') : [];
+		for (var i = 0; i < bars.length; i++) {
+			if (!bars[i][SB_SEEN]) {
+				bars[i][SB_SEEN] = true;
+				stuckWatch.observe(bars[i]);
+			}
+		}
+	}
+
+	watchSavebars(doc);
+	doc.addEventListener('oscript-ui:update', function () {
+		watchSavebars(doc);
+	});
+
+	/* --- 7. окно ------------------------------------------------------------------- */
+
+	// Окно — нативный <dialog>: открывает его кнопка с командой show-modal (command +
+	// commandfor), закрывают крестик (close), Esc и щелчок мимо — движок, и он же держит
+	// фокус внутри и возвращает его на открывашку. Скрипт добавляет вот что:
+	//   — доучивает командам движок, который их ещё не знает;
+	//   — поднимает модальным окно, которое сервер напечатал открытым (?окно=… или отбитая
+	//     форма): без скрипта оно стоит в потоке страницы;
+	//   — ссылка-кнопка окна этой страницы (data-opens="<ид окна>"): без скрипта она ведёт
+	//     на страницу, где сервер печатает окно открытым, а скрипт открывает окно на месте;
+	//   — окно по адресу (data-window-link): берёт страницу кнопки запросом в фоне, кладёт её
+	//     окно в одну на страницу оболочку (data-window-shell) и открывает; не вышло —
+	//     показывает тост ошибки, напечатанный сервером рядом с оболочкой (data-window-error);
+	//   — подтверждение (data-confirm у формы): отправка формы открывает окно подтверждения,
+	//     а уходит форма его кнопкой; эхо-поле держит эту кнопку недоступной до совпадения.
+	// Закрытие окна по успеху тихой отправки и окна ответа — в разделе 6 (land, settleWindows).
+
+	var COMMANDS = !!(window.HTMLButtonElement && 'command' in HTMLButtonElement.prototype);
+	var SHELL = '[data-window-shell]';
+	var SOURCE = 'oscriptUiWindow';  // свойство оболочки: идентификатор окна, которое в ней лежит
+	var LOCKED = 'oscriptUiLocked';  // свойство эхо-поля: сервер напечатал его заблокированным
+
+	if (!COMMANDS) {
+		doc.addEventListener('click', function (e) {
+			var button = e.target.closest ? e.target.closest('button[commandfor]') : null;
+			if (!button || button.disabled) {
+				return;
+			}
+			var target = doc.getElementById(button.getAttribute('commandfor'));
+			if (!target || target.tagName !== 'DIALOG' || !target.showModal) {
+				return;
+			}
+			var command = button.getAttribute('command');
+			if (command === 'show-modal' && !target.open) {
+				prepareConfirm(target);
+				prepareFocus(target);
+				target.showModal();
+			} else if (command === 'close' && target.open) {
+				target.close();
+			}
+		});
+	} else {
+		// команду исполнит движок, но эхо-поле подтверждения надо открыть до него
+		doc.addEventListener('click', function (e) {
+			var button = e.target.closest ? e.target.closest('button[commandfor][command="show-modal"]') : null;
+			var target = button && doc.getElementById(button.getAttribute('commandfor'));
+			if (target && !target.open) {
+				prepareConfirm(target);
+				prepareFocus(target);
+			}
+		}, true);
+	}
+
+	// Окно, напечатанное открытым, стоит в потоке страницы без фона и без удержания фокуса;
+	// модальным его делает только showModal.
+	function lift() {
+		var list = doc.querySelectorAll('dialog.modal[open]');
+		for (var i = 0; i < list.length; i++) {
+			var d = list[i];
+			var modal = false;
+			try { modal = d.matches(':modal'); } catch (err) { /* движок без :modal */ }
+			if (!modal && d.showModal) {
+				d.close();
+				prepareFocus(d);
+				d.showModal();
+			}
+		}
+	}
+	lift();
+
+	/* ссылка, которая закрывает окно (дев-сборка 8) */
+
+	// Крестик и «Отмена» окна со словом АдресЗакрытия — ссылки на страницу без окна: без
+	// скрипта переход закрывает окно и там, где движок не знает команды close. Со скриптом
+	// окно закрывается на месте — без перехода и перезагрузки; фокус возвращает движок.
+	// Щелчок с клавишей (новая вкладка) и окно, которое не открыто, оставляют ссылку ссылкой.
+	doc.addEventListener('click', function (e) {
+		if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) {
+			return;
+		}
+		var link = e.target.closest ? e.target.closest('a[data-closes][href]') : null;
+		var box = link && doc.getElementById(link.getAttribute('data-closes'));
+		if (!box || box.tagName !== 'DIALOG' || !box.open) {
+			return;
+		}
+		e.preventDefault();
+		box.close();
+	});
+
+	// Окно, которое закрывается только переходом (дев-сборка 10, слово Переходом): Esc не
+	// закрывает его на месте — секрет остался бы в DOM, а вкладка на ответе POST, — а уводит
+	// на адрес закрытия, как его крестик.
+	doc.addEventListener('cancel', function (e) {
+		var box = e.target;
+		var to = box && box.getAttribute ? box.getAttribute('data-close-to') : null;
+		if (to && box.tagName === 'DIALOG') {
+			e.preventDefault();
+			location.assign(to);
+		}
+	}, true);
+
+	/* ссылка-кнопка окна этой страницы */
+
+	// Окно уже на странице — запрос не нужен: открываем его, как команда show-modal. Щелчок
+	// с клавишей (новая вкладка) и окно, которого на странице нет, оставляют ссылку ссылкой.
+	doc.addEventListener('click', function (e) {
+		if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) {
+			return;
+		}
+		var link = e.target.closest ? e.target.closest('a[data-opens][href]') : null;
+		var box = link && doc.getElementById(link.getAttribute('data-opens'));
+		if (!box || box.tagName !== 'DIALOG' || !box.showModal) {
+			return;
+		}
+		e.preventDefault();
+		if (box.open) {
+			return;
+		}
+		prepareConfirm(box);
+		prepareFocus(box);
+		box.showModal();
+		var back = function () {
+			box.removeEventListener('close', back);
+			if (!doc.activeElement || doc.activeElement === doc.body) {
+				link.focus();
+			}
+		};
+		box.addEventListener('close', back);
+	});
+
+	/* окно по адресу */
+
+	doc.addEventListener('click', function (e) {
+		if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) {
+			return;
+		}
+		var link = e.target.closest ? e.target.closest('a[data-window-link][href]') : null;
+		var shell = doc.querySelector('dialog' + SHELL);
+		if (!link || !shell || !shell.showModal || !window.fetch || !window.DOMParser
+			|| !sameOrigin(link.href)) {
+			return; // ссылка ведёт на страницу с окном — обычная навигация
+		}
+		e.preventDefault();
+		link.setAttribute('aria-busy', 'true');
+		fetch(link.href, { credentials: 'same-origin', headers: { 'Accept': 'text/html' } })
+			.then(function (response) {
+				var type = response.headers.get('Content-Type') || '';
+				if (!response.ok || !/text\/html/i.test(type)) {
+					throw new Error('окно не загрузилось');
+				}
+				return response.text();
+			})
+			.then(function (html) {
+				var next = new DOMParser().parseFromString(html, 'text/html');
+				var picked = next.querySelector('dialog.modal[open]:not(' + SHELL + ')')
+					|| next.querySelector('dialog.modal:not(' + SHELL + ')');
+				if (!picked) {
+					throw new Error('в ответе нет окна');
+				}
+				fill(shell, picked);
+				hideError();
+				prepareConfirm(shell);
+				prepareFocus(shell);
+				shell.showModal();
+				var back = function () {
+					shell.removeEventListener('close', back);
+					if (!doc.activeElement || doc.activeElement === doc.body) {
+						link.focus();
+					}
+				};
+				shell.addEventListener('close', back);
+			})
+			.catch(showError)
+			.finally(function () { link.removeAttribute('aria-busy'); });
+	});
+
+	// Оболочка берёт у окна его вид и имя (класс, aria-*), содержимое — целиком; свои id
+	// и признак оставляет: она одна на страницу и постоянна. Кнопки окна, которые звали
+	// его по идентификатору (крестик, отмена), теперь зовут оболочку.
+	function fill(shell, picked) {
+		var i, a;
+		for (i = shell.attributes.length - 1; i >= 0; i--) {
+			a = shell.attributes[i].name;
+			if (a !== 'id' && a !== 'data-window-shell' && a !== 'open') {
+				shell.removeAttribute(a);
+			}
+		}
+		for (i = 0; i < picked.attributes.length; i++) {
+			a = picked.attributes[i];
+			if (a.name !== 'id' && a.name !== 'open') {
+				shell.setAttribute(a.name, a.value);
+			}
+		}
+		while (shell.firstChild) {
+			shell.removeChild(shell.firstChild);
+		}
+		for (var child = picked.firstChild; child; child = child.nextSibling) {
+			shell.appendChild(doc.importNode(child, true));
+		}
+		shell[SOURCE] = picked.id;
+		retarget(shell);
+		markAll(shell);
+		doc.dispatchEvent(new CustomEvent('oscript-ui:update', { detail: { url: location.href } }));
+	}
+
+	function retarget(shell) {
+		var from = shell[SOURCE];
+		if (!from) {
+			return;
+		}
+		var list = shell.querySelectorAll('[commandfor]');
+		for (var i = 0; i < list.length; i++) {
+			if (list[i].getAttribute('commandfor') === from) {
+				list[i].setAttribute('commandfor', shell.id);
+			}
+		}
+	}
+
+	var errorTimer = 0;
+	function showError() {
+		var box = doc.querySelector('[data-window-error]');
+		if (!box) {
+			return;
+		}
+		box.hidden = false;
+		clearTimeout(errorTimer);
+		errorTimer = setTimeout(hideError, 6000);
+	}
+	function hideError() {
+		var box = doc.querySelector('[data-window-error]');
+		if (box) {
+			box.hidden = true;
+		}
+	}
+
+	/* подтверждение */
+
+	// Форма с data-confirm не уходит сразу: её отправка открывает окно подтверждения,
+	// а уходит она кнопкой этого окна (атрибут form). Ловим в фазе погружения — раньше
+	// тихой отправки, которая иначе унесла бы форму в фоне.
+	doc.addEventListener('submit', function (e) {
+		var form = e.target;
+		var id = form && form.getAttribute ? form.getAttribute('data-confirm') : null;
+		if (!id || form[NATIVE]) {
+			return;
+		}
+		var box = doc.getElementById(id);
+		if (!box || box.tagName !== 'DIALOG' || !box.showModal) {
+			return; // окна нет — форма уходит, и подтверждение спросит сервер
+		}
+		if (e.submitter && box.contains(e.submitter)) {
+			return; // это и есть подтверждение
+		}
+		e.preventDefault();
+		if (!box.open) {
+			prepareConfirm(box);
+			prepareFocus(box);
+			box.showModal();
+		}
+	}, true);
+
+	// Эхо-поле закрытого подтверждения сервер печатает заблокированным: заблокированное поле
+	// не держит обязательность, и форма страницы, к которой оно приписано, отправляется
+	// без него. Открывая окно, поле открываем, закрывая — блокируем снова.
+	function echoOf(box) {
+		return box.classList && box.classList.contains('modal--confirm')
+			? box.querySelector('.modal__echo input') : null;
+	}
+
+	function confirmButton(box) {
+		return box.querySelector('.modal__actions [name="confirmed"]');
+	}
+
+	// Фокус при открытии окна (аудит M3 №18, дев-сборка 8). Движок ставит его на первое, что
+	// в окне можно сфокусировать, — крестик в шапке, и кольцо на нём видно сразу. Свой выбор
+	// движок берёт у признака autofocus: скрипт ставит его до открытия на первое поле тела
+	// (поле с отказом — раньше), а окну без полей — на заголовок (tabindex="-1": заголовок
+	// не элемент управления, в обход Tab он не встаёт). Свой autofocus сервера не трогаем.
+	// Команду show-modal, которую исполняет сам движок, ловит щелчок в фазе погружения.
+	function prepareFocus(box) {
+		if (!box || !box.querySelector || box.querySelector('[autofocus]')) {
+			return;
+		}
+		var body = box.querySelector('.modal__body') || box;
+		var all = body.querySelectorAll('input:not([type="hidden"]), select, textarea');
+		var first = null;
+		for (var i = 0; i < all.length; i++) {
+			var f = all[i];
+			if (f.disabled || f.closest('[hidden], details:not([open])') || (f.type === 'radio' && !f.checked)) {
+				continue;
+			}
+			if (f.getAttribute('aria-invalid') === 'true') {
+				first = f;
+				break;
+			}
+			first = first || f;
+		}
+		if (!first) {
+			first = box.querySelector('.modal__title');
+			if (first && !first.hasAttribute('tabindex')) {
+				first.setAttribute('tabindex', '-1');
+			}
+		}
+		if (first) {
+			first.setAttribute('autofocus', '');
+		}
+	}
+
+	function prepareConfirm(box) {
+		var echo = echoOf(box);
+		if (!echo) {
+			return;
+		}
+		if (echo.disabled) {
+			echo[LOCKED] = true;
+			echo.disabled = false;
+		}
+		echo.value = '';
+		markEmpty(echo);
+		paintConfirm(box);
+	}
+
+	function paintConfirm(box) {
+		var echo = echoOf(box);
+		var ok = confirmButton(box);
+		if (echo && ok) {
+			ok.disabled = !echo.validity.valid;
+		}
+	}
+
+	doc.addEventListener('input', function (e) {
+		var box = e.target && e.target.closest ? e.target.closest('dialog.modal--confirm') : null;
+		if (box && e.target === echoOf(box)) {
+			paintConfirm(box);
+		}
+	});
+
+	doc.addEventListener('close', function (e) {
+		var echo = e.target && e.target.tagName === 'DIALOG' ? echoOf(e.target) : null;
+		if (echo && echo[LOCKED]) {
+			echo.disabled = true;
+			echo[LOCKED] = false;
+		}
+	}, true);
+
+	/* --- 8. шаги (выпуск 0.11, шаг 10) --------------------------------------------------- */
+
+	// Без скрипта шаги — панели <details> подряд, и форма уходит целиком: проверяет её
+	// сервер. Скрипт показывает одну панель, полосу номеров и «Назад / Дальше» (сервер
+	// печатает их hidden), а «Дальше» пускает на следующий шаг только тогда, когда поля
+	// текущего годны: первому негодному браузер показывает свой отказ (reportValidity).
+	// Признаки (data-steps, -bar, -go, -panel, -back, -next, -submit) объявлены
+	// в холст/Шаги.os; скрипт ставит только data-steps-live, data-steps-done, aria-current,
+	// hidden и open.
+
+	var stepsAt = new WeakMap(); // корень шагов → номер текущей панели с нуля
+
+	function stepsOwn(root, selector) {
+		return root.querySelectorAll(':scope > ' + selector);
+	}
+
+	function stepsParts(root) {
+		var bar = stepsOwn(root, '[data-steps-bar]')[0];
+		var nav = stepsOwn(root, '.steps__nav')[0];
+		var pick = function (name) {
+			return nav ? nav.querySelector(':scope > [' + name + ']') : null;
+		};
+		return {
+			bar: bar,
+			items: bar ? bar.querySelectorAll(':scope > li') : [],
+			panels: stepsOwn(root, '[data-steps-panel]'),
+			back: pick('data-steps-back'),
+			next: pick('data-steps-next'),
+			submit: pick('data-steps-submit')
+		};
+	}
+
+	// Мастер ведёт по порядку; вид «вкладки» (правка) печатается без «Дальше»: любой шаг
+	// открывается сразу, отправка видна всегда.
+	function stepsFree(parts) {
+		return !parts.next;
+	}
+
+	function stepsShow(root, index, focus) {
+		var parts = stepsParts(root);
+		var last = parts.panels.length - 1;
+		var free = stepsFree(parts);
+		index = Math.max(0, Math.min(index, last));
+		stepsAt.set(root, index);
+		for (var i = 0; i <= last; i++) {
+			parts.panels[i].open = true;
+			parts.panels[i].hidden = i !== index;
+			var item = parts.items[i];
+			if (item) {
+				if (i === index) {
+					item.setAttribute('aria-current', 'step');
+				} else {
+					item.removeAttribute('aria-current');
+				}
+				item.toggleAttribute('data-steps-done', !free && i < index);
+			}
+		}
+		if (parts.back) {
+			parts.back.hidden = index === 0;
+		}
+		if (parts.next) {
+			parts.next.hidden = index === last;
+		}
+		if (parts.submit) {
+			parts.submit.hidden = !free && index !== last;
+		}
+		if (focus) {
+			// фокус на панель: скринридер называет её «Шаг 2 из 3: Участники»
+			var panel = parts.panels[index];
+			panel.setAttribute('tabindex', '-1');
+			panel.focus({ preventScroll: true });
+			if (root.getBoundingClientRect().top < 0) {
+				root.scrollIntoView({ block: 'start', behavior: calm && calm.matches ? 'auto' : 'smooth' });
+			}
+		}
+	}
+
+	// Годны ли поля панели. Первое негодное получает отказ браузера и фокус; поля
+	// отключённой группы браузер не проверяет (willValidate).
+	function stepsValid(panel) {
+		var controls = panel.querySelectorAll('input, select, textarea');
+		for (var i = 0; i < controls.length; i++) {
+			if (controls[i].willValidate && !controls[i].checkValidity()) {
+				controls[i].reportValidity();
+				return false;
+			}
+		}
+		return true;
+	}
+
+	// Вперёд мастер идёт через каждый шаг по дороге: прыжок с первого на третий по полосе
+	// проверяет и второй, и останавливается на первом шаге с негодным полем.
+	function stepsGo(root, target) {
+		var parts = stepsParts(root);
+		var current = stepsAt.has(root) ? stepsAt.get(root) : 0;
+		target = Math.max(0, Math.min(target, parts.panels.length - 1));
+		if (target === current) {
+			return;
+		}
+		if (!stepsFree(parts) && target > current) {
+			for (var i = current; i < target; i++) {
+				if (i !== current) {
+					stepsShow(root, i, false);
+				}
+				if (!stepsValid(parts.panels[i])) {
+					return;
+				}
+			}
+		}
+		stepsShow(root, target, true);
+	}
+
+	// Шаг, с которого начать: тот, где у поля отказ сервера; иначе прежний (страницу
+	// поменяла чужая тихая отправка — человек остаётся там, где был); иначе тот, что
+	// назвал сервер (data-steps).
+	function stepsStart(root) {
+		var panels = stepsParts(root).panels;
+		for (var i = 0; i < panels.length; i++) {
+			if (panels[i].querySelector('[aria-invalid="true"]')) {
+				return i;
+			}
+		}
+		if (stepsAt.has(root)) {
+			return stepsAt.get(root);
+		}
+		return (parseInt(root.getAttribute('data-steps'), 10) || 1) - 1;
+	}
+
+	function stepsInit(scope) {
+		var roots = (scope || doc).querySelectorAll('[data-steps]');
+		for (var i = 0; i < roots.length; i++) {
+			var root = roots[i];
+			var parts = stepsParts(root);
+			if (!parts.panels.length) {
+				continue;
+			}
+			root.setAttribute('data-steps-live', '');
+			if (parts.bar) {
+				parts.bar.hidden = false;
+			}
+			stepsShow(root, stepsStart(root), false);
+		}
+	}
+
+	doc.addEventListener('click', function (e) {
+		var hit = e.target.closest
+			? e.target.closest('[data-steps-go], [data-steps-back] button, [data-steps-next] button')
+			: null;
+		var root = hit ? hit.closest('[data-steps-live]') : null;
+		if (!root) {
+			return;
+		}
+		var current = stepsAt.get(root) || 0;
+		if (hit.hasAttribute('data-steps-go')) {
+			stepsGo(root, (parseInt(hit.getAttribute('data-steps-go'), 10) || 1) - 1);
+		} else if (hit.closest('[data-steps-back]')) {
+			stepsGo(root, current - 1);
+		} else {
+			stepsGo(root, current + 1);
+		}
+	});
+
+	// Enter в поле мастера — «Дальше», а не отправка всей формы с середины: кнопка
+	// отправки ждёт последнего шага.
+	doc.addEventListener('keydown', function (e) {
+		var field = e.target;
+		if (e.key !== 'Enter' || e.defaultPrevented || e.isComposing || !field
+			|| field.tagName !== 'INPUT' || /^(button|submit|reset|checkbox|radio|file|image)$/.test(field.type)) {
+			return;
+		}
+		var panel = field.closest('[data-steps-panel]');
+		var root = panel ? panel.parentNode : null;
+		if (!root || !root.hasAttribute || !root.hasAttribute('data-steps-live')) {
+			return;
+		}
+		var parts = stepsParts(root);
+		var current = stepsAt.get(root) || 0;
+		if (stepsFree(parts) || current >= parts.panels.length - 1) {
+			return;
+		}
+		e.preventDefault();
+		stepsGo(root, current + 1);
+	});
+
+	// Отправка, чьё негодное поле лежит на скрытой панели (вид «вкладки»), открывает эту
+	// панель: иначе браузер молча не отправил бы форму — показать отказ ему негде.
+	var stepsReported = false;
+	doc.addEventListener('invalid', function (e) {
+		var panel = e.target.closest ? e.target.closest('[data-steps-panel]') : null;
+		var root = panel ? panel.parentNode : null;
+		if (stepsReported || !panel || !panel.hidden || !root.hasAttribute('data-steps-live')) {
+			return;
+		}
+		stepsReported = true;
+		var panels = stepsParts(root).panels;
+		stepsShow(root, Array.prototype.indexOf.call(panels, panel), false);
+		var control = e.target;
+		setTimeout(function () {
+			stepsReported = false;
+			if (doc.activeElement !== control) {
+				control.reportValidity();
+			}
+		}, 0);
+	}, true);
+
+	// Удачно отправленная форма сброшена тихой отправкой — её шаги начинаются сначала.
+	doc.addEventListener('reset', function (e) {
+		var roots = e.target.querySelectorAll ? e.target.querySelectorAll('[data-steps]') : [];
+		for (var i = 0; i < roots.length; i++) {
+			stepsAt.delete(roots[i]);
+		}
+	});
+
+	// Морфинг ответа возвращает разметке серверный вид (hidden у полосы и кнопок):
+	// шаги оживают заново.
+	doc.addEventListener('oscript-ui:update', function () { stepsInit(); });
+	stepsInit();
+
+	/* --- 9. поля список и цвет (выпуск 0.12, шаги 14–15) ------------------------------ */
+
+	// Поле-список без скрипта — текстовое поле со строкой через запятую. Скрипт показывает
+	// плашки, которые напечатал сервер, отдаёт имя поля скрытому полю data-chips-value
+	// и при каждой правке пишет в него ту же строку; в строке ввода остаётся только новое.
+	// Новую плашку он клонирует из шаблона data-chips-chip — разметку печатает сервер.
+	var chipsRequired = new WeakMap();
+
+	function chipsParts(root) {
+		return {
+			input: root.querySelector('.chips-in__input'),
+			list: root.querySelector('.chips-in__list'),
+			value: root.querySelector('[data-chips-value]'),
+			chip: root.querySelector('template[data-chips-chip]')
+		};
+	}
+
+	function chipsValues(parts) {
+		return Array.prototype.map.call(parts.list.querySelectorAll('.chips-in__text'), function (text) {
+			return text.textContent;
+		});
+	}
+
+	// Обязательный список держит required у строки ввода, только пока плашек нет: скрытое
+	// поле браузер не проверяет, а пустая строка при плашках — не пустое поле.
+	function chipsSync(root, parts) {
+		var values = chipsValues(parts);
+		parts.value.value = values.join(', ');
+		if (chipsRequired.get(root)) {
+			parts.input.required = values.length === 0;
+		}
+	}
+
+	// Значения делятся по запятым, края срезаются, пустые и повторы отбрасываются — то же
+	// правило, что у сервера при печати и разборе.
+	function chipsAdd(root, parts, text) {
+		var values = chipsValues(parts);
+		text.split(',').forEach(function (part) {
+			var value = part.trim();
+			if (!value || values.indexOf(value) >= 0) {
+				return;
+			}
+			values.push(value);
+			var chip = parts.chip.content.firstElementChild.cloneNode(true);
+			chip.querySelector('.chips-in__text').textContent = value;
+			var remove = chip.querySelector('[data-chips-remove]');
+			remove.setAttribute('aria-label', (remove.getAttribute('aria-label') || '').replace('%1', value));
+			parts.list.appendChild(chip);
+		});
+		chipsSync(root, parts);
+	}
+
+	function chipsLive(target) {
+		var root = target && target.closest ? target.closest('[data-chips-live]') : null;
+		return root ? { root: root, parts: chipsParts(root) } : null;
+	}
+
+	function chipsFixed(parts) {
+		return parts.input.disabled || parts.input.readOnly;
+	}
+
+	function chipsInit(scope) {
+		var roots = (scope || doc).querySelectorAll('[data-chips]');
+		for (var i = 0; i < roots.length; i++) {
+			var root = roots[i];
+			var parts = chipsParts(root);
+			// заблокированное поле — витрина значения: ему хватает строки без плашек
+			if (root.hasAttribute('data-chips-live') || !parts.input || !parts.list || !parts.value
+				|| !parts.chip || parts.input.disabled) {
+				continue;
+			}
+			chipsRequired.set(root, parts.input.required);
+			parts.value.name = parts.input.name;
+			parts.value.disabled = false;
+			parts.input.removeAttribute('name');
+			parts.input.value = '';
+			parts.list.hidden = false;
+			root.setAttribute('data-chips-live', '');
+			chipsSync(root, parts);
+		}
+	}
+
+	// Перехват в фазе захвата: Enter с набранным добавляет плашку раньше, чем его увидят
+	// отправка формы и «Дальше» шагов. Пустой Enter работает как обычно — отправляет форму.
+	doc.addEventListener('keydown', function (e) {
+		var live = e.target && e.target.classList && e.target.classList.contains('chips-in__input')
+			? chipsLive(e.target) : null;
+		if (!live || e.isComposing || chipsFixed(live.parts)) {
+			return;
+		}
+		var input = live.parts.input;
+		if (e.key === 'Enter' && input.value.trim() !== '') {
+			e.preventDefault();
+			chipsAdd(live.root, live.parts, input.value);
+			input.value = '';
+		} else if (e.key === 'Backspace' && input.value === '') {
+			var last = live.parts.list.lastElementChild;
+			if (last) {
+				e.preventDefault();
+				last.remove();
+				chipsSync(live.root, live.parts);
+			}
+		}
+	}, true);
+
+	// Запятая — тоже конец значения: набранное и вставленное до последней запятой уходит
+	// в плашки, хвост остаётся в строке.
+	doc.addEventListener('input', function (e) {
+		var live = e.target && e.target.classList && e.target.classList.contains('chips-in__input')
+			? chipsLive(e.target) : null;
+		if (!live || e.isComposing || chipsFixed(live.parts)) {
+			return;
+		}
+		var input = live.parts.input;
+		var cut = input.value.lastIndexOf(',');
+		if (cut >= 0) {
+			chipsAdd(live.root, live.parts, input.value.slice(0, cut));
+			input.value = input.value.slice(cut + 1).replace(/^\s+/, '');
+		}
+	});
+
+	// Ушёл из строки — набранное становится плашкой: щелчок по кнопке отправки иначе
+	// унёс бы форму без последнего значения.
+	doc.addEventListener('focusout', function (e) {
+		var live = e.target && e.target.classList && e.target.classList.contains('chips-in__input')
+			? chipsLive(e.target) : null;
+		if (live && !chipsFixed(live.parts) && live.parts.input.value.trim() !== '') {
+			chipsAdd(live.root, live.parts, live.parts.input.value);
+			live.parts.input.value = '';
+		}
+	});
+
+	doc.addEventListener('click', function (e) {
+		var remove = e.target.closest ? e.target.closest('[data-chips-remove]') : null;
+		var live = chipsLive(remove || e.target);
+		if (!live) {
+			return;
+		}
+		if (remove && !remove.disabled) {
+			remove.closest('.chips-in__chip').remove();
+			chipsSync(live.root, live.parts);
+			live.parts.input.focus();
+		} else if (!remove && e.target.closest('.chips-in') && !e.target.closest('.chips-in__entry')) {
+			// щелчок по рамке мимо плашек — в строку ввода, как у любого поля
+			live.parts.input.focus();
+		}
+	});
+
+	// Сброс формы возвращает строке ввода значение сервера: из него же заново плашки.
+	doc.addEventListener('reset', function (e) {
+		var form = e.target;
+		setTimeout(function () {
+			var roots = form.querySelectorAll ? form.querySelectorAll('[data-chips-live]') : [];
+			for (var i = 0; i < roots.length; i++) {
+				var parts = chipsParts(roots[i]);
+				parts.list.textContent = '';
+				chipsAdd(roots[i], parts, parts.input.value);
+				parts.input.value = '';
+			}
+		}, 0);
+	});
+
+	// Поле цвета без скрипта — код текстом с pattern. Скрипт показывает ряд образцов и держит
+	// его в согласии с кодом: кружок пишет свой код в поле, набранный код отмечает свой
+	// кружок, системный выбор цвета — «свой». Радиокнопки и выбор цвета отвязаны от формы
+	// (form=""), поэтому значение по-прежнему несёт одно поле кода.
+	var SWATCH_CODE = /^#[0-9a-f]{6}$/;
+
+	function swatchParts(root) {
+		return {
+			row: root.querySelector('[data-swatches-row]'),
+			code: root.querySelector('.swatches__code'),
+			name: root.querySelector('[data-swatches-name]'),
+			own: root.querySelector('[data-swatches-own]'),
+			dot: root.querySelector('.swatches__item--own .swatches__dot'),
+			radios: root.querySelectorAll('.swatches__radio')
+		};
+	}
+
+	function swatchTitle(control) {
+		var label = control.closest('label');
+		return label ? label.title : '';
+	}
+
+	function swatchShow(root) {
+		var parts = swatchParts(root);
+		if (!parts.code) {
+			return;
+		}
+		var code = parts.code.value.trim().toLowerCase();
+		var found = null;
+		for (var i = 0; i < parts.radios.length; i++) {
+			parts.radios[i].checked = !found && parts.radios[i].value === code;
+			found = parts.radios[i].checked ? parts.radios[i] : found;
+		}
+		var own = !found && SWATCH_CODE.test(code);
+		if (parts.dot) {
+			if (own) {
+				parts.dot.style.setProperty('--_swatch', code);
+			} else {
+				parts.dot.removeAttribute('style');
+			}
+		}
+		if (parts.own && own) {
+			parts.own.value = code;
+		}
+		if (parts.name) {
+			parts.name.textContent = found ? swatchTitle(found)
+				: (code ? swatchTitle(parts.own || parts.code) : parts.code.placeholder);
+		}
+	}
+
+	// Код меняется так, как его поменял бы человек: событием ввода — его слышат подсветка
+	// несохранённого и прочие слушатели формы.
+	function swatchWrite(root, value) {
+		var code = swatchParts(root).code;
+		if (!code || code.disabled || code.readOnly) {
+			return;
+		}
+		code.value = value;
+		code.dispatchEvent(new Event('input', { bubbles: true }));
+		code.dispatchEvent(new Event('change', { bubbles: true }));
+	}
+
+	// Радиокнопки без формы-владельца группируются по имени на всей странице: два поля цвета
+	// с одним именем (в двух формах) делили бы один выбор. Своё имя группы каждому полю
+	// даёт скрипт; отметку он всё равно выводит из кода, поэтому перепутанная при разборе
+	// страницы отметка значения не имеет.
+	var swatchGroups = 0;
+
+	function swatchesInit(scope) {
+		var roots = (scope || doc).querySelectorAll('[data-swatches]');
+		for (var i = 0; i < roots.length; i++) {
+			var parts = swatchParts(roots[i]);
+			if (parts.row && parts.code && parts.row.hidden) {
+				swatchGroups += 1;
+				for (var j = 0; j < parts.radios.length; j++) {
+					parts.radios[j].name = 'oscript-ui-swatches-' + swatchGroups;
+				}
+				parts.row.hidden = false;
+				swatchShow(roots[i]);
+			}
+		}
+	}
+
+	doc.addEventListener('change', function (e) {
+		var target = e.target;
+		var root = target && target.closest ? target.closest('[data-swatches]') : null;
+		if (root && target.classList.contains('swatches__radio') && target.checked) {
+			swatchWrite(root, target.value);
+		}
+	});
+
+	doc.addEventListener('input', function (e) {
+		var target = e.target;
+		var root = target && target.closest ? target.closest('[data-swatches]') : null;
+		if (!root) {
+			return;
+		}
+		if (target.hasAttribute('data-swatches-own')) {
+			swatchWrite(root, target.value);
+		} else if (target.classList.contains('swatches__code')) {
+			swatchShow(root);
+		}
+	});
+
+	doc.addEventListener('reset', function (e) {
+		var form = e.target;
+		setTimeout(function () {
+			var roots = form.querySelectorAll ? form.querySelectorAll('[data-swatches]') : [];
+			for (var i = 0; i < roots.length; i++) {
+				swatchShow(roots[i]);
+			}
+		}, 0);
+	});
+
+	// Морфинг ответа возвращает полям серверный вид: они оживают заново.
+	doc.addEventListener('oscript-ui:update', function () { chipsInit(); swatchesInit(); });
+	chipsInit();
+	swatchesInit();
+
+	/* --- 10. проверка до отправки (выпуск 0.12, шаг 18) ------------------------------ */
+
+	// Без скрипта поле проверяет браузер (required, pattern, minlength, type=email/url —
+	// своим пузырём) и сервер (отказ под полем после отправки). Скрипт берёт отказ браузера
+	// на себя только у поля, которое принесло тексты отказов словаря (data-error-*) или адрес
+	// проверки (data-check), — их печатает ПолеФормы: пишет текст в field__error того же
+	// поля, куда сервер кладёт свой, и ставит aria-invalid. Поле без этих признаков скрипт
+	// не трогает. Когда — на попытке отправить (invalid) и на уходе из поля, в котором
+	// человек что-то набрал; исправленное поле снимает отказ сразу, на вводе.
+	//
+	// Поле с data-check спрашивает сервер, свободно ли значение: GET адрес?имя=значение,
+	// когда человек перестал набирать (CHECK_DELAY) или ушёл из поля. 200 — свободно, 409 —
+	// занято, текст ответа — отказ: он держит форму (setCustomValidity), пока значение не
+	// сменят. Сеть и другие ответы молчат: занятость проверит сервер при отправке.
+
+	var VERIFY_KINDS = [
+		['valueMissing', 'required'], ['typeMismatch', 'type'], ['badInput', 'number'],
+		['patternMismatch', 'pattern'], ['tooShort', 'minlength'], ['tooLong', 'maxlength'],
+		['rangeUnderflow', 'min'], ['rangeOverflow', 'max']
+	];
+	var CHECK_DELAY = 500;             // мс тишины ввода до вопроса серверу
+	var verifyAsked = new WeakMap();   // поле → { timer, ctrl, value, busy }
+	var verifyTouched = new WeakSet(); // поле, в котором человек что-то набрал
+	var verifyFocusing = false;        // первое негодное поле этой отправки уже в фокусе
+
+	function verifyOwn(control) {
+		if (!control || !control.attributes || !control.closest || !control.willValidate
+			|| !control.closest('.field')) {
+			return false;
+		}
+		if (control.hasAttribute('data-check')) {
+			return true;
+		}
+		for (var i = 0; i < control.attributes.length; i++) {
+			if (control.attributes[i].name.indexOf('data-error-') === 0) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	// Текст отказа — словом словаря, которое принесло поле; слова нет — словами браузера.
+	function verifyMessage(control) {
+		var v = control.validity;
+		if (v.customError) {
+			return control.validationMessage;
+		}
+		for (var i = 0; i < VERIFY_KINDS.length; i++) {
+			if (v[VERIFY_KINDS[i][0]]) {
+				return control.getAttribute('data-error-' + VERIFY_KINDS[i][1]) || control.validationMessage;
+			}
+		}
+		return control.validationMessage;
+	}
+
+	// Ссылка поля на текст отказа — одна из возможных: подсказку рядом с подписью поле
+	// называет из того же aria-describedby.
+	function verifyDescribe(control, id, on) {
+		var list = (control.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean);
+		var at = list.indexOf(id);
+		if (on && at < 0) {
+			list.push(id);
+		} else if (!on && at >= 0) {
+			list.splice(at, 1);
+		}
+		if (list.length) {
+			control.setAttribute('aria-describedby', list.join(' '));
+		} else {
+			control.removeAttribute('aria-describedby');
+		}
+	}
+
+	// Место отказа то же, что у сервера: последний ребёнок подписи поля, с тем же id.
+	function verifyBox(control, create) {
+		var field = control.closest('.field');
+		var box = field.querySelector(':scope > .field__error');
+		if (!box && create) {
+			box = doc.createElement('span');
+			box.className = 'field__error';
+			box.setAttribute('role', 'alert');
+			if (control.id) {
+				box.id = control.id + '-err';
+			}
+			field.appendChild(box);
+		}
+		return box;
+	}
+
+	function verifyShow(control, text) {
+		var box = verifyBox(control, true);
+		if (box.textContent !== text) {
+			box.textContent = text;
+		}
+		control.closest('.field').classList.add('field--error');
+		control.setAttribute('aria-invalid', 'true');
+		if (box.id) {
+			verifyDescribe(control, box.id, true);
+		}
+	}
+
+	function verifyClear(control) {
+		var box = verifyBox(control, false);
+		if (box) {
+			if (box.id) {
+				verifyDescribe(control, box.id, false);
+			}
+			box.parentNode.removeChild(box);
+		}
+		control.closest('.field').classList.remove('field--error');
+		control.removeAttribute('aria-invalid');
+	}
+
+	function verifyJudge(control) {
+		if (control.validity.valid) {
+			verifyClear(control);
+		} else {
+			verifyShow(control, verifyMessage(control));
+		}
+	}
+
+	// Браузер не пускает форму: пузырь заменяет текст под полем, а фокус встаёт на первое
+	// негодное поле — пузыря нет, и фокус браузер теперь не ставит.
+	doc.addEventListener('invalid', function (e) {
+		var control = e.target;
+		if (!verifyOwn(control)) {
+			return;
+		}
+		e.preventDefault();
+		verifyTouched.add(control);
+		verifyShow(control, verifyMessage(control));
+		if (!verifyFocusing) {
+			verifyFocusing = true;
+			setTimeout(function () { verifyFocusing = false; }, 0);
+			if (doc.activeElement !== control && control.focus) {
+				control.focus();
+			}
+		}
+	}, true);
+
+	doc.addEventListener('input', function (e) {
+		var control = e.target;
+		if (!verifyOwn(control)) {
+			return;
+		}
+		verifyTouched.add(control);
+		if (control.hasAttribute('data-check')) {
+			verifyAsk(control, CHECK_DELAY);
+		}
+		// отказ на экране судится на каждом вводе: исправил — отказ ушёл сразу
+		if (control.getAttribute('aria-invalid') === 'true') {
+			verifyJudge(control);
+		}
+	});
+
+	doc.addEventListener('focusout', function (e) {
+		var control = e.target;
+		if (!verifyOwn(control) || !verifyTouched.has(control)) {
+			return;
+		}
+		// Уход в кнопку отправки своей формы отказ сейчас не печатает: его напечатает проверка
+		// отправки на том же щелчке. Иначе текст отказа появлялся между нажатием и отпусканием
+		// мыши, сдвигал кнопку вниз на свою строку — и отпускание приходилось мимо неё: щелчок
+		// пропадал, форма не проверялась, фокус не вставал на негодное поле.
+		var to = e.relatedTarget;
+		if (!(to && to.form === control.form && to.type === 'submit')) {
+			verifyJudge(control);
+		}
+		if (control.hasAttribute('data-check')) {
+			verifyAsk(control, 0);
+		}
+	});
+
+	function verifyAsk(control, delay) {
+		var state = verifyAsked.get(control);
+		if (!state) {
+			state = { timer: 0, ctrl: null, value: null, busy: '', pending: null };
+			verifyAsked.set(control, state);
+		}
+		clearTimeout(state.timer);
+		var value = control.value;
+		// ответ про это значение уже есть: занятое снова держит форму, свободное — нет
+		control.setCustomValidity(state.value === value ? state.busy : '');
+		if (state.value === value || state.pending === value || value === '' || !window.fetch) {
+			return;
+		}
+		state.timer = setTimeout(function () {
+			// своё сначала: про значение, которое не прошло шаблон, сервер спрашивать незачем
+			if (control.value !== value || !control.validity.valid) {
+				return;
+			}
+			if (state.ctrl) {
+				state.ctrl.abort();
+			}
+			state.ctrl = window.AbortController ? new AbortController() : null;
+			var url = new URL(control.getAttribute('data-check'), location.href);
+			url.searchParams.set(control.name, value);
+			state.pending = value;
+			control.setAttribute('aria-busy', 'true');
+			fetch(url.href, { credentials: 'same-origin', headers: { 'Accept': 'text/plain, text/html' },
+				signal: state.ctrl ? state.ctrl.signal : undefined })
+				.then(function (response) {
+					if (response.status !== 409 && !response.ok) {
+						return null;
+					}
+					return response.text().then(function (text) {
+						if (control.value !== value) {
+							return;
+						}
+						var busy = response.status === 409 ? verifyText(response, text) : '';
+						state.value = value;
+						state.busy = busy;
+						control.setCustomValidity(busy);
+						verifyJudge(control);
+					});
+				})
+				.catch(function () { /* сеть или отменён: проверит сервер при отправке */ })
+				.finally(function () {
+					if (state.pending === value) {
+						state.pending = null;
+					}
+					if (control.value === value) {
+						control.removeAttribute('aria-busy');
+					}
+				});
+		}, delay);
+	}
+
+	// Отказ — текст ответа; страница вместо текста отдаёт свой текст без разметки.
+	function verifyText(response, text) {
+		if (/text\/html/i.test(response.headers.get('Content-Type') || '') && window.DOMParser) {
+			text = new DOMParser().parseFromString(text, 'text/html').body.textContent || '';
+		}
+		text = text.replace(/\s+/g, ' ').trim();
+		return text || response.statusText || String(response.status);
+	}
+
+	// Сброс формы (так тихая отправка встречает успех) забывает ответы про прежние значения.
+	doc.addEventListener('reset', function (e) {
+		var list = e.target.querySelectorAll ? e.target.querySelectorAll('[data-check]') : [];
+		for (var i = 0; i < list.length; i++) {
+			list[i].setCustomValidity('');
+			verifyAsked.delete(list[i]);
+		}
+	});
+
+	/* --- 11. тост из ответа (выпуск 0.12, шаг 19) ------------------------------------ */
+
+	// Без скрипта тост стоит в потоке страницы, где его напечатал сервер, и там остаётся.
+	// После тихой отправки тост ответа ложится морфингом на своё место — скрипт поднимает
+	// его оттуда вниз экрана (data-toast-live: wait — ждёт очереди, show — виден, gone —
+	// гаснет) и показывает тосты по одному, каждый TOAST_TIME; пока на тосте мышь или фокус,
+	// время стоит. Новый — тот, которого на странице до ответа не было: тост, что стоял в
+	// потоке и пришёл в ответе тем же (образец на странице, постоянное предупреждение), и
+	// смена темы, и любая другая тихая отправка оставляют на месте. Крестик закрывает раньше (раздел 5). Тост с ролью alert скрипт не трогает:
+	// он остаётся на месте, пока его не закроют или не уберёт следующий ответ сервера.
+	// Поднятый тост живёт в конце <body>, и морфинг его не трогает (toastOwned).
+
+	var TOAST_TIME = 5000;
+	var toastTimer = 0;
+	var toastLeft = 0;
+	var toastStart = 0;
+	var toastPaused = false;
+
+	function toastOwned(node) {
+		return !!(node && node.nodeType === 1 && node.hasAttribute('data-toast-live'));
+	}
+
+	// Тосты в потоке страницы — тем, как их напечатал сервер: тост без id, и узнать
+	// прежний после морфинга можно только по разметке.
+	function toastSnapshot() {
+		var seen = {};
+		var list = doc.body.querySelectorAll('.toast:not([data-toast-live])');
+		for (var i = 0; i < list.length; i++) {
+			seen[list[i].outerHTML] = (seen[list[i].outerHTML] || 0) + 1;
+		}
+		return seen;
+	}
+
+	function toastLift(before) {
+		var list = doc.body.querySelectorAll('.toast:not([data-toast-live])');
+		for (var i = 0; i < list.length; i++) {
+			var toast = list[i];
+			var key = toast.outerHTML;
+			if (before && before[key]) {
+				before[key]--;
+				continue;
+			}
+			if (toast.getAttribute('role') === 'alert'
+				|| toast.closest('dialog, [hidden], [data-window-error]')) {
+				continue;
+			}
+			toast.setAttribute('data-toast-live', 'wait');
+			doc.body.appendChild(toast);
+		}
+		toastPump();
+	}
+
+	function toastLive(state) {
+		return doc.body.querySelector(':scope > .toast[data-toast-live="' + state + '"]');
+	}
+
+	function toastPump() {
+		if (toastLive('show')) {
+			return;
+		}
+		var next = toastLive('wait');
+		if (!next) {
+			return;
+		}
+		next.setAttribute('data-toast-live', 'show');
+		toastLeft = TOAST_TIME;
+		toastPaused = false;
+		toastRun(next);
+	}
+
+	function toastRun(toast) {
+		clearTimeout(toastTimer);
+		toastStart = Date.now();
+		toastTimer = setTimeout(function () { toastGone(toast); }, toastLeft);
+	}
+
+	function toastGone(toast) {
+		clearTimeout(toastTimer);
+		toast.setAttribute('data-toast-live', 'gone');
+		var done = function () {
+			if (toast.parentNode) {
+				toast.parentNode.removeChild(toast);
+			}
+			toastPump();
+		};
+		if (calm && calm.matches) {
+			done();
+			return;
+		}
+		toast.classList.add('toast--closing');
+		setTimeout(done, 250);
+	}
+
+	function toastHold(e, hold) {
+		var toast = toastLive('show');
+		if (!toast || !toast.contains(e.target) || hold === toastPaused) {
+			return;
+		}
+		if (!hold && e.relatedTarget && toast.contains(e.relatedTarget)) {
+			return;
+		}
+		toastPaused = hold;
+		if (hold) {
+			clearTimeout(toastTimer);
+			toastLeft = Math.max(1000, toastLeft - (Date.now() - toastStart));
+		} else {
+			toastRun(toast);
+		}
+	}
+	doc.addEventListener('mouseover', function (e) { toastHold(e, true); });
+	doc.addEventListener('focusin', function (e) { toastHold(e, true); });
+	doc.addEventListener('mouseout', function (e) { toastHold(e, false); });
+	doc.addEventListener('focusout', function (e) { toastHold(e, false); });
+
+	// Крестик поднятого тоста гасит его сам (раздел 5); очередь идёт дальше, как по времени.
+	doc.addEventListener('click', function (e) {
+		var close = e.target.closest ? e.target.closest('.toast[data-toast-live="show"] [data-close]') : null;
+		if (!close) {
+			return;
+		}
+		clearTimeout(toastTimer);
+		close.closest('.toast').setAttribute('data-toast-live', 'gone');
+		setTimeout(toastPump, 260);
+	});
+
+	/* --- 12. слот картинки и образец (выпуск 0.12, шаги 16–17) ----------------------- */
+
+	// Слот картинки отправляет себя сам: на файловом поле признак data-autosubmit, и выбор
+	// файла уходит формой слота тихой отправкой (раздел 6, multipart). Здесь — только то, что
+	// человек видит, пока файл в пути: выбранная картинка сразу встаёт в предпросмотр. Ответ
+	// сервера морфингом вернёт адрес сохранённой; отказ — прежнюю.
+	var PICKED = 'oscriptUiPicked'; // свойство картинки слота: адрес выбранного файла в памяти
+
+	doc.addEventListener('change', function (e) {
+		var input = e.target;
+		if (!input || input.type !== 'file' || !input.files || !input.files[0]
+			|| !window.URL || !URL.createObjectURL) {
+			return;
+		}
+		var slot = input.closest ? input.closest('.imgslot') : null;
+		var img = slot ? slot.querySelector('.imgslot__image') : null;
+		if (!img) {
+			return; // пустой слот: картинки ещё нет, ждём ответа сервера
+		}
+		if (img[PICKED]) {
+			URL.revokeObjectURL(img[PICKED]);
+		}
+		img[PICKED] = URL.createObjectURL(input.files[0]);
+		img.src = img[PICKED];
+	});
+
+	// Окно сброса открывает пункт меню ⚙: меню закрылось вместе с открытием окна, и движок,
+	// закрыв окно, вернул бы фокус в спрятанный пункт — то есть никуда. Фокус встаёт на
+	// кнопку ⚙ того же слота. Ход позже: движок возвращает фокус своим порядком.
+	doc.addEventListener('close', function (e) {
+		var box = e.target;
+		var slot = box && box.tagName === 'DIALOG' && box.closest ? box.closest('.imgslot') : null;
+		if (!slot) {
+			return;
+		}
+		setTimeout(function () {
+			var lost = !doc.activeElement || doc.activeElement === doc.body
+				|| !doc.activeElement.getClientRects().length;
+			var gear = slot.isConnected ? slot.querySelector('.imgslot__gear .menu > .button') : null;
+			if (lost && gear) {
+				gear.focus();
+			}
+		}, 0);
+	}, true);
+
+	// Зеркало значения (data-mirror="имя"): узел показывает текущее значение поля с этим
+	// именем. Текст узла — то, что напечатал сервер; он и возвращается, когда поле опустело.
+	// Поле цвета (системный выбор цвета, образцы-кружки или поле вида «цвет» — его код
+	// .swatches__code, раздел 9) пишет не текст, а свойство CSS --mirror-<имя> на узле: его
+	// берёт лист приложения, а пустое значение («по умолчанию») свойство снимает. Текст
+	// пишется textContent-ом — разметка из поля не исполняется.
+	var MIRROR_TEXT = 'oscriptUiMirrorText'; // свойство узла: текст, напечатанный сервером
+	var HEX = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+
+	function mirrorsOf(name) {
+		var all = doc.querySelectorAll('[data-mirror]');
+		var out = [];
+		for (var i = 0; i < all.length; i++) {
+			if (all[i].getAttribute('data-mirror') === name) {
+				out.push(all[i]);
+			}
+		}
+		return out;
+	}
+
+	// Поле вида «цвет» узнаётся по своему полю кода: его кружки раздел 9 уводит в группу
+	// со своим именем, и под именем поля остаётся одно текстовое поле.
+	function mirrorIsColor(name) {
+		var list = doc.getElementsByName(name);
+		for (var i = 0; i < list.length; i++) {
+			if (list[i].type === 'color' || (list[i].type === 'radio' && HEX.test(list[i].value))
+				|| (list[i].classList && list[i].classList.contains('swatches__code'))) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	function mirrorValue(control) {
+		if (control.type === 'radio') {
+			if (control.checked) {
+				return control.value;
+			}
+			var list = doc.getElementsByName(control.name);
+			for (var i = 0; i < list.length; i++) {
+				if (list[i].checked) {
+					return list[i].value;
+				}
+			}
+			return '';
+		}
+		if (control.type === 'checkbox') {
+			return control.checked ? control.value : '';
+		}
+		return control.type === 'file' ? null : control.value;
+	}
+
+	// Зеркало признаком (data-mirrors="стиль значок", 0.13, дев-сборка 7): значение поля
+	// пишется не в текст, а в признак data-mirror-<имя> узла — вид по нему задаёт лист
+	// приложения. Текст и свойство --mirror-* узла не трогаются. Имя признака — строчными,
+	// как его печатает сервер.
+	function attrMirrorsOf(name) {
+		var all = doc.querySelectorAll('[data-mirrors]');
+		var out = [];
+		for (var i = 0; i < all.length; i++) {
+			if ((' ' + all[i].getAttribute('data-mirrors') + ' ').indexOf(' ' + name.toLowerCase() + ' ') >= 0) {
+				out.push(all[i]);
+			}
+		}
+		return out;
+	}
+
+	function mirror(control) {
+		var name = control && control.name;
+		if (!name || !('value' in control)) {
+			return;
+		}
+		var attrTargets = attrMirrorsOf(name);
+		var targets = mirrorsOf(name);
+		var value = targets.length || attrTargets.length ? mirrorValue(control) : null;
+		if (value === null) {
+			return;
+		}
+		for (var a = 0; a < attrTargets.length; a++) {
+			attrTargets[a].setAttribute('data-mirror-' + name.toLowerCase(), value);
+		}
+		// выбор значка (дев-сборка 9, раздел 16): образец показывает сам выбранный значок
+		if (control.type === 'radio' && control.closest && control.closest('[data-iconpicker]')) {
+			iconMirror(control, targets, attrTargets);
+			return;
+		}
+		var color = mirrorIsColor(name);
+		for (var i = 0; i < targets.length; i++) {
+			var t = targets[i];
+			if (color) {
+				if (!value) {
+					t.style.removeProperty('--mirror-' + name);
+				} else if (HEX.test(value) && !(control.validity && control.validity.patternMismatch)) {
+					// код, который не пропустит pattern поля (#abc у поля «цвет»), — ещё не цвет
+					t.style.setProperty('--mirror-' + name, value);
+				}
+				continue;
+			}
+			if (!(MIRROR_TEXT in t)) {
+				t[MIRROR_TEXT] = t.textContent;
+			}
+			t.textContent = value !== '' ? value : t[MIRROR_TEXT];
+		}
+	}
+
+	['input', 'change'].forEach(function (type) {
+		doc.addEventListener(type, function (e) { mirror(e.target); });
+	});
+
+	// Сброс формы возвращает полям значения по умолчанию — зеркала идут за ними; значения
+	// поля уже другие только после события, поэтому ход позже.
+	doc.addEventListener('reset', function (e) {
+		var form = e.target;
+		setTimeout(function () {
+			var list = form.elements || [];
+			for (var i = 0; i < list.length; i++) {
+				if (list[i].name && (list[i].type !== 'radio' || list[i].checked)) {
+					mirror(list[i]);
+				}
+			}
+		}, 0);
+	});
+
+	// Образец: тема рамки — атрибут data-theme на .preview__frame. Палитры в голове страницы
+	// привязаны к <html>, вложенная рамка их не наследует, поэтому палитру рамки скрипт
+	// собирает из того же блока токенов (#токены-темы): тёмная — правило :root, светлая —
+	// оно же, перекрытое светлым. Лист подключается adoptedStyleSheets — в разметку страницы
+	// ничего не печатается; сменились токены (тихая отправка с новым акцентом) — лист
+	// пересобирается. Выбор темы переживает морфинг: он помнится на фигуре.
+	var THEME = 'oscriptUiPreviewTheme'; // свойство фигуры образца: тема, выбранная человеком
+	var palette = null;
+	var paletteOf = '';
+
+	function previewPalette() {
+		var tokens = doc.getElementById('токены-темы');
+		if (!tokens || !tokens.sheet || !doc.adoptedStyleSheets || !window.CSSStyleSheet) {
+			return false;
+		}
+		if (palette && paletteOf === tokens.textContent) {
+			return true;
+		}
+		var dark = '';
+		var light = '';
+		var rules = tokens.sheet.cssRules;
+		for (var i = 0; i < rules.length; i++) {
+			var r = rules[i];
+			if (!r.style) {
+				continue;
+			}
+			if (r.selectorText === ':root') {
+				dark = r.style.cssText;
+			} else if (/data-theme/.test(r.selectorText)) {
+				light = r.style.cssText;
+			}
+		}
+		if (!dark) {
+			return false;
+		}
+		try {
+			if (!palette) {
+				palette = new CSSStyleSheet();
+				doc.adoptedStyleSheets = doc.adoptedStyleSheets.concat([palette]);
+			}
+			palette.replaceSync('.preview__frame[data-theme="dark"]{' + dark + '}'
+				+ '.preview__frame[data-theme="light"]{' + dark + light + '}');
+		} catch (err) {
+			return false;
+		}
+		paletteOf = tokens.textContent;
+		return true;
+	}
+
+	function previewFrame(figure) {
+		return figure.querySelector(':scope > .preview__frame');
+	}
+
+	function previewTheme(figure, theme) {
+		var frame = previewFrame(figure);
+		if (!frame) {
+			return;
+		}
+		if (theme) {
+			frame.setAttribute('data-theme', theme);
+		} else {
+			frame.removeAttribute('data-theme');
+		}
+		var buttons = figure.querySelectorAll(':scope > .preview__themes [data-preview-theme]');
+		for (var i = 0; i < buttons.length; i++) {
+			buttons[i].setAttribute('aria-pressed',
+				buttons[i].getAttribute('data-preview-theme') === theme ? 'true' : 'false');
+		}
+	}
+
+	// Нажатая тема — ещё раз нажата — снимается: рамка возвращается к теме страницы.
+	doc.addEventListener('click', function (e) {
+		var button = e.target.closest ? e.target.closest('[data-preview-theme]') : null;
+		var figure = button ? button.closest('.preview') : null;
+		if (!figure || !previewPalette()) {
+			return;
+		}
+		var theme = button.getAttribute('data-preview-theme');
+		var frame = previewFrame(figure);
+		figure[THEME] = frame && frame.getAttribute('data-theme') === theme ? '' : theme;
+		previewTheme(figure, figure[THEME]);
+	});
+
+	function previewInit() {
+		var figures = doc.querySelectorAll('.preview');
+		if (!figures.length || !previewPalette()) {
+			return;
+		}
+		for (var i = 0; i < figures.length; i++) {
+			if (figures[i][THEME] !== undefined) {
+				previewTheme(figures[i], figures[i][THEME]);
+			}
+		}
+	}
+
+	// Морфинг возвращает разметке серверный вид: выбор темы и текст зеркал берутся заново,
+	// а пересобранный блок токенов (новый акцент) — пересобирает палитру рамки.
+	doc.addEventListener('oscript-ui:update', function () {
+		var all = doc.querySelectorAll('[data-mirror]');
+		for (var i = 0; i < all.length; i++) {
+			delete all[i][MIRROR_TEXT];
+		}
+		previewInit();
+	});
+	previewInit();
+
+	/* --- 13. страницы и отбор без перезагрузки (выпуск 0.13, шаг 20) ------------------ */
+
+	// Ссылка с data-quiet (страница пагинации, сортировка колонки) берётся запросом в фоне,
+	// и ответ ложится на страницу тем же морфингом, что ответ тихой формы (раздел 6): список
+	// меняется на месте, прокрутка и фокус остаются, адрес вкладки уходит в её историю.
+	// GET-форма с data-quiet (строка поиска, форма отбора) уходит разделом 6, а здесь ещё
+	// и сама — по изменению поля, с задержкой: набрал — и список уже отобран. «Назад»
+	// и «Вперёд» по записям истории, которые пометил кит, тоже берутся тихо, и прокрутка
+	// встаёт туда, где была. Без скрипта всё это — обычные ссылки и обычная GET-форма.
+
+	var TYPE_DELAY = 400; // мс после последней буквы: поиск не уходит на каждую
+	var PICK_DELAY = 150; // мс после выбора в списке, флажка, даты — выбор уже сделан
+	var FILTER_TIMER = 'oscriptUiFilterTimer';
+	var FILTER_SENT = 'oscriptUiFilterSent';
+	var hop = 0;          // номер последнего тихого перехода: на страницу ложится только он
+	var scrollSave = 0;
+	var shown = sansHash(location.href); // адрес страницы, которая сейчас на экране
+
+	function sansHash(href) {
+		return String(href).split('#')[0];
+	}
+
+	// Обновив страницу, скрипт уже перевёл адрес вкладки (pushState раздела 6): на экране
+	// теперь страница этого адреса.
+	doc.addEventListener('oscript-ui:update', function () {
+		shown = sansHash(location.href);
+	});
+
+	// Ссылка и GET-форма листают и отбирают тот же список: страница остаётся на месте,
+	// а форма не сбрасывается — в поле поиска то, что человек набрал и ещё набирает.
+	function inPlace(el) {
+		return !el || el.tagName !== 'FORM'
+			|| (el.getAttribute('method') || 'get').toLowerCase() === 'get';
+	}
+
+	function quietGet() {
+		return { method: 'GET', credentials: 'same-origin', headers: { 'Accept': 'text/html' } };
+	}
+
+	// Запись истории, с которой уходим, помечается: на неё «Назад» вернётся тихо и встанет
+	// на ту же прокрутку. Чужие поля состояния остаются как были.
+	function remember() {
+		var was = history.state && typeof history.state === 'object' ? history.state : {};
+		var state = {};
+		for (var key in was) {
+			if (Object.prototype.hasOwnProperty.call(was, key)) {
+				state[key] = was[key];
+			}
+		}
+		state.oscriptUi = true;
+		state.scroll = window.scrollY || 0;
+		try {
+			history.replaceState(state, '');
+		} catch (err) {
+			// состояние не записалось — «Назад» перезагрузит страницу, как раньше
+		}
+	}
+
+	window.addEventListener('scroll', function () {
+		if (!history.state || !history.state.oscriptUi) {
+			return;
+		}
+		clearTimeout(scrollSave);
+		scrollSave = setTimeout(remember, 200);
+	}, { passive: true });
+
+	doc.addEventListener('click', function (e) {
+		if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) {
+			return; // новая вкладка, окно, загрузка — это навигация, её делает браузер
+		}
+		var link = e.target && e.target.closest ? e.target.closest('a[data-quiet][href]') : null;
+		if (!link || link.hasAttribute('download') || (link.getAttribute('target') || '') !== ''
+			|| !window.fetch || !window.DOMParser || !sameOrigin(link.href)) {
+			return;
+		}
+		e.preventDefault();
+		var mine = ++hop;
+		var host = link.closest('nav, table, form') || link;
+		host.setAttribute('aria-busy', 'true');
+		send(link, null, { url: link.href, init: quietGet(), blank: false },
+			function () { return mine === hop; }).then(function () {
+			host.removeAttribute('aria-busy');
+		});
+	});
+
+	// «Назад» на запись, которую пометил кит: страница этого адреса берётся тихо. Поля тихих
+	// отборов возвращаются к значениям с сервера — иначе в поиске осталось бы набранное
+	// позже, а список был бы прежним.
+	function quietBack(state) {
+		if (sansHash(location.href) === shown) {
+			return true; // сменилась только решётка: страница та же, якорь браузер найдёт сам
+		}
+		if (!state || !state.oscriptUi || !window.fetch || !window.DOMParser) {
+			return false;
+		}
+		var mine = ++hop;
+		var url = location.href;
+		send(doc.body, null, { url: url, init: quietGet(), blank: false }, function () {
+			return mine === hop && location.href === url;
+		}).then(function () {
+			if (mine !== hop || location.href !== url) {
+				return;
+			}
+			var forms = doc.querySelectorAll('form[data-quiet]');
+			for (var i = 0; i < forms.length; i++) {
+				if (quietFilter(forms[i])) {
+					clearTimeout(forms[i][FILTER_TIMER]);
+					forms[i][FILTER_SENT] = undefined;
+					forms[i].reset();
+				}
+			}
+			markAll();
+			window.scrollTo(0, state.scroll || 0);
+		});
+		return true;
+	}
+
+	/* отбор по изменению поля */
+
+	function quietFilter(form) {
+		return quietForm(form) && inPlace(form);
+	}
+
+	// Отбор уходит, когда человек перестал набирать; тот же отбор дважды не уходит —
+	// ни вслед за Enter, ни на уходе из поля, ни когда набранное вернули как было.
+	function filterSoon(form, delay) {
+		clearTimeout(form[FILTER_TIMER]);
+		form[FILTER_TIMER] = setTimeout(function () {
+			var url = plan(form).url;
+			if (url === form[FILTER_SENT] || url === location.href || !form.isConnected) {
+				return;
+			}
+			if (form.requestSubmit) {
+				form.requestSubmit();
+			} else {
+				form[FILTER_SENT] = url;
+				enqueue(form, null, plan(form));
+			}
+		}, delay);
+	}
+
+	['input', 'change'].forEach(function (type) {
+		doc.addEventListener(type, function (e) {
+			var control = e.target;
+			var form = control && control.form;
+			if (!form || !quietFilter(form) || control.hasAttribute('data-autosubmit')
+				|| /^(submit|button|reset|file|hidden)$/.test(control.type || '')) {
+				return;
+			}
+			var typing = e.type === 'input' && (control.tagName === 'TEXTAREA'
+				|| /^(text|search|email|url|tel|number|password)$/.test(control.type || 'text'));
+			filterSoon(form, typing ? TYPE_DELAY : PICK_DELAY);
+		});
+	});
+
+	// Отправка руками (Enter, кнопка) снимает отложенную и запоминает, что ушло.
+	doc.addEventListener('submit', function (e) {
+		var form = e.target;
+		if (quietFilter(form)) {
+			clearTimeout(form[FILTER_TIMER]);
+			form[FILTER_SENT] = plan(form, e.submitter).url;
+		}
+	}, true);
+
+	/* --- таблица карточками и свойства (выпуск 0.13) -------------------------------------
+	   Своего поведения у них нет: карточку раскладывает лист, секрет показывает лист
+	   (галка «Показать»), а кнопку копирования свойства (data-copy) оживляет скрипт
+	   инсталляции — тот же, что у блока команды. Здесь кнопка только получает рябь, как
+	   остальные кнопки копирования: список элементов ряби читается на каждом нажатии. */
+
+	RIPPLE += ', .props__copy, .props__reveal';
+
+	/* --- 14. дерево галок (выпуск 0.13, шаг 23) -------------------------------------- */
+
+	// Дерево галок без скрипта — флажки формы: «частично» печатает сервер, ветка показывает
+	// первые 50 детей, «Показать ещё» — ссылка на адрес ветки, «Найти» — кнопка отправки на
+	// адрес поиска, режим ветки — радиокнопки, и форма уходит обычной отправкой галок.
+	// Скрипт добавляет вот что:
+	//   — щелчок по галке ветки раздаёт её состояние детям, а ветки выше пересчитывают
+	//     «частично» по детям. Ветка, у которой дети загружены не все, «целиком» становится,
+	//     только если так её напечатал сервер или отметил целиком человек: чего не видно,
+	//     того скрипт не знает; новые дети такой ветки приезжают её состоянием;
+	//   — «Показать ещё» и раскрытие пустой ветки берут страницу детей запросом в фоне
+	//     (так же, как окно по адресу, раздел 7) и дописывают её в ветку: из ответа берётся
+	//     список data-checktree-page с ключом ветки и следующая строка data-checktree-more;
+	//     не вышло — обычный переход по ссылке;
+	//   — «Найти» и ввод в поле поиска берут Поиск?найти=<строка> и кладут ответ
+	//     (data-checktree-found) на место веток; пустое поле возвращает ветки; «Включить /
+	//     Снять найденные» отмечают совпадения на месте;
+	//   — у дерева data-checktree-edits-only правки (галки и режимы, которые человек поменял
+	//     против напечатанного сервером) копятся, видны плашками data-checktree-edits
+	//     (плашку скрипт клонирует из шаблона сервера) и уходят с формой вместо галок:
+	//     правки=1, включить=<ключ>, снять=<ключ>, режим=<ключ>:<режим>;
+	//   — (дев-сборка 10) три режима ветки с массовыми галками: «все» — дети отмечены
+	//     и заперты (data-checktree-locked), «никакие» — сняты и заперты, «выбранные» —
+	//     отперты и начинаются с того, что было видно: из «все» — все отмечены, из «никакие» —
+	//     все сняты, из «выбранных» — как есть. Массовая отметка — основа «выбранных»: правки
+	//     детей считаются против неё, с формой уходит «основа=<ключ>:все|никакие», и сервер
+	//     строит набор заново (все минус снятые | только отмеченные). Дети, подгруженные
+	//     позже, встают по текущему режиму. «Кроме» (дев-сборка 8) — «все, кроме снятых»:
+	//     дети отперты и отмечены; скрытое поле data-checktree-shown (ПравкиБезСкрипта) при
+	//     отправке без правок пересчитывается по всем галкам обёртки, с правками — не уходит;
+	//   — (дев-сборка 8) крестик плашки отмеченного вне показанного (data-checktree-pick) —
+	//     галка «снять» (у снятого узла — «включить»); у дерева с правками она становится
+	//     правкой того же узла в общем ряду, а ряд правок держит её в согласии с собой;
+	//   — (дев-сборка 8) строка data-checktree-changes под деревом — сводка ряда правок.
+	// Узел называет ключ: своё значение галки, иначе её имя — то же правило у сервера.
+
+	var CT_EDITS = 'oscriptUiEdits';        // свойство обёртки: Map «box:ключ» | «mode:ключ» → правка
+	var CT_MIXED = 'oscriptUiMixed';        // свойство галки: показана «частично»
+	var CT_TOUCHED = 'oscriptUiTouched';    // свойство галки: её состояние ставил скрипт
+	var CT_WHOLE = 'oscriptUiWhole';        // свойство галки ветки: человек отметил или снял её целиком
+	var CT_SEQ = 'oscriptUiFind';           // свойство обёртки: номер последнего запроса поиска
+	var CT_BUSY = 'oscriptUiLoading';       // свойство строки «Показать ещё»: её страница в пути
+	var CT_NATIVE = 'oscriptUiTreeNative';  // свойство формы: отправку поиска пустить к браузеру
+	var CT_MODE = 'oscriptUiMode';          // свойство группы режима: режим, отмеченный сейчас
+	var CT_BASE = 'oscriptUiBase';          // свойство группы режима: основа «выбранных» — все | никакие
+	var ctTimer = 0;
+
+	function ctKey(box) {
+		return box.value && box.value !== '1' ? box.value : box.name;
+	}
+
+	function ctOrigin(box) {
+		return box.getAttribute('data-checktree-state') || (box.defaultChecked ? 'on' : 'off');
+	}
+
+	function ctState(box) {
+		return box[CT_MIXED] ? 'mixed' : box.checked ? 'on' : 'off';
+	}
+
+	// «Частично» держит свойство indeterminate: по нему и лист рисует черту, и скринридер
+	// слышит «частично». Атрибут aria-checked сервера после этого только мешал бы.
+	function ctShow(box, state) {
+		box[CT_MIXED] = state === 'mixed';
+		box.indeterminate = state === 'mixed';
+		box.checked = state !== 'off';
+		box.removeAttribute('aria-checked');
+	}
+
+	function ctSet(box, state) {
+		box[CT_TOUCHED] = true;
+		ctShow(box, state);
+	}
+
+	function ctChild(el, cls) {
+		for (var c = el ? el.firstElementChild : null; c; c = c.nextElementSibling) {
+			if (c.classList.contains(cls)) {
+				return c;
+			}
+		}
+		return null;
+	}
+
+	function ctBoxOf(node) {
+		var row = ctChild(node, 'checktree__row');
+		return row ? row.querySelector('[data-checktree-box]') : null;
+	}
+
+	function ctList(node) {
+		return ctChild(ctChild(node, 'checktree__branch'), 'checktree__children');
+	}
+
+	function ctParent(node) {
+		var list = node ? node.parentElement : null;
+		if (!list || !list.classList.contains('checktree__children')) {
+			return null;
+		}
+		var up = list.parentElement ? list.parentElement.parentElement : null;
+		return up && up.classList.contains('checktree__node') ? up : null;
+	}
+
+	function ctUnloaded(node) {
+		var branch = ctChild(node, 'checktree__branch');
+		return !!(branch && branch.querySelector(':scope > [data-checktree-more]'));
+	}
+
+	function ctFindBy(root, name, key) {
+		var all = root.querySelectorAll('[' + name + ']');
+		for (var i = 0; i < all.length; i++) {
+			if (all[i].getAttribute(name) === key) {
+				return all[i];
+			}
+		}
+		return null;
+	}
+
+	function ctBoxes(set, key) {
+		var all = set.querySelectorAll('[data-checktree-box]');
+		var out = [];
+		for (var i = 0; i < all.length; i++) {
+			if (ctKey(all[i]) === key) {
+				out.push(all[i]);
+			}
+		}
+		return out;
+	}
+
+	// Ветка по детям: все включены — включена, все сняты — снята, иначе «частично».
+	function ctRecalc(node) {
+		var box = ctBoxOf(node);
+		var list = ctList(node);
+		if (!box || !list) {
+			return false;
+		}
+		var on = 0, off = 0, n = 0;
+		for (var li = list.firstElementChild; li; li = li.nextElementSibling) {
+			var kid = ctBoxOf(li);
+			if (kid) {
+				n++;
+				var s = ctState(kid);
+				on += s === 'on' ? 1 : 0;
+				off += s === 'off' ? 1 : 0;
+			}
+		}
+		if (!n) {
+			return false;
+		}
+		var next = on === n ? 'on' : off === n ? 'off' : 'mixed';
+		if (next !== 'mixed' && next !== ctOrigin(box) && next !== box[CT_WHOLE] && ctUnloaded(node)) {
+			next = 'mixed';
+		}
+		if (next === ctState(box)) {
+			return false;
+		}
+		ctSet(box, next);
+		return true;
+	}
+
+	function ctUp(node, out) {
+		for (var p = ctParent(node); p; p = ctParent(p)) {
+			if (ctRecalc(p)) {
+				out.push(ctBoxOf(p));
+			}
+		}
+	}
+
+	function ctCascade(node, state, out) {
+		var list = ctList(node);
+		var all = list ? list.querySelectorAll('[data-checktree-box]') : [];
+		for (var i = 0; i < all.length; i++) {
+			if (!all[i].disabled && ctState(all[i]) !== state) {
+				ctSet(all[i], state);
+				out.push(all[i]);
+			}
+		}
+	}
+
+	// Сменились галки changed: ветки над ними пересчитываются, двойники в обёртке (та же
+	// галка в ответе поиска и в дереве) встают так же, правки записываются.
+	function ctSettle(set, changed) {
+		var queue = changed.slice();
+		var touched = [];
+		var guard = 0;
+		while (queue.length && guard++ < 10000) {
+			var box = queue.shift();
+			if (touched.indexOf(box) < 0) {
+				touched.push(box);
+			}
+			var up = [];
+			ctUp(box.closest('.checktree__node'), up);
+			queue.push.apply(queue, up);
+			if (!set) {
+				continue;
+			}
+			var twins = ctBoxes(set, ctKey(box));
+			for (var i = 0; i < twins.length; i++) {
+				if (twins[i] !== box && ctState(twins[i]) !== ctState(box)) {
+					ctSet(twins[i], ctState(box));
+					queue.push(twins[i]);
+				}
+			}
+		}
+		if (set) {
+			ctRecord(set, touched);
+			ctPaint(set);
+		}
+	}
+
+	function ctEdits(set) {
+		if (!set[CT_EDITS]) {
+			set[CT_EDITS] = new Map();
+		}
+		return set[CT_EDITS];
+	}
+
+	function ctLabelOf(el) {
+		var row = el.closest('.checktree__row');
+		var label = row ? row.querySelector('.checktree__label') : null;
+		return label ? label.textContent : '';
+	}
+
+	function ctRecord(set, boxes) {
+		if (!set.hasAttribute('data-checktree-edits-only')) {
+			return;
+		}
+		var edits = ctEdits(set);
+		boxes.forEach(function (box) {
+			var key = ctKey(box);
+			var state = ctState(box);
+			if (state === 'mixed' || state === ctEffOrigin(box) || ctLocked(box)) {
+				edits.delete('box:' + key);
+			} else {
+				edits.set('box:' + key, { kind: state, key: key, label: ctLabelOf(box) || key });
+			}
+		});
+	}
+
+	/* щелчок по галке */
+
+	doc.addEventListener('change', function (e) {
+		var box = e.target;
+		if (!box || !box.hasAttribute || !box.hasAttribute('data-checktree-box')) {
+			return;
+		}
+		// «частично» щелчком становится «включено», как у трёхпозиционного флажка ARIA
+		var state = box[CT_MIXED] || box.checked ? 'on' : 'off';
+		ctSet(box, state);
+		box[CT_WHOLE] = state;
+		var changed = [box];
+		ctCascade(box.closest('.checktree__node'), state, changed);
+		ctSettle(box.closest('[data-checktree-set]'), changed);
+	});
+
+	/* режим ветки */
+
+	function ctModeOf(group) {
+		var checked = group.querySelector('input:checked');
+		return checked ? checked.value : '';
+	}
+
+	// Строка ветки над страницей её детей (дев-сборка 10, фрагмент с режимом ветки): группа
+	// режима стоит в data-checktree-head, список — рядом, с тем же ключом.
+	function ctHeadGroup(list) {
+		var key = list ? list.getAttribute('data-checktree-page') : null;
+		var scope = list ? list.parentElement : null;
+		var heads = key !== null && scope ? scope.querySelectorAll(':scope > [data-checktree-head] [data-checktree-modes]') : [];
+		for (var i = 0; i < heads.length; i++) {
+			if (heads[i].getAttribute('data-checktree-modes') === key) {
+				return heads[i];
+			}
+		}
+		return null;
+	}
+
+	function ctGroupOf(node) {
+		var row = ctChild(node, 'checktree__row');
+		return row ? ctChild(row, 'checktree__modes') : null;
+	}
+
+	// Дети ветки этой группы режима: в дереве — список её узла, на странице ветки — список
+	// с её ключом рядом со строкой ветки.
+	function ctListOf(group) {
+		var node = group.closest('.checktree__node');
+		if (node) {
+			return ctList(node);
+		}
+		var head = group.closest('[data-checktree-head]');
+		var key = group.getAttribute('data-checktree-modes');
+		var lists = head && head.parentElement ? head.parentElement.querySelectorAll(':scope > [data-checktree-page]') : [];
+		for (var i = 0; i < lists.length; i++) {
+			if (lists[i].getAttribute('data-checktree-page') === key) {
+				return lists[i];
+			}
+		}
+		return null;
+	}
+
+	// Группа режима ближайшей ветки над галкой — та, что решает за неё.
+	function ctOwnerGroup(box) {
+		var node = box.closest('.checktree__node');
+		for (var p = ctParent(node); p; p = ctParent(p)) {
+			var g = ctGroupOf(p);
+			if (g) {
+				return g;
+			}
+		}
+		var list = node ? node.parentElement : null;
+		return list && list.hasAttribute('data-checktree-page') ? ctHeadGroup(list) : null;
+	}
+
+	// То, против чего считается правка галки: напечатанное сервером, а у детей «выбранных»,
+	// начатых массовой отметкой, — сама отметка (основа).
+	function ctEffOrigin(box) {
+		var g = ctOwnerGroup(box);
+		var base = g ? g[CT_BASE] : '';
+		return base === 'все' ? 'on' : base === 'никакие' ? 'off' : ctOrigin(box);
+	}
+
+	function ctLocked(box) {
+		return box.disabled && box.hasAttribute('data-checktree-locked');
+	}
+
+	// Запереть галку режимом или отпереть. Галку, которую закрыло приложение (disabled без
+	// признака запора), режим не трогает.
+	function ctLockBox(box, lock) {
+		if (lock && !box.disabled) {
+			box.disabled = true;
+			box.setAttribute('data-checktree-locked', '');
+		} else if (!lock && ctLocked(box)) {
+			box.disabled = false;
+			box.removeAttribute('data-checktree-locked');
+		}
+	}
+
+	function ctModeOrigin(group) {
+		var all = group.querySelectorAll('input');
+		for (var i = 0; i < all.length; i++) {
+			if (all[i].defaultChecked) {
+				return all[i].value;
+			}
+		}
+		return '';
+	}
+
+	// Дети ветки в режиме «все» или «никакие» решены режимом: их не правят ни указатель
+	// (лист), ни клавиатура (inert). «Выбранные» и «кроме» дети правят. Режим узнаётся по
+	// значению: набор режимов у ветки бывает свой, и место сегмента ничего не говорит.
+	function ctModeLock(group) {
+		var list = ctListOf(group);
+		if (list && group.querySelector('input')) {
+			var mode = ctModeOf(group);
+			var lock = mode === 'все' || mode === 'никакие';
+			list.inert = lock;
+			var boxes = list.querySelectorAll('[data-checktree-box]');
+			for (var i = 0; i < boxes.length; i++) {
+				ctLockBox(boxes[i], lock);
+			}
+		}
+	}
+
+	function ctPickMode(group, value) {
+		var all = group.querySelectorAll('input');
+		for (var i = 0; i < all.length; i++) {
+			all[i].checked = all[i].value === value;
+		}
+		group[CT_MODE] = value;
+		ctModeLock(group);
+	}
+
+	// Смена режима ветки (дев-сборка 10: три режима с массовыми галками). «Все» и «никакие»
+	// отмечают или снимают всех детей и запирают их — правки детей уходят, решает режим.
+	// «Выбранные» отпирают детей и начинают с того, что было видно: после «все» — все
+	// отмечены, после «никакие» — все сняты (массовая отметка становится основой, против неё
+	// считаются правки детей), после «выбранных» — как есть. «Кроме» — «все, кроме снятых»:
+	// дети отперты и отмечены. Restore — возврат к напечатанному (снятие правки режима):
+	// галки — к тому, что напечатал сервер, основы нет.
+	function ctModeTurn(set, group, from, to, restore) {
+		group[CT_MODE] = to;
+		var list = ctListOf(group);
+		if (!list || (from === to && !restore)) {
+			return;
+		}
+		var lock = to === 'все' || to === 'никакие';
+		if (restore || lock) {
+			group[CT_BASE] = '';
+		} else if (to === 'кроме') {
+			group[CT_BASE] = 'все';
+		} else if (from === 'все' || from === 'никакие') {
+			group[CT_BASE] = from;
+		}
+		var base = group[CT_BASE];
+		var boxes = list.querySelectorAll('[data-checktree-box]');
+		var changed = [];
+		for (var i = 0; i < boxes.length; i++) {
+			var box = boxes[i];
+			if (box.disabled && !ctLocked(box)) {
+				continue;
+			}
+			ctLockBox(box, lock);
+			var want = restore ? ctOrigin(box) : lock ? (to === 'все' ? 'on' : 'off')
+				: base === 'все' ? 'on' : base === 'никакие' ? 'off' : '';
+			if (lock || restore || base) {
+				box[CT_WHOLE] = '';
+				if (set) {
+					ctEdits(set).delete('box:' + ctKey(box));
+				}
+			}
+			if (want && ctState(box) !== want) {
+				ctSet(box, want);
+				changed.push(box);
+			}
+		}
+		if (changed.length) {
+			ctSettle(set, changed);
+		}
+	}
+
+	function ctRecordMode(set, group) {
+		if (!set.hasAttribute('data-checktree-edits-only')) {
+			return;
+		}
+		var key = group.getAttribute('data-checktree-modes');
+		var value = ctModeOf(group);
+		var edits = ctEdits(set);
+		var base = group[CT_BASE] || '';
+		if (value === ctModeOrigin(group) && !base) {
+			edits.delete('mode:' + key);
+			return;
+		}
+		var checked = group.querySelector('input:checked');
+		var text = checked ? checked.parentNode.querySelector('.segments__text') : null;
+		edits.set('mode:' + key, { kind: 'mode', key: key, value: value, base: base, label: ctLabelOf(group) || key,
+			mode: text ? text.textContent : value });
+	}
+
+	doc.addEventListener('change', function (e) {
+		var radio = e.target;
+		var group = radio && radio.closest ? radio.closest('[data-checktree-modes]') : null;
+		if (!group || radio.type !== 'radio') {
+			return;
+		}
+		var from = group[CT_MODE] || ctModeOrigin(group);
+		ctModeLock(group);
+		var set = group.closest('[data-checktree-set]');
+		ctModeTurn(set, group, from, radio.value);
+		if (!set) {
+			return;
+		}
+		var key = group.getAttribute('data-checktree-modes');
+		var all = set.querySelectorAll('[data-checktree-modes]');
+		for (var i = 0; i < all.length; i++) {
+			if (all[i] !== group && all[i].getAttribute('data-checktree-modes') === key) {
+				ctPickMode(all[i], radio.value);
+			}
+		}
+		ctRecordMode(set, group);
+		ctPaint(set);
+	});
+
+	/* плашки правок */
+
+	// Правка ребёнка не нужна плашкой, если её покрыла правка ветки выше того же рода:
+	// «+ Альфа» уже говорит, что включены и все её участники.
+	function ctCovered(set, edits, ed) {
+		var boxes = ctBoxes(set, ed.key);
+		for (var i = 0; i < boxes.length; i++) {
+			for (var p = ctParent(boxes[i].closest('.checktree__node')); p; p = ctParent(p)) {
+				var pb = ctBoxOf(p);
+				var pe = pb ? edits.get('box:' + ctKey(pb)) : null;
+				if (pe && pe.kind === ed.kind) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	function ctText(pattern, a, b) {
+		return pattern.replace('%1', function () { return a; }).replace('%2', function () { return b || ''; });
+	}
+
+	function ctPaint(set) {
+		var row = set.querySelector('[data-checktree-edits]');
+		var tpl = row ? row.querySelector('template[data-checktree-chip]') : null;
+		var list = row ? row.querySelector('.checktree__edits-list') : null;
+		var edits = ctEdits(set);
+		if (set.hasAttribute('data-checktree-edits-only')) {
+			ctPaintPicks(set, edits);
+		}
+		if (!tpl || !list || !tpl.content) {
+			return;
+		}
+		while (list.firstChild) {
+			list.removeChild(list.firstChild);
+		}
+		var count = { all: 0, on: 0, off: 0 };
+		edits.forEach(function (ed, id) {
+			if (ed.kind !== 'mode' && ctCovered(set, edits, ed)) {
+				return;
+			}
+			count.all++;
+			count[ed.kind] = (count[ed.kind] || 0) + 1;
+			var text = ctText(tpl.getAttribute('data-checktree-text-' + ed.kind) || '%1', ed.label, ed.mode);
+			var chip = tpl.content.firstElementChild.cloneNode(true);
+			chip.classList.add('checktree__edit--' + ed.kind);
+			chip.querySelector('.chips-in__text').textContent = text;
+			var undo = chip.querySelector('[data-checktree-undo]');
+			undo.setAttribute('aria-label', ctText(undo.getAttribute('aria-label') || '%1', text));
+			undo.setAttribute('data-checktree-undo', id);
+			list.appendChild(chip);
+		});
+		row.hidden = !list.firstElementChild;
+		ctPaintChanges(set, count);
+	}
+
+	// Сводка правок (дев-сборка 8): «Изменений: 3 (+2 −1)» — по тем же плашкам, что в ряду.
+	function ctPaintChanges(set, count) {
+		var line = set.querySelector('[data-checktree-changes]');
+		if (!line) {
+			return;
+		}
+		var text = ctText(line.getAttribute('data-checktree-text-changes') || '%1', String(count.all));
+		if (count.on || count.off) {
+			text += ' ' + ctText(line.getAttribute('data-checktree-text-split') || '', String(count.on), String(count.off));
+		}
+		line.textContent = count.all ? text : '';
+		line.hidden = !count.all;
+	}
+
+	// Плашка отмеченного зачёркнута, пока её узел снят правкой (у снятого узла — включён):
+	// правку могли поставить её крестиком, галкой двойника в дереве или найденным.
+	function ctPaintPicks(set, edits) {
+		var boxes = set.querySelectorAll('[data-checktree-pick] .checktree__unpick-box');
+		for (var i = 0; i < boxes.length; i++) {
+			var ed = edits.get('box:' + boxes[i].value);
+			boxes[i].checked = !!(ed && ed.kind === (boxes[i].name === 'включить' ? 'on' : 'off'));
+		}
+	}
+
+	doc.addEventListener('change', function (e) {
+		var box = e.target;
+		if (!box || !box.classList || !box.classList.contains('checktree__unpick-box')) {
+			return;
+		}
+		var pick = box.closest('[data-checktree-pick]');
+		var set = pick ? pick.closest('[data-checktree-set]') : null;
+		if (!set) {
+			return;
+		}
+		var key = pick.getAttribute('data-checktree-pick');
+		var kind = box.name === 'включить' ? 'on' : 'off';
+		var changed = [];
+		ctBoxes(set, key).forEach(function (twin) {
+			var want = box.checked ? kind : ctEffOrigin(twin);
+			if (!twin.disabled && ctState(twin) !== want) {
+				ctSet(twin, want);
+				changed.push(twin);
+			}
+		});
+		if (changed.length) {
+			ctSettle(set, changed);
+		}
+		if (set.hasAttribute('data-checktree-edits-only')) {
+			var text = pick.querySelector('.chips-in__text');
+			if (box.checked) {
+				ctEdits(set).set('box:' + key, { kind: kind, key: key, label: (text && text.textContent) || key });
+			} else {
+				ctEdits(set).delete('box:' + key);
+			}
+			ctPaint(set);
+		}
+	});
+
+	// Снять правку — вернуть узлу то, что напечатал сервер. Правка ветки уносит с собой
+	// и правки её детей того же рода: они были её частью.
+	function ctUndo(set, ed) {
+		var edits = ctEdits(set);
+		if (ed.kind === 'mode') {
+			var groups = set.querySelectorAll('[data-checktree-modes]');
+			for (var i = 0; i < groups.length; i++) {
+				if (groups[i].getAttribute('data-checktree-modes') === ed.key) {
+					var from = ctModeOf(groups[i]);
+					ctPickMode(groups[i], ctModeOrigin(groups[i]));
+					ctModeTurn(set, groups[i], from, ctModeOrigin(groups[i]), true);
+				}
+			}
+			edits.delete('mode:' + ed.key);
+			return;
+		}
+		var changed = [];
+		var revert = function (key) {
+			ctBoxes(set, key).forEach(function (box) {
+				ctSet(box, ctEffOrigin(box));
+				box[CT_WHOLE] = '';
+				changed.push(box);
+			});
+			edits.delete('box:' + key);
+		};
+		ctBoxes(set, ed.key).forEach(function (box) {
+			var list = ctList(box.closest('.checktree__node'));
+			var kids = list ? list.querySelectorAll('[data-checktree-box]') : [];
+			for (var k = 0; k < kids.length; k++) {
+				var ke = edits.get('box:' + ctKey(kids[k]));
+				if (ke && ke.kind === ed.kind) {
+					revert(ke.key);
+				}
+			}
+		});
+		revert(ed.key);
+		ctSettle(set, changed);
+	}
+
+	doc.addEventListener('click', function (e) {
+		var undo = e.target.closest ? e.target.closest('[data-checktree-undo]') : null;
+		var set = undo ? undo.closest('[data-checktree-set]') : null;
+		var ed = set ? ctEdits(set).get(undo.getAttribute('data-checktree-undo')) : null;
+		if (!ed) {
+			return;
+		}
+		var list = undo.closest('.checktree__edits-list');
+		var at = Array.prototype.indexOf.call(list.children, undo.closest('.checktree__edit'));
+		ctUndo(set, ed);
+		ctPaint(set);
+		// фокус — на соседнюю плашку, а без них — на сам узел: кнопка, которую нажали, ушла
+		var rest = list.querySelectorAll('[data-checktree-undo]');
+		var next = rest[Math.min(at, rest.length - 1)];
+		if (!next) {
+			next = ctBoxes(set, ed.key).filter(function (b) { return b.offsetParent; })[0]
+				|| ctFindBy(set, 'data-checktree-pick', ed.key)
+				|| set.querySelector('[data-checktree-modes] input:checked, [data-checktree-box]');
+			if (next && next.hasAttribute('data-checktree-pick')) {
+				next = next.querySelector('input');
+			}
+		}
+		if (next) {
+			next.focus();
+		}
+	});
+
+	/* страница ветки */
+
+	function ctLoad(link, navigate) {
+		var more = link.closest('[data-checktree-more]');
+		var key = more.getAttribute('data-checktree-more');
+		var host = more.parentElement;
+		// список ветки: в дереве — дети узла или корень; на странице ветки (дев-сборка 10) —
+		// список с её ключом рядом со строкой «Показать ещё»
+		var list = host ? ctChild(host, 'checktree__children') || host.querySelector(':scope > [data-checktree]')
+			|| host.querySelector(':scope > [data-checktree-page]') : null;
+		if (!list || list.getAttribute('data-checktree-page') !== key) {
+			if (navigate) {
+				location.assign(link.href);
+			}
+			return;
+		}
+		if (more[CT_BUSY]) {
+			return;
+		}
+		more[CT_BUSY] = true;
+		link.setAttribute('aria-busy', 'true');
+		var focused = doc.activeElement === link;
+		fetch(link.href, { credentials: 'same-origin', headers: { 'Accept': 'text/html' } })
+			.then(function (response) {
+				var type = response.headers.get('Content-Type') || '';
+				if (!response.ok || !/text\/html/i.test(type)) {
+					throw new Error('страница ветки не пришла');
+				}
+				return response.text();
+			})
+			.then(function (html) {
+				var next = new DOMParser().parseFromString(html, 'text/html');
+				var page = ctFindBy(next, 'data-checktree-page', key);
+				if (!page) {
+					throw new Error('в ответе нет ветки');
+				}
+				var have = {};
+				for (var li = list.firstElementChild; li; li = li.nextElementSibling) {
+					var own = ctBoxOf(li);
+					if (own) {
+						have[ctKey(own)] = true;
+					}
+				}
+				var added = [];
+				for (var item = page.firstElementChild; item; item = item.nextElementSibling) {
+					var box = ctBoxOf(item);
+					if (item.classList.contains('checktree__node') && !(box && have[ctKey(box)])) {
+						added.push(list.appendChild(doc.importNode(item, true)));
+					}
+				}
+				var fresh = ctFindBy(next, 'data-checktree-more', key);
+				if (fresh) {
+					more.parentNode.replaceChild(doc.importNode(fresh, true), more);
+				} else {
+					more.parentNode.removeChild(more);
+				}
+				ctAdopt(list, added);
+				var first = added.length ? added[0].querySelector('[data-checktree-box], input') : null;
+				if (focused && first) {
+					first.focus();
+				}
+				doc.dispatchEvent(new CustomEvent('oscript-ui:update', { detail: { url: link.href } }));
+			})
+			.catch(function () {
+				more[CT_BUSY] = false;
+				link.removeAttribute('aria-busy');
+				if (navigate) {
+					location.assign(link.href);
+				}
+			});
+	}
+
+	// Новые узлы ветки: ветка, которую человек отметил или снял целиком, раздаёт себя и им,
+	// а накопленные правки ложатся на свои галки и режимы.
+	function ctAdopt(list, added) {
+		var set = list.closest('[data-checktree-set]');
+		var node = list.closest('.checktree__node');
+		var parent = node ? ctBoxOf(node) : null;
+		var whole = parent && parent[CT_WHOLE] && ctState(parent) === parent[CT_WHOLE] ? parent[CT_WHOLE] : '';
+		// дев-сборка 10: дети ветки с режимом встают по режиму, который отмечен сейчас, а не
+		// по тому, с которым сервер напечатал страницу: «все» | «никакие» — заперты его
+		// состоянием, «выбранные» после массовой отметки — её основой
+		var group = node ? ctGroupOf(node) : ctHeadGroup(list);
+		var mode = group ? ctModeOf(group) : '';
+		var lock = mode === 'все' || mode === 'никакие';
+		var base = group ? group[CT_BASE] || '' : '';
+		var force = lock ? (mode === 'все' ? 'on' : 'off') : base === 'все' ? 'on' : base === 'никакие' ? 'off' : '';
+		var edits = set ? ctEdits(set) : new Map();
+		var changed = [];
+		added.forEach(function (li) {
+			ctInit(li);
+			var boxes = li.querySelectorAll('[data-checktree-box]');
+			for (var i = 0; i < boxes.length; i++) {
+				if (group) {
+					ctLockBox(boxes[i], lock);
+				}
+				var ed = lock ? null : edits.get('box:' + ctKey(boxes[i]));
+				var want = (ed ? ed.kind : '') || force || whole;
+				if (want && (!boxes[i].disabled || ctLocked(boxes[i])) && ctState(boxes[i]) !== want) {
+					ctSet(boxes[i], want);
+					changed.push(boxes[i]);
+				}
+			}
+			var groups = li.querySelectorAll('[data-checktree-modes]');
+			for (var g = 0; g < groups.length; g++) {
+				var me = edits.get('mode:' + groups[g].getAttribute('data-checktree-modes'));
+				if (me) {
+					ctPickMode(groups[g], me.value);
+				}
+			}
+		});
+		if (changed.length) {
+			ctSettle(set, changed);
+		}
+	}
+
+	doc.addEventListener('click', function (e) {
+		if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) {
+			return;
+		}
+		var link = e.target.closest ? e.target.closest('[data-checktree-more] a[href]') : null;
+		if (!link || !window.fetch || !window.DOMParser || !sameOrigin(link.href)) {
+			return; // без запроса в фоне ссылка ведёт на страницу ветки — обычный переход
+		}
+		e.preventDefault();
+		ctLoad(link, true);
+	});
+
+	// Ветка, чьи дети не напечатаны, берёт первую страницу, раскрываясь.
+	function ctLazy(branch) {
+		var list = ctChild(branch, 'checktree__children');
+		var more = branch.querySelector(':scope > [data-checktree-more]');
+		var link = more ? more.querySelector('a[href]') : null;
+		if (list && !list.firstElementChild && link && window.fetch && window.DOMParser && sameOrigin(link.href)) {
+			ctLoad(link, false);
+		}
+	}
+
+	doc.addEventListener('toggle', function (e) {
+		var branch = e.target;
+		if (branch && branch.classList && branch.classList.contains('checktree__branch') && branch.open) {
+			ctLazy(branch);
+		}
+	}, true);
+
+	/* поиск */
+
+	function ctSearchOf(set) {
+		var box = set.querySelector(':scope > [data-checktree-search]');
+		return box ? { input: box.querySelector('input'), button: box.querySelector('button') } : null;
+	}
+
+	function ctShowFound(set, found) {
+		var old = set.querySelector(':scope > [data-checktree-found]');
+		if (old) {
+			set.replaceChild(found, old);
+		} else {
+			var search = set.querySelector(':scope > [data-checktree-search]');
+			set.insertBefore(found, search ? search.nextSibling : set.firstChild);
+		}
+		var tree = set.querySelector(':scope > [data-checktree]');
+		var more = set.querySelector(':scope > [data-checktree-more]');
+		if (tree) {
+			tree.hidden = true;
+		}
+		if (more) {
+			more.hidden = true;
+		}
+		ctInit(found);
+		// совпадение показывает то же, что его двойник в дереве, а без двойника — правку
+		var edits = ctEdits(set);
+		var boxes = found.querySelectorAll('[data-checktree-box]');
+		for (var i = 0; i < boxes.length; i++) {
+			var key = ctKey(boxes[i]);
+			var twin = ctBoxes(set, key).filter(function (b) { return !found.contains(b); })[0];
+			var ed = edits.get('box:' + key);
+			var want = twin ? ctState(twin) : ed ? ed.kind : '';
+			if (want && ctState(boxes[i]) !== want) {
+				ctSet(boxes[i], want);
+			}
+		}
+		var groups = found.querySelectorAll('[data-checktree-modes]');
+		for (var g = 0; g < groups.length; g++) {
+			var me = edits.get('mode:' + groups[g].getAttribute('data-checktree-modes'));
+			if (me) {
+				ctPickMode(groups[g], me.value);
+			}
+		}
+		doc.dispatchEvent(new CustomEvent('oscript-ui:update', { detail: { url: location.href } }));
+	}
+
+	function ctUnfind(set) {
+		var found = set.querySelector(':scope > [data-checktree-found]');
+		var tree = set.querySelector(':scope > [data-checktree]');
+		if (!tree) {
+			return false; // ответ поиска напечатал сервер, веток на странице нет
+		}
+		if (found) {
+			set.removeChild(found);
+		}
+		tree.hidden = false;
+		var more = set.querySelector(':scope > [data-checktree-more]');
+		if (more) {
+			more.hidden = false;
+		}
+		return true;
+	}
+
+	function ctNative(button) {
+		var form = button.form;
+		if (form && form.requestSubmit) {
+			form[CT_NATIVE] = true;
+			form.requestSubmit(button);
+		}
+	}
+
+	// explicit — человек сам попросил искать (Enter, «Найти»): тогда неудача уводит
+	// в обычную отправку на адрес поиска, а ввод с паузой молча ждёт следующего.
+	function ctSearch(set, explicit) {
+		var parts = ctSearchOf(set);
+		if (!parts || !parts.input || !parts.button) {
+			return;
+		}
+		clearTimeout(ctTimer);
+		var q = parts.input.value.trim();
+		var seq = set[CT_SEQ] = (set[CT_SEQ] || 0) + 1;
+		if (!q) {
+			set.removeAttribute('aria-busy');
+			if (!ctUnfind(set) && explicit) {
+				ctNative(parts.button);
+			}
+			return;
+		}
+		var url = new URL(parts.button.getAttribute('formaction') || location.href, location.href);
+		if (!sameOrigin(url.href)) {
+			return;
+		}
+		url.searchParams.set(parts.input.name || 'найти', q);
+		set.setAttribute('aria-busy', 'true');
+		fetch(url.href, { credentials: 'same-origin', headers: { 'Accept': 'text/html' } })
+			.then(function (response) {
+				var type = response.headers.get('Content-Type') || '';
+				if (!response.ok || !/text\/html/i.test(type)) {
+					throw new Error('ответ поиска не пришёл');
+				}
+				return response.text();
+			})
+			.then(function (html) {
+				if (seq !== set[CT_SEQ]) {
+					return; // ответ устарел: человек уже набрал другое
+				}
+				var found = new DOMParser().parseFromString(html, 'text/html').querySelector('[data-checktree-found]');
+				if (!found) {
+					throw new Error('в ответе нет найденного');
+				}
+				ctShowFound(set, doc.importNode(found, true));
+			})
+			.catch(function () {
+				if (seq === set[CT_SEQ] && explicit) {
+					ctNative(parts.button);
+				}
+			})
+			.finally(function () {
+				if (seq === set[CT_SEQ]) {
+					set.removeAttribute('aria-busy');
+				}
+			});
+	}
+
+	function ctFoundAll(set, found, button) {
+		var buttons = found.querySelectorAll('.checktree__found-actions button');
+		var state = button === buttons[0] ? 'on' : 'off';
+		var boxes = found.querySelectorAll('[data-checktree-box]');
+		var changed = [];
+		for (var i = 0; i < boxes.length; i++) {
+			if (!boxes[i].disabled && ctState(boxes[i]) !== state) {
+				ctSet(boxes[i], state);
+				changed.push(boxes[i]);
+			}
+		}
+		ctSettle(set, changed);
+	}
+
+	// Перехват на window в фазе погружения — раньше подтверждения и тихой отправки (они
+	// слушают document): со скриптом «Найти» и «Включить / Снять найденные» форму
+	// не отправляют. Отправку, которую пустил к браузеру скрипт кита, не трогаем.
+	window.addEventListener('submit', function (e) {
+		var form = e.target;
+		if (!form || form[NATIVE]) {
+			return;
+		}
+		if (form[CT_NATIVE]) {
+			form[CT_NATIVE] = false;
+			return;
+		}
+		var button = e.submitter;
+		if (!button || !button.closest || !window.fetch || !window.DOMParser) {
+			return;
+		}
+		var search = button.closest('[data-checktree-search]');
+		var found = button.closest('[data-checktree-found]');
+		var set = search || found ? button.closest('[data-checktree-set]') : null;
+		if (!set) {
+			return;
+		}
+		e.preventDefault();
+		e.stopPropagation();
+		if (search) {
+			ctSearch(set, true);
+		} else {
+			ctFoundAll(set, found, button);
+		}
+	}, true);
+
+	function ctSearchSet(target) {
+		var box = target && target.tagName === 'INPUT' && target.closest
+			? target.closest('[data-checktree-search]') : null;
+		return box ? box.closest('[data-checktree-set]') : null;
+	}
+
+	doc.addEventListener('input', function (e) {
+		var set = ctSearchSet(e.target);
+		if (!set) {
+			return;
+		}
+		clearTimeout(ctTimer);
+		if (!e.target.value.trim()) {
+			ctSearch(set, false);
+			return;
+		}
+		ctTimer = setTimeout(function () { ctSearch(set, false); }, 400);
+	});
+
+	doc.addEventListener('keydown', function (e) {
+		var set = e.key === 'Enter' && !e.isComposing ? ctSearchSet(e.target) : null;
+		if (set) {
+			e.preventDefault();
+			ctSearch(set, true);
+		}
+	}, true);
+
+	/* отправка правок */
+
+	// Форма дерева data-checktree-edits-only отдаёт вместо галок и режимов правки: событие
+	// formdata приходит и к обычной отправке, и к тихой (FormData в разделе 6), поэтому
+	// разметку трогать не нужно — меняется только то, что уходит.
+	// Поле показанного (ПравкиБезСкрипта) сервер напечатал по тому, что показал; со скриптом
+	// на странице бывает больше — страницы веток, найденное. Значение собирается заново по
+	// всем галкам обёртки тем же правилом, что у сервера: знак напечатанного и ключ.
+	function ctShownValue(set) {
+		var esc = function (key) { return key.replace(/%/g, '%25').replace(/,/g, '%2C'); };
+		var seen = {};
+		var out = [];
+		var boxes = set.querySelectorAll('[data-checktree-box]');
+		for (var i = 0; i < boxes.length; i++) {
+			var key = ctKey(boxes[i]);
+			if (!boxes[i].disabled && !seen['box:' + key]) {
+				seen['box:' + key] = true;
+				var origin = ctEffOrigin(boxes[i]);
+				out.push((origin === 'on' ? '+' : origin === 'off' ? '-' : '~') + esc(key));
+			}
+		}
+		var groups = set.querySelectorAll('[data-checktree-modes]');
+		for (var g = 0; g < groups.length; g++) {
+			var first = groups[g].querySelector('input');
+			var mode = groups[g].getAttribute('data-checktree-modes');
+			if (first && !first.disabled && !seen['mode:' + mode]) {
+				seen['mode:' + mode] = true;
+				out.push('=' + esc(mode) + ':' + ctModeOrigin(groups[g]));
+			}
+		}
+		return out.join(',');
+	}
+
+	doc.addEventListener('formdata', function (e) {
+		var form = e.target;
+		var data = e.formData;
+		if (!form || !form.querySelectorAll || !data) {
+			return;
+		}
+		var shown = form.querySelectorAll('[data-checktree-set] > [data-checktree-shown]');
+		var shownNames = {};
+		for (var h = 0; h < shown.length; h++) {
+			if (shown[h].name && !shownNames[shown[h].name]) {
+				shownNames[shown[h].name] = true;
+				data.delete(shown[h].name);
+			}
+		}
+		for (var v = 0; v < shown.length; v++) {
+			if (shown[v].name && !shown[v].parentNode.hasAttribute('data-checktree-edits-only')) {
+				data.append(shown[v].name, ctShownValue(shown[v].parentNode));
+				// основа «выбранных» после массовой отметки (дев-сборка 10)
+				var bases = shown[v].parentNode.querySelectorAll('[data-checktree-modes]');
+				var sent = {};
+				for (var q = 0; q < bases.length; q++) {
+					var mk = bases[q].getAttribute('data-checktree-modes');
+					if (bases[q][CT_BASE] && !sent[mk]) {
+						sent[mk] = true;
+						data.append('основа', mk + ':' + bases[q][CT_BASE]);
+					}
+				}
+			}
+		}
+		var sets = form.querySelectorAll('[data-checktree-set][data-checktree-edits-only]');
+		for (var s = 0; s < sets.length; s++) {
+			var all = sets[s].querySelectorAll('[data-checktree-box], [data-checktree-modes] input, [data-checktree-pick] input');
+			var names = {};
+			for (var i = 0; i < all.length; i++) {
+				if (all[i].name) {
+					names[all[i].name] = true;
+				}
+			}
+			Object.keys(names).forEach(function (name) { data.delete(name); });
+			data.set('правки', '1');
+			ctEdits(sets[s]).forEach(function (ed) {
+				if (ed.kind === 'on') {
+					data.append('включить', ed.key);
+				} else if (ed.kind === 'off') {
+					data.append('снять', ed.key);
+				} else {
+					data.append('режим', ed.key + ':' + ed.value);
+					if (ed.base) {
+						data.append('основа', ed.key + ':' + ed.base);
+					}
+				}
+			});
+		}
+	}, true);
+
+	// Сброс формы (и удачная тихая отправка, раздел 6) возвращает галкам то, что напечатал
+	// сервер, — правки уходят вместе с ним. Ждём конца задачи: тихая отправка сбрасывает
+	// форму до морфинга, а свежие состояния сервер приносит морфингом.
+	doc.addEventListener('reset', function (e) {
+		var form = e.target;
+		if (!form || !form.querySelectorAll) {
+			return;
+		}
+		setTimeout(function () {
+			var boxes = form.querySelectorAll('[data-checktree-box]');
+			for (var i = 0; i < boxes.length; i++) {
+				boxes[i][CT_TOUCHED] = false;
+				boxes[i][CT_WHOLE] = '';
+				ctShow(boxes[i], ctOrigin(boxes[i]));
+			}
+			var sets = form.querySelectorAll('[data-checktree-set]');
+			for (var s = 0; s < sets.length; s++) {
+				ctEdits(sets[s]).clear();
+			}
+			var bases = form.querySelectorAll('[data-checktree-modes]');
+			for (var m = 0; m < bases.length; m++) {
+				bases[m][CT_BASE] = '';
+			}
+			ctInit(form);
+		}, 0);
+	}, true);
+
+	function ctInit(scope) {
+		var root = scope || doc;
+		var mixed = root.querySelectorAll('[data-checktree-box][aria-checked="mixed"]');
+		for (var i = 0; i < mixed.length; i++) {
+			if (!mixed[i][CT_TOUCHED]) {
+				ctShow(mixed[i], 'mixed');
+			}
+			mixed[i].removeAttribute('aria-checked');
+		}
+		var groups = root.querySelectorAll('[data-checktree-modes]');
+		for (var g = 0; g < groups.length; g++) {
+			groups[g][CT_MODE] = ctModeOf(groups[g]);
+			ctModeLock(groups[g]);
+		}
+		var open = root.querySelectorAll('details.checktree__branch[open]');
+		for (var b = 0; b < open.length; b++) {
+			ctLazy(open[b]);
+		}
+		var sets = root.querySelectorAll('[data-checktree-set]');
+		for (var s = 0; s < sets.length; s++) {
+			ctPaint(sets[s]);
+		}
+	}
+
+	// Морфинг возвращает разметке серверный вид: «частично» снова приходит атрибутом,
+	// замки режимов снимаются — их ставим заново; правки живут в обёртке и переживают его.
+	doc.addEventListener('oscript-ui:update', function () {
+		ctInit(doc);
+	});
+	ctInit(doc);
+
+	/* --- 16. выбор значка (дев-сборка 9) ----------------------------------------------
+	   Сервер печатает радио-сетку значков целиком, с разделами, и строку поиска hidden: без
+	   скрипта искать нечем. Скрипт показывает строку и фильтрует ячейки на месте по имени
+	   (data-iconpicker-name: имя значка и название бренда строчными), прячет пустые разделы
+	   и пишет счёт найденного в живую область (шаблон — значение data-iconpicker, %1 — число).
+	   Ячейка «без значка» видна всегда. Зеркало поля выбора значка (раздел 12) пишет в образец
+	   не имя, а сам значок: копию рисунка выбранной ячейки. */
+
+	function iconPickerInit(scope) {
+		var roots = (scope || doc).querySelectorAll('[data-iconpicker]');
+		for (var i = 0; i < roots.length; i++) {
+			var search = roots[i].querySelector('[data-iconpicker-search]');
+			if (search && search.hidden && !roots[i].hasAttribute('data-iconpicker-live')) {
+				search.hidden = false;
+				roots[i].setAttribute('data-iconpicker-live', '');
+			}
+		}
+	}
+
+	function iconPickerFilter(root, query) {
+		var q = query.trim().toLowerCase();
+		var groups = root.querySelectorAll('[data-iconpicker-group]');
+		var found = 0;
+		for (var g = 0; g < groups.length; g++) {
+			var items = groups[g].querySelectorAll('[data-iconpicker-name]');
+			var shown = 0;
+			for (var i = 0; i < items.length; i++) {
+				var hit = !q || items[i].getAttribute('data-iconpicker-name').indexOf(q) >= 0;
+				items[i].hidden = !hit;
+				shown += hit ? 1 : 0;
+			}
+			groups[g].hidden = shown === 0;
+			found += shown;
+		}
+		var live = root.querySelector('[data-iconpicker-found]');
+		if (live) {
+			live.textContent = q ? (root.getAttribute('data-iconpicker') || '%1').replace('%1', String(found)) : '';
+		}
+	}
+
+	doc.addEventListener('input', function (e) {
+		var target = e.target;
+		var search = target && target.closest ? target.closest('[data-iconpicker-search]') : null;
+		var root = search ? search.closest('[data-iconpicker]') : null;
+		if (root) {
+			iconPickerFilter(root, target.value || '');
+		}
+	});
+
+	// Enter в строке поиска ничего не отправляет (у неё нет формы), а первый найденный
+	// значок выбирается — так поиск заканчивается выбором, а не тупиком.
+	doc.addEventListener('keydown', function (e) {
+		var target = e.target;
+		var search = e.key === 'Enter' && target && target.closest ? target.closest('[data-iconpicker-search]') : null;
+		var root = search ? search.closest('[data-iconpicker]') : null;
+		if (!root) {
+			return;
+		}
+		e.preventDefault();
+		var first = root.querySelector('[data-iconpicker-group]:not([hidden]) [data-iconpicker-name]:not([hidden]) .iconpicker__radio');
+		if (first && !first.disabled) {
+			first.checked = true;
+			first.dispatchEvent(new Event('change', { bubbles: true }));
+			first.focus();
+		}
+	});
+
+	// Значок выбранной ячейки — в узлы зеркала: у зеркала признаком (плашка, кнопка) — вместо
+	// её первого значка или первым ребёнком, у зеркала текстом — вместо текста; «без значка»
+	// снимает значок, а текстовому зеркалу возвращает напечатанное сервером.
+	function iconMirror(control, targets, attrTargets) {
+		var radio = control.checked ? control : null;
+		if (!radio) {
+			var list = doc.getElementsByName(control.name);
+			for (var i = 0; i < list.length; i++) {
+				if (list[i].checked) {
+					radio = list[i];
+				}
+			}
+		}
+		var picture = radio && radio.parentNode ? radio.parentNode.querySelector('svg') : null;
+		for (var a = 0; a < attrTargets.length; a++) {
+			var old = attrTargets[a].querySelector('svg.icon');
+			if (!picture) {
+				if (old) {
+					old.remove();
+				}
+			} else if (old) {
+				old.replaceWith(picture.cloneNode(true));
+			} else {
+				attrTargets[a].insertBefore(picture.cloneNode(true), attrTargets[a].firstChild);
+			}
+		}
+		for (var t = 0; t < targets.length; t++) {
+			var node = targets[t];
+			if (!(MIRROR_HTML in node)) {
+				node[MIRROR_HTML] = node.innerHTML;
+			}
+			if (picture) {
+				node.replaceChildren(picture.cloneNode(true));
+			} else {
+				node.innerHTML = node[MIRROR_HTML];
+			}
+		}
+	}
+	var MIRROR_HTML = 'oscriptUiMirrorHtml'; // свойство узла: разметка, напечатанная сервером
+
+	doc.addEventListener('oscript-ui:update', function () { iconPickerInit(); });
+	iconPickerInit();
+
+	/* --- 15. подсказка обрезанного имени --------------------------------------------
+	   Имя карточки объекта лист держит одной строкой с многоточием (.objcard__name). Что
+	   именно обрезано, знает только движок после раскладки, поэтому title ставится не
+	   сервером, а здесь — на наведении и только у обрезанного имени: у целого подсказка
+	   повторяла бы видимое. Свой title, напечатанный сервером, скрипт не трогает. */
+
+	var cutTitled = typeof WeakSet === 'function' ? new WeakSet() : null; // title поставил скрипт
+
+	doc.addEventListener('mouseover', function (e) {
+		var name = e.target && e.target.closest ? e.target.closest('.objcard__name') : null;
+		if (!name || !cutTitled || (name.hasAttribute('title') && !cutTitled.has(name))) {
+			return;
+		}
+		if (name.scrollWidth > name.clientWidth) {
+			name.setAttribute('title', name.textContent.replace(/\s+/g, ' ').trim());
+			cutTitled.add(name);
+		} else if (cutTitled.has(name)) {
+			name.removeAttribute('title');
+			cutTitled.delete(name);
+		}
+	});
+})();

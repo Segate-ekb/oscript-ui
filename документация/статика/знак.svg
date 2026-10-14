@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="oscript-ui">
+	<rect width="64" height="64" rx="16" fill="#6750a4"/>
+	<rect x="12" y="14" width="40" height="10" rx="5" fill="#eaddff"/>
+	<rect x="12" y="30" width="18" height="20" rx="6" fill="#d0bcff"/>
+	<rect x="34" y="30" width="18" height="20" rx="10" fill="#ffffff"/>
+</svg>
