@@ -96,6 +96,7 @@
 	Тексты.Вставить("checktree.mode.none", "Никакие");
 	Тексты.Вставить("checktree.mode.except", "Все, кроме");
 	Тексты.Вставить("checktree.picked", "Выбрано");
+	Тексты.Вставить("checktree.picked.more", "ещё %1");
 	Тексты.Вставить("checktree.picked.drop", "Снять «%1»");
 	Тексты.Вставить("checktree.picked.return", "Вернуть «%1»");
 	Тексты.Вставить("checktree.changes", "Изменений: %1");

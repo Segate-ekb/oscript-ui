@@ -1641,6 +1641,9 @@ span.checktree__item { cursor: default; }
 .checktree__picked-label { font: var(--type-label-medium); color: var(--md-sys-color-on-surface-variant); }
 .checktree__picked-list { display: flex; flex-wrap: wrap; gap: var(--space-1); min-width: 0; }
 .checktree__pick { max-width: 100%; }
+/* хвост ряда за пределом (дев-сборка 10): «ещё 120» — текстом или ссылкой на продолжение */
+.checktree__picked-more { font: var(--type-label-medium); color: var(--md-sys-color-on-surface-variant); }
+a.checktree__picked-more { color: var(--md-sys-color-primary); }
 .checktree__pick--off { color: var(--md-sys-color-on-error-container); background: var(--md-sys-color-error-container); }
 .checktree__unpick {
 	--_state: 0%;
