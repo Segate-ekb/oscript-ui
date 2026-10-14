@@ -239,11 +239,40 @@ async function закрытиеПереходом(b) {
   await ctx.close();
 }
 
+// П7: ворота вошедшего — учётка справа от пилюли, меню без дорог, шапка строкой на 390
+async function воротаВошедшего(b) {
+  for (const ширина of [1280, 390]) {
+    const ctx = await контекст(b, ширина);
+    const p = await ctx.newPage();
+    await p.goto(адрес('образец-входа') + '?' + new URLSearchParams({ 'вошедший': '1' }), { waitUntil: 'networkidle' });
+    const кнопка = p.locator('header .hubmenu__user button');
+    проверить(await кнопка.isVisible() && (await кнопка.innerText()).includes('мария'), `П7 ${ширина}: учётка вошедшего в шапке`);
+    const строкой = await p.evaluate(() => {
+      const r = (s) => document.querySelector(s).getBoundingClientRect();
+      const a = r('header .brand'), t = r('header .theme-switch'), u = r('header .hubmenu__user');
+      return Math.abs((a.top + a.bottom) / 2 - (u.top + u.bottom) / 2) < 6 && t.right <= u.left + 1;
+    });
+    проверить(строкой, `П7 ${ширина}: знак, пилюля и учётка — одной строкой, учётка справа от пилюли`);
+    проверить(await p.locator('header .tree--top').count() === 0, `П7 ${ширина}: дорог в шапке нет`);
+    await кнопка.click();
+    await p.waitForTimeout(400);
+    const панель = p.locator('.hubmenu');
+    проверить(await панель.isVisible() && (await панель.innerText()).includes('Выйти'), `П7 ${ширина}: меню открылось, в нём «Выйти»`);
+    проверить(await p.locator('.hubmenu__section--roads').count() === 0, `П7 ${ширина}: в меню нет дорог`);
+    await ctx.close();
+  }
+  const ctx = await контекст(b, 390);
+  const p = await ctx.newPage();
+  await p.goto(адрес('образец-входа'), { waitUntil: 'networkidle' });
+  проверить(await p.locator('.hubmenu__user').count() === 0 && await p.locator('.hubmenu').count() === 0, 'П7: гостю учётки и меню нет');
+  await ctx.close();
+}
+
 (async () => {
   const b = await браузер();
   const шаги = [['режимы со скриптом', режимыСоСкриптом], ['режимы без скрипта', режимыБезСкрипта],
     ['страница ветки', страницаВетки], ['режимы строкой', режимыСтрокой],
-    ['закрытие переходом', закрытиеПереходом]];
+    ['закрытие переходом', закрытиеПереходом], ['ворота вошедшего', воротаВошедшего]];
   for (const [имя, шаг] of шаги) {
     try {
       await шаг(b);
