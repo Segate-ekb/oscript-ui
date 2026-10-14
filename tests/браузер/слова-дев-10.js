@@ -197,10 +197,36 @@ async function страницаВетки(b) {
   await ctx2.close();
 }
 
+// П16а: сегменты режима у строки дерева — строкой на 390, и в окне
+async function режимыСтрокой(b) {
+  for (const тема of ['светлая', 'тёмная']) {
+    const ctx = await контекст(b, 390, true, тема);
+    const p = await ctx.newPage();
+    await p.goto(ПОЛУЧАТЕЛИ, { waitUntil: 'networkidle' });
+    await p.evaluate(() => {
+      const form = document.querySelector('form:has([data-checktree-set])');
+      const d = document.createElement('dialog');
+      d.className = 'modal';
+      d.innerHTML = '<div class="modal__box"><div class="modal__head"><h2 class="modal__title">Получатели</h2></div><div class="modal__body"></div></div>';
+      d.querySelector('.modal__body').appendChild(form);
+      document.body.appendChild(d);
+      d.showModal();
+    });
+    const ряды = await p.evaluate(() => [...document.querySelectorAll('dialog [data-checktree-modes]')].map((g) => {
+      const tops = [...g.querySelectorAll('.segments__item')].map((x) => Math.round(x.getBoundingClientRect().top));
+      return { строкой: tops.every((t) => t === tops[0]), высота: Math.round(g.getBoundingClientRect().height) };
+    }));
+    проверить(ряды.length === 6 && ряды.every((r) => r.строкой && r.высота <= 36),
+      `П16а ${тема}: в окне на 390 сегменты каждой ветки — одной строкой (${JSON.stringify(ряды[0])})`);
+    await снимок(p.locator('dialog .modal__box'), `п16а-режимы-в-окне-390-${тема}`);
+    await ctx.close();
+  }
+}
+
 (async () => {
   const b = await браузер();
   const шаги = [['режимы со скриптом', режимыСоСкриптом], ['режимы без скрипта', режимыБезСкрипта],
-    ['страница ветки', страницаВетки]];
+    ['страница ветки', страницаВетки], ['режимы строкой', режимыСтрокой]];
   for (const [имя, шаг] of шаги) {
     try {
       await шаг(b);

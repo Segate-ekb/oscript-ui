@@ -4425,6 +4425,38 @@ div.entry__head:hover { --_state: 0%; }
 	}
 }
 
+/* Сегменты режима у строки дерева галок (дев-сборка 10, ревью ui-получатели-2 П4) — строкой на
+   любой ширине. Правила выше (телефон — во всю ширину с переносом подписей, окно — столбиком
+   от четырёх-пяти сегментов) для выбора в форме, а у строки дерева сегменты — её короткое
+   действие: столбиком они удлиняли каждую строку в 3–4 раза, и окно получателей на 38 веток
+   становилось втрое длиннее. Здесь пилюля — малыми сегментами своей ширины, подписи не
+   переносятся (не влезли — многоточие у длинной), строка ветки переносит пилюлю под подпись
+   целиком. Правила стоят после правил окна и телефона и не слабее их: побеждают порядком. */
+.checktree__row > .segments.checktree__modes {
+	display: inline-grid;
+	grid-auto-flow: column;
+	grid-auto-columns: minmax(0, auto);
+	width: auto;
+	max-width: 100%;
+	border-radius: var(--md-sys-shape-corner-full);
+}
+.checktree__row > .segments.checktree__modes > .segments__item + .segments__item {
+	border-top: 0;
+	border-left: 1px solid var(--md-sys-color-outline);
+}
+.checktree__row > .segments.checktree__modes > .segments__item > .segments__label { padding: 0 var(--space-2); border-radius: 0; }
+.checktree__row > .segments.checktree__modes > .segments__item:first-child > .segments__label {
+	border-radius: var(--md-sys-shape-corner-full) 0 0 var(--md-sys-shape-corner-full);
+}
+.checktree__row > .segments.checktree__modes > .segments__item:last-child > .segments__label {
+	border-radius: 0 var(--md-sys-shape-corner-full) var(--md-sys-shape-corner-full) 0;
+}
+.checktree__row > .segments.checktree__modes .segments__text {
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	text-align: start;
+}
+
 /* Источник значения сегментов (слово Источник, 0.13 дев-сборка 6) — справка о значении, как
    у поля и тумблера: мелко и приглушённо. Сервер печатает его перед группой, и он стоит
    справа на строке подписи группы: подпись (<legend>) встаёт влево обтеканием, источник —
