@@ -3162,8 +3162,17 @@
 		var more = link.closest('[data-checktree-more]');
 		var key = more.getAttribute('data-checktree-more');
 		var host = more.parentElement;
-		var list = host ? ctChild(host, 'checktree__children') || host.querySelector(':scope > [data-checktree]') : null;
-		if (!list || list.getAttribute('data-checktree-page') !== key || more[CT_BUSY]) {
+		// список ветки: в дереве — дети узла или корень; на странице ветки (дев-сборка 10) —
+		// список с её ключом рядом со строкой «Показать ещё»
+		var list = host ? ctChild(host, 'checktree__children') || host.querySelector(':scope > [data-checktree]')
+			|| host.querySelector(':scope > [data-checktree-page]') : null;
+		if (!list || list.getAttribute('data-checktree-page') !== key) {
+			if (navigate) {
+				location.assign(link.href);
+			}
+			return;
+		}
+		if (more[CT_BUSY]) {
 			return;
 		}
 		more[CT_BUSY] = true;
@@ -3229,7 +3238,7 @@
 		// дев-сборка 10: дети ветки с режимом встают по режиму, который отмечен сейчас, а не
 		// по тому, с которым сервер напечатал страницу: «все» | «никакие» — заперты его
 		// состоянием, «выбранные» после массовой отметки — её основой
-		var group = node ? ctGroupOf(node) : null;
+		var group = node ? ctGroupOf(node) : ctHeadGroup(list);
 		var mode = group ? ctModeOf(group) : '';
 		var lock = mode === 'все' || mode === 'никакие';
 		var base = group ? group[CT_BASE] || '' : '';

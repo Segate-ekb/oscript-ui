@@ -1602,6 +1602,9 @@ a.tag:hover { --_state: var(--state-hover); text-decoration: none; }
 .checktree__page .button[aria-busy="true"] { cursor: progress; opacity: .6; }
 span.checktree__item { cursor: default; }
 .checktree__modes { margin-left: auto; }
+/* Строка ветки над страницей её детей (дев-сборка 10): подпись и сегменты режима, без места
+   под шеврон — раскрывать на странице ветки нечего. */
+.checktree__head { padding-left: 0; }
 .checktree__node:has(> .checktree__row > .checktree__modes > .segments__item > [value="все"]:checked) > .checktree__branch > .checktree__children,
 .checktree__node:has(> .checktree__row > .checktree__modes > .segments__item > [value="никакие"]:checked) > .checktree__branch > .checktree__children {
 	pointer-events: none;

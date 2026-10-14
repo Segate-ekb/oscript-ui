@@ -160,9 +160,47 @@ async function режимыБезСкрипта(b) {
   await ctx.close();
 }
 
+// П16: страница ветки без скрипта — режим ветки, запертые дети, ряд отмеченного
+async function страницаВетки(b) {
+  const ctx = await контекст(b, 1280, false);
+  const p = await ctx.newPage();
+  await p.goto((ПОЛУЧАТЕЛИ + '/' + encodeURIComponent('ветка')) + '?' + new URLSearchParams({ 'ветка': 'epsilon', 'страница': '1' }),
+    { waitUntil: 'networkidle' });
+  проверить(await p.locator('[data-checktree-head] [data-checktree-modes="epsilon"] input[value="никакие"]').isChecked(),
+    'П16: на странице ветки — её режим сегментами');
+  const д = await ветка(p, 'epsilon').evaluate((el) => [...el.querySelectorAll('[data-checktree-box]')].map((x) => x.checked || !x.disabled));
+  проверить(д.length === 45 && д.every((x) => !x), `П16: дети «никакие» сняты и заперты (${д.length})`);
+  проверить(await p.locator('[data-checktree-shown]').count() === 1, 'П16: поле показанного на странице ветки');
+  await снимок(p.locator('form#vybor-poluchateley'), 'п16-страница-ветки-без-скрипта-1280');
+  await p.locator('[data-checktree-head] label:has(input[value="выбранные"])').click();
+  await p.locator('button', { hasText: 'Сохранить получателей' }).click({ noWaitAfter: true });
+  await p.waitForURL((u) => decodeURIComponent(u.toString()).includes('пришло='), { waitUntil: 'commit' });
+  await p.waitForSelector('.toast', { state: 'attached' });
+  const тост = await p.locator('.toast').first().textContent();
+  проверить(тост.includes('epsilon — выбранные от «никакие»'), `П16: смена режима со страницы ветки ушла («${тост.trim().slice(0, 140)}»)`);
+
+  // страница гаммы — с рядом отмеченного вне показанного
+  await p.goto((ПОЛУЧАТЕЛИ + '/' + encodeURIComponent('ветка')) + '?' + new URLSearchParams({ 'ветка': 'gamma', 'страница': '1' }),
+    { waitUntil: 'networkidle' });
+  проверить(await p.locator('[data-checktree-picked] [data-checktree-pick]').count() === 3, 'П16: ряд отмеченного на странице ветки');
+  проверить(await p.locator('[data-checktree-more="gamma"] a').count() === 1, 'П16: «Показать ещё» на странице ветки');
+  await ctx.close();
+
+  // со скриптом страница ветки дописывает следующую в себя
+  const ctx2 = await контекст(b, 1280);
+  const q = await ctx2.newPage();
+  await q.goto((ПОЛУЧАТЕЛИ + '/' + encodeURIComponent('ветка')) + '?' + new URLSearchParams({ 'ветка': 'gamma', 'страница': '1' }),
+    { waitUntil: 'networkidle' });
+  await q.locator('[data-checktree-more="gamma"] a').click();
+  await q.waitForFunction(() => document.querySelectorAll('[data-checktree-page="gamma"] > li').length > 50);
+  проверить(true, 'П16: со скриптом «Показать ещё» на странице ветки дописывает детей');
+  await ctx2.close();
+}
+
 (async () => {
   const b = await браузер();
-  const шаги = [['режимы со скриптом', режимыСоСкриптом], ['режимы без скрипта', режимыБезСкрипта]];
+  const шаги = [['режимы со скриптом', режимыСоСкриптом], ['режимы без скрипта', режимыБезСкрипта],
+    ['страница ветки', страницаВетки]];
   for (const [имя, шаг] of шаги) {
     try {
       await шаг(b);
