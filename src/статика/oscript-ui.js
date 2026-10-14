@@ -959,6 +959,18 @@
 		box.close();
 	});
 
+	// Окно, которое закрывается только переходом (дев-сборка 10, слово Переходом): Esc не
+	// закрывает его на месте — секрет остался бы в DOM, а вкладка на ответе POST, — а уводит
+	// на адрес закрытия, как его крестик.
+	doc.addEventListener('cancel', function (e) {
+		var box = e.target;
+		var to = box && box.getAttribute ? box.getAttribute('data-close-to') : null;
+		if (to && box.tagName === 'DIALOG') {
+			e.preventDefault();
+			location.assign(to);
+		}
+	}, true);
+
 	/* ссылка-кнопка окна этой страницы */
 
 	// Окно уже на странице — запрос не нужен: открываем его, как команда show-modal. Щелчок

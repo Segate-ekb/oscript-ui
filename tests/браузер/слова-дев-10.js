@@ -223,10 +223,27 @@ async function режимыСтрокой(b) {
   }
 }
 
+// П20: окно с секретом закрывается только переходом — крестик без закрытия на месте, Esc уводит
+async function закрытиеПереходом(b) {
+  const ctx = await контекст(b, 1280);
+  const p = await ctx.newPage();
+  await p.goto(адрес('окно') + '#vypushchen', { waitUntil: 'networkidle' });
+  const блок = образец(p, 'Секрет показан один раз');
+  await блок.locator('button', { hasText: 'Выпустить токен' }).click();
+  await p.waitForFunction(() => document.getElementById('vypushchen') && document.getElementById('vypushchen').open);
+  проверить(await p.locator('#vypushchen [data-closes]').count() === 0, 'П20: у окна нет закрытия на месте');
+  await p.evaluate(() => { window.__метка = 1; });
+  await Promise.all([p.waitForNavigation({ waitUntil: 'load' }), p.keyboard.press('Escape')]);
+  проверить(await p.evaluate(() => window.__метка === undefined) && decodeURIComponent(p.url()).endsWith('/окно'),
+    `П20: Esc увёл на адрес закрытия (${decodeURIComponent(p.url())})`);
+  await ctx.close();
+}
+
 (async () => {
   const b = await браузер();
   const шаги = [['режимы со скриптом', режимыСоСкриптом], ['режимы без скрипта', режимыБезСкрипта],
-    ['страница ветки', страницаВетки], ['режимы строкой', режимыСтрокой]];
+    ['страница ветки', страницаВетки], ['режимы строкой', режимыСтрокой],
+    ['закрытие переходом', закрытиеПереходом]];
   for (const [имя, шаг] of шаги) {
     try {
       await шаг(b);
